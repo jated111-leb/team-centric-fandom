@@ -14,19 +14,29 @@ const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCompetition, setSelectedCompetition] = useState("all");
   const [selectedPriority, setSelectedPriority] = useState("all");
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { data: matches = [], isLoading, refetch } = useQuery({
-    queryKey: ['matches'],
+    queryKey: ['matches', selectedTeams],
     queryFn: async () => {
       const today = new Date().toISOString().split('T')[0];
       const fourWeeksFromNow = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('matches')
         .select('*')
         .gte('match_date', today)
-        .lte('match_date', fourWeeksFromNow)
+        .lte('match_date', fourWeeksFromNow);
+
+      // Filter by selected teams if any are chosen
+      if (selectedTeams.length > 0) {
+        query = query.or(
+          selectedTeams.map(team => `home_team.eq.${team},away_team.eq.${team}`).join(',')
+        );
+      }
+
+      const { data, error } = await query
         .order('match_date', { ascending: true })
         .order('match_time', { ascending: true });
 
@@ -183,6 +193,8 @@ const Index = () => {
           onCompetitionChange={setSelectedCompetition}
           selectedPriority={selectedPriority}
           onPriorityChange={setSelectedPriority}
+          selectedTeams={selectedTeams}
+          onTeamsChange={setSelectedTeams}
         />
 
         <Card className="shadow-card">
