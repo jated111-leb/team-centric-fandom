@@ -67,12 +67,38 @@ export default function Admin() {
 
       setIsAdmin(true);
       fetchFeatureFlag();
-      setCampaignId(import.meta.env.VITE_BRAZE_CAMPAIGN_ID || 'Not configured');
+      fetchBrazeConfig();
     } catch (error) {
       console.error('Auth check error:', error);
       window.location.href = '/auth';
     } finally {
       setCheckingAuth(false);
+    }
+  };
+
+  const fetchBrazeConfig = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-braze-config`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setCampaignId(data.campaignId || 'Not configured');
+      } else {
+        setCampaignId('Not configured');
+      }
+    } catch (error) {
+      console.error('Error fetching Braze config:', error);
+      setCampaignId('Not configured');
     }
   };
 
