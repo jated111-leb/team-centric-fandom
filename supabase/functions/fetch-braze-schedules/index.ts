@@ -23,9 +23,16 @@ serve(async (req) => {
     console.log('Fetching scheduled messages from Braze...');
     console.log('Campaign ID:', BRAZE_CAMPAIGN_ID);
 
-    // Fetch all scheduled messages from Braze
+    // Calculate end_time (30 days from now) in ISO-8601 format
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 30);
+    const endTime = endDate.toISOString();
+
+    console.log('Fetching schedules until:', endTime);
+
+    // Fetch all scheduled messages from Braze (requires end_time parameter)
     const brazeResponse = await fetch(
-      `${BRAZE_REST_ENDPOINT}/messages/scheduled_broadcasts`,
+      `${BRAZE_REST_ENDPOINT}/messages/scheduled_broadcasts?end_time=${encodeURIComponent(endTime)}`,
       {
         method: 'GET',
         headers: {
