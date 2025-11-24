@@ -121,7 +121,7 @@ export const ScheduledNotificationsTable = () => {
             No scheduled notifications found
           </div>
         ) : (
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

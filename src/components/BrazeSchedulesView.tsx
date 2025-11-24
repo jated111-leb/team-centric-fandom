@@ -151,7 +151,7 @@ export const BrazeSchedulesView = () => {
         )}
 
         {schedules.length > 0 && (
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
