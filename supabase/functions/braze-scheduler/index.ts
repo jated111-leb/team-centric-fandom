@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
       
       const timeStr = `${hours12}:${minutes.toString().padStart(2, '0')}`;
       const dateStr = `${day.toString().padStart(2, '0')}-${month.toString().padStart(2, '0')}-${year}`;
-      const kickoff_ar = toArabicDigits(`الساعة ${timeStr} ${ampm} ${dateStr}`);
+      const kickoff_ar = toArabicDigits(`الساعة ${timeStr} ${ampm} ${dateStr} (توقيت بغداد)`);
       
       // Format kickoff_baghdad: "YYYY-MM-DD HH:MM" in Baghdad timezone
       const kickoff_baghdad = formatInTimeZone(kickoffDate, BAGHDAD_TIMEZONE, 'yyyy-MM-dd HH:mm');
