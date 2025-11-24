@@ -4,9 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface BrazeSchedule {
   schedule_id: string;
@@ -21,6 +31,8 @@ export const BrazeSchedulesView = () => {
   const [schedules, setSchedules] = useState<BrazeSchedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null);
+  const [scheduleToDelete, setScheduleToDelete] = useState<BrazeSchedule | null>(null);
   const { toast } = useToast();
 
   const fetchBrazeSchedules = async () => {
@@ -51,6 +63,37 @@ export const BrazeSchedulesView = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteSchedule = async (schedule: BrazeSchedule) => {
+    setDeletingScheduleId(schedule.schedule_id);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-braze-schedule', {
+        body: { schedule_id: schedule.schedule_id },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setSchedules(prev => prev.filter(s => s.schedule_id !== schedule.schedule_id));
+        toast({
+          title: "Schedule Deleted",
+          description: "The notification has been removed from Braze",
+        });
+      } else {
+        throw new Error(data.error || 'Failed to delete schedule');
+      }
+    } catch (error) {
+      console.error('Error deleting schedule:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete schedule",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingScheduleId(null);
+      setScheduleToDelete(null);
     }
   };
 
@@ -118,6 +161,7 @@ export const BrazeSchedulesView = () => {
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Last Updated</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -143,6 +187,21 @@ export const BrazeSchedulesView = () => {
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(schedule.updated_at), 'MMM dd, HH:mm')}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setScheduleToDelete(schedule)}
+                        disabled={deletingScheduleId === schedule.schedule_id}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        {deletingScheduleId === schedule.schedule_id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -150,6 +209,34 @@ export const BrazeSchedulesView = () => {
           </div>
         )}
       </CardContent>
+
+      <AlertDialog open={!!scheduleToDelete} onOpenChange={() => setScheduleToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Scheduled Notification</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this scheduled notification from Braze? This action cannot be undone.
+              {scheduleToDelete && (
+                <div className="mt-4 p-3 rounded-lg bg-muted text-sm">
+                  <div className="font-medium">{scheduleToDelete.name || 'Unnamed notification'}</div>
+                  <div className="text-muted-foreground mt-1">
+                    Scheduled for: {format(new Date(scheduleToDelete.send_at), 'MMM dd, yyyy HH:mm')}
+                  </div>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => scheduleToDelete && deleteSchedule(scheduleToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
