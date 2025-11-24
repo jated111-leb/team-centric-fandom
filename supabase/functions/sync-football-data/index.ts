@@ -22,23 +22,21 @@ const COMPETITION_CODES = {
   'ELC': 'Carabao_Cup'
 };
 
-const STAR_TEAMS = [
-  'Real Madrid', 'Barcelona', 'Manchester City', 'Liverpool',
-  'Bayern Munich', 'Paris Saint-Germain', 'Juventus', 'AC Milan',
-  'Inter Milan', 'Arsenal', 'Manchester United', 'Chelsea', 'Tottenham'
+const FEATURED_TEAMS = [
+  'Real Madrid CF',
+  'FC Barcelona',
+  'Manchester City FC',
+  'Manchester United FC',
+  'Liverpool FC',
+  'Arsenal FC',
+  'FC Bayern München',
+  'Paris Saint-Germain FC',
+  'Juventus FC',
+  'Inter Milan',
 ];
 
-function normalizeTeamName(name: string): string {
-  return name
-    .replace(/\b(FC|CF|Club|United|City|Athletic|Real|SL|AC|AS|SC)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
 function isStarTeam(teamName: string): boolean {
-  const normalized = normalizeTeamName(teamName);
-  return STAR_TEAMS.some(star => normalizeTeamName(star) === normalized);
+  return FEATURED_TEAMS.includes(teamName);
 }
 
 function calculatePriority(match: any, competition: string): { priority: string, score: number, reason: string } {
