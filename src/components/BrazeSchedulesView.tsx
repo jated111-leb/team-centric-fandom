@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, RefreshCw, Trash2 } from "lucide-react";
-import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { formatBaghdadTime } from "@/lib/timezone";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -133,7 +133,7 @@ export const BrazeSchedulesView = () => {
         </div>
         {lastFetched && (
           <p className="text-xs text-muted-foreground mt-2">
-            Last fetched: {format(lastFetched, 'MMM dd, yyyy HH:mm:ss')}
+            Last fetched: {formatBaghdadTime(lastFetched, 'MMM dd, yyyy HH:mm:ss')} Baghdad Time
           </p>
         )}
       </CardHeader>
@@ -157,7 +157,7 @@ export const BrazeSchedulesView = () => {
                 <TableRow>
                   <TableHead>Schedule ID</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Send Time (UTC)</TableHead>
+                  <TableHead>Send Time (Baghdad)</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Last Updated</TableHead>
@@ -176,16 +176,17 @@ export const BrazeSchedulesView = () => {
                       {schedule.name || 'Unnamed'}
                     </TableCell>
                     <TableCell>
-                      {format(new Date(schedule.send_at), 'MMM dd, yyyy HH:mm')}
+                      <div>{formatBaghdadTime(new Date(schedule.send_at), 'MMM dd, yyyy HH:mm')}</div>
+                      <div className="text-xs text-muted-foreground">Baghdad Time</div>
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(schedule.send_at)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(schedule.created_at), 'MMM dd, HH:mm')}
+                      {formatBaghdadTime(new Date(schedule.created_at), 'MMM dd, HH:mm')}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(schedule.updated_at), 'MMM dd, HH:mm')}
+                      {formatBaghdadTime(new Date(schedule.updated_at), 'MMM dd, HH:mm')}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -220,7 +221,7 @@ export const BrazeSchedulesView = () => {
                 <div className="mt-4 p-3 rounded-lg bg-muted text-sm">
                   <div className="font-medium">{scheduleToDelete.name || 'Unnamed notification'}</div>
                   <div className="text-muted-foreground mt-1">
-                    Scheduled for: {format(new Date(scheduleToDelete.send_at), 'MMM dd, yyyy HH:mm')}
+                    Scheduled for: {formatBaghdadTime(new Date(scheduleToDelete.send_at), 'MMM dd, yyyy HH:mm')} Baghdad Time
                   </div>
                 </div>
               )}
