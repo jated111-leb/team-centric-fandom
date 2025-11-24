@@ -173,9 +173,28 @@ Deno.serve(async (req) => {
       // Format kickoff time for Arabic display (Riyadh timezone UTC+3)
       const riyadhOffset = 3 * 60; // UTC+3 in minutes
       const riyadhTime = new Date(kickoffDate.getTime() + riyadhOffset * 60 * 1000);
-      const hours = riyadhTime.getUTCHours();
+      
+      // Helper to convert digits to Arabic numerals
+      const toArabicDigits = (str: string) => {
+        const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        return str.replace(/\d/g, (d) => arabicDigits[parseInt(d)]);
+      };
+      
+      // Format kickoff_ar: "الساعة ٨:٠٠ م ٢٥-١١-٢٠٢٥"
+      const hours24 = riyadhTime.getUTCHours();
       const minutes = riyadhTime.getUTCMinutes();
-      const kickoff_ar = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      const hours12 = hours24 % 12 || 12;
+      const ampm = hours24 < 12 ? 'ص' : 'م';
+      const day = riyadhTime.getUTCDate();
+      const month = riyadhTime.getUTCMonth() + 1;
+      const year = riyadhTime.getUTCFullYear();
+      
+      const timeStr = `${hours12}:${minutes.toString().padStart(2, '0')}`;
+      const dateStr = `${day.toString().padStart(2, '0')}-${month.toString().padStart(2, '0')}-${year}`;
+      const kickoff_ar = toArabicDigits(`الساعة ${timeStr} ${ampm} ${dateStr}`);
+      
+      // Format kickoff_baghdad: "YYYY-MM-DD HH:MM"
+      const kickoff_baghdad = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
       // Skip if send window has passed
       if (sendAtDate <= now) {
@@ -227,6 +246,7 @@ Deno.serve(async (req) => {
         home_ar: teamArabicMap.get(match.home_team) || match.home_team,
         away_ar: teamArabicMap.get(match.away_team) || match.away_team,
         kickoff_utc: match.utc_date,
+        kickoff_baghdad: kickoff_baghdad,
         kickoff_ar: kickoff_ar,
         sig: signature,
       };
@@ -375,6 +395,73 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Braze scheduler complete: scheduled=${scheduled}, updated=${updated}, skipped=${skipped}`);
+
+    // Post-run deduplication: remove any duplicate fixture schedules
+    try {
+      console.log('Running post-run deduplication...');
+      const brazeApiKey = Deno.env.get('BRAZE_API_KEY')!;
+      const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT')!;
+      const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID')!;
+      const daysAhead = 365;
+      const endIso = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString();
+
+      const brazeRes = await fetch(
+        `${brazeEndpoint}/messages/scheduled_broadcasts?end_time=${encodeURIComponent(endIso)}`,
+        { method: 'GET', headers: { 'Authorization': `Bearer ${brazeApiKey}` } }
+      );
+
+      if (brazeRes.ok) {
+        const brazeData = await brazeRes.json();
+        const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
+          b.campaign_id === brazeCampaignId ||
+          b.campaign_api_id === brazeCampaignId ||
+          b.campaign_api_identifier === brazeCampaignId
+        );
+
+        const byFixture = new Map<string, any[]>();
+        const now = new Date();
+
+        for (const broadcast of ourBroadcasts) {
+          const sendTime = new Date(broadcast.next_send_time);
+          if (sendTime <= now) continue;
+
+          const props = broadcast.trigger_properties || {};
+          const key = [
+            String(props.competition_key || '').toLowerCase(),
+            String(props.kickoff_utc || '').slice(0, 16),
+            String(props.home_en || '').toLowerCase(),
+            String(props.away_en || '').toLowerCase()
+          ].join('|');
+
+          if (!key.replace(/\|/g, '').length) continue;
+          if (!byFixture.has(key)) byFixture.set(key, []);
+          byFixture.get(key)!.push(broadcast);
+        }
+
+        let deduped = 0;
+        for (const [fixtureKey, schedules] of byFixture.entries()) {
+          if (schedules.length <= 1) continue;
+          schedules.sort((a, b) => new Date(a.next_send_time).getTime() - new Date(b.next_send_time).getTime());
+          const duplicates = schedules.slice(1);
+
+          for (const dup of duplicates) {
+            try {
+              const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${brazeApiKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ campaign_id: brazeCampaignId, schedule_id: dup.schedule_id }),
+              });
+              if (cancelRes.ok || cancelRes.status === 404) deduped++;
+            } catch (e) {
+              console.error(`Dedupe cancel failed for ${dup.schedule_id}:`, e);
+            }
+          }
+        }
+        console.log(`Post-run deduplication complete: removed ${deduped} duplicate schedules`);
+      }
+    } catch (error) {
+      console.error('Post-run deduplication failed:', error);
+    }
 
     // Phase 2: Release advisory lock
     await supabase.rpc('pg_advisory_unlock', { key: lockKey });

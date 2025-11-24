@@ -93,6 +93,28 @@ export function SchedulerStats() {
     }
   };
 
+  const runDedupe = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('braze-dedupe-fixtures');
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Deduplication Complete',
+        description: `Removed ${data.cancelled_count} duplicate schedules across ${data.total_fixtures} fixtures`,
+      });
+      
+      fetchLogs();
+    } catch (error) {
+      console.error('Error running dedupe:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to run deduplication',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const openDebugConsole = async () => {
     try {
       const { data, error } = await supabase.functions.invoke('braze-debug', {
@@ -176,6 +198,14 @@ export function SchedulerStats() {
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
               Run Reconcile
+            </Button>
+            <Button
+              onClick={runDedupe}
+              size="sm"
+              variant="outline"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Dedupe Fixtures
             </Button>
             <Button
               onClick={openDebugConsole}
