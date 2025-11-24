@@ -1,7 +1,7 @@
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
+import { CompetitionBadge } from "./CompetitionBadge";
 import type { Match } from "@/types/match";
 
 interface MatchRowProps {
@@ -12,9 +12,7 @@ export const MatchRow = ({ match }: MatchRowProps) => {
   return (
     <TableRow className="hover:bg-muted/50 transition-colors">
       <TableCell className="font-medium">
-        <Badge variant="secondary" className="text-xs">
-          {match.competition.replace(/_/g, " ")}
-        </Badge>
+        <CompetitionBadge competition={match.competition} />
       </TableCell>
       <TableCell className="text-center text-muted-foreground">
         {match.matchday || "—"}
