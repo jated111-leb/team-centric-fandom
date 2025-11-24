@@ -45,6 +45,7 @@ const Index = () => {
         matchday: match.matchday || '',
         date: match.match_date,
         time: match.match_time || '',
+        utcDate: match.utc_date,
         homeTeam: match.home_team,
         awayTeam: match.away_team,
         status: match.status as Match['status'],

@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
-import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { formatBaghdadTime } from "@/lib/timezone";
 
 interface ScheduledNotification {
   id: string;
@@ -128,7 +128,7 @@ export const ScheduledNotificationsTable = () => {
                   <TableHead>Match</TableHead>
                   <TableHead>Competition</TableHead>
                   <TableHead>Match Date</TableHead>
-                  <TableHead>Send Time (UTC)</TableHead>
+                  <TableHead>Send Time (Baghdad)</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Braze Schedule ID</TableHead>
                   <TableHead>Last Updated</TableHead>
@@ -152,10 +152,10 @@ export const ScheduledNotificationsTable = () => {
                     <TableCell>
                       {notification.matches?.match_date ? (
                         <div>
-                          <div>{format(new Date(notification.matches.match_date), 'MMM dd, yyyy')}</div>
+                          <div>{formatBaghdadTime(new Date(notification.matches.match_date), 'MMM dd, yyyy')}</div>
                           {notification.matches.match_time && (
                             <div className="text-xs text-muted-foreground">
-                              {notification.matches.match_time}
+                              {notification.matches.match_time} Baghdad
                             </div>
                           )}
                         </div>
@@ -164,7 +164,8 @@ export const ScheduledNotificationsTable = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {format(new Date(notification.send_at_utc), 'MMM dd, yyyy HH:mm')}
+                      <div>{formatBaghdadTime(new Date(notification.send_at_utc), 'MMM dd, yyyy HH:mm')}</div>
+                      <div className="text-xs text-muted-foreground">Baghdad Time</div>
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(notification.send_at_utc)}
@@ -175,7 +176,7 @@ export const ScheduledNotificationsTable = () => {
                       </code>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(notification.updated_at), 'MMM dd, HH:mm')}
+                      {formatBaghdadTime(new Date(notification.updated_at), 'MMM dd, HH:mm')}
                     </TableCell>
                   </TableRow>
                 ))}

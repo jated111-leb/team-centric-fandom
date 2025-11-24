@@ -4,9 +4,10 @@ export type Match = {
   matchday: string;
   date: string;
   time: string;
+  utcDate?: string; // UTC timestamp for timezone conversions
   homeTeam: string;
   awayTeam: string;
-  status: "SCHEDULED" | "LIVE" | "IN_PLAY" | "PAUSED" | "FINISHED" | "POSTPONED" | "CANCELLED";
+  status: "SCHEDULED" | "LIVE" | "IN_PLAY" | "PAUSED" | "FINISHED" | "POSTPONED" | "CANCELLED" | "TIMED";
   score: string;
   stage: string;
   priority: "High" | "Medium" | "Low";
