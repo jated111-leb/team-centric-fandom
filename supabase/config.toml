@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.fetch-braze-schedules]
 verify_jwt = false
+
+[functions.delete-braze-schedule]
+verify_jwt = false
