@@ -18,12 +18,63 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [campaignId, setCampaignId] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchFeatureFlag();
-    setCampaignId(import.meta.env.VITE_BRAZE_CAMPAIGN_ID || 'Not configured');
+    checkAdminAccess();
   }, []);
+
+  const checkAdminAccess = async () => {
+    try {
+      // Check if user is logged in
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        window.location.href = '/auth';
+        return;
+      }
+
+      // Check if user has admin role
+      const { data: roles, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking admin role:', error);
+        toast({
+          title: 'Access Denied',
+          description: 'Unable to verify admin access',
+          variant: 'destructive',
+        });
+        window.location.href = '/auth';
+        return;
+      }
+
+      if (!roles) {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have admin access',
+          variant: 'destructive',
+        });
+        window.location.href = '/auth';
+        return;
+      }
+
+      setIsAdmin(true);
+      fetchFeatureFlag();
+      setCampaignId(import.meta.env.VITE_BRAZE_CAMPAIGN_ID || 'Not configured');
+    } catch (error) {
+      console.error('Auth check error:', error);
+      window.location.href = '/auth';
+    } finally {
+      setCheckingAuth(false);
+    }
+  };
 
   const fetchFeatureFlag = async () => {
     try {
@@ -76,12 +127,16 @@ export default function Admin() {
     }
   };
 
-  if (loading) {
+  if (checkingAuth || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (!isAdmin) {
+    return null; // Will redirect to /auth
   }
 
   return (

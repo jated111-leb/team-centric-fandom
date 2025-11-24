@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScheduleFilters } from "@/components/ScheduleFilters";
 import { MatchRow } from "@/components/MatchRow";
+import { AdminSetupButton } from "@/components/AdminSetupButton";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar, TrendingUp, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -167,16 +168,25 @@ const Index = () => {
                   </span>
                 </div>
               </div>
-              <Button 
-                onClick={handleRefresh} 
-                disabled={isRefreshing}
-                variant="outline"
-                size="sm"
-                className="ml-4"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Syncing...' : 'Refresh Data'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <AdminSetupButton />
+                <Button 
+                  onClick={() => window.location.href = '/auth'}
+                  variant="outline"
+                  size="sm"
+                >
+                  Admin Login
+                </Button>
+                <Button 
+                  onClick={handleRefresh} 
+                  disabled={isRefreshing}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Syncing...' : 'Refresh Data'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
