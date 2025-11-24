@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Calendar, TrendingUp, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import type { Match } from "@/types/match";
+import { FEATURED_TEAMS } from "@/lib/teamConfig";
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,20 +24,16 @@ const Index = () => {
       const today = new Date().toISOString().split('T')[0];
       const fourWeeksFromNow = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      let query = supabase
+      const teamsToFilter = selectedTeams.length > 0 ? selectedTeams : Array.from(FEATURED_TEAMS);
+
+      const { data, error } = await supabase
         .from('matches')
         .select('*')
         .gte('match_date', today)
-        .lte('match_date', fourWeeksFromNow);
-
-      // Filter by selected teams if any are chosen
-      if (selectedTeams.length > 0) {
-        query = query.or(
-          selectedTeams.map(team => `home_team.eq.${team},away_team.eq.${team}`).join(',')
-        );
-      }
-
-      const { data, error } = await query
+        .lte('match_date', fourWeeksFromNow)
+        .or(
+          teamsToFilter.map(team => `home_team.eq.${team},away_team.eq.${team}`).join(',')
+        )
         .order('match_date', { ascending: true })
         .order('match_time', { ascending: true });
 
