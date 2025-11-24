@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -53,6 +53,29 @@ const Index = () => {
       }));
     },
   });
+
+  // Real-time subscription for match updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('matches-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'matches'
+        },
+        (payload) => {
+          console.log('Match update received:', payload);
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
