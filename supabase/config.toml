@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.braze-dedupe-fixtures]
 verify_jwt = false
 
+[functions.braze-webhook]
+verify_jwt = false
+
 [functions.fetch-braze-schedules]
 verify_jwt = false
 

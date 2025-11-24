@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Info } from 'lucide-react';
+import { Loader2, Info, FileText } from 'lucide-react';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
 import { SchedulerStats } from '@/components/SchedulerStats';
@@ -14,6 +15,7 @@ import { FeaturedTeamsManager } from '@/components/FeaturedTeamsManager';
 import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
+  const navigate = useNavigate();
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -168,11 +170,17 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-4xl font-bold text-foreground">Admin Panel</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage Braze notification settings and monitor scheduler activity
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-foreground">Admin Panel</h1>
+            <p className="text-muted-foreground mt-2">
+              Manage Braze notification settings and monitor scheduler activity
+            </p>
+          </div>
+          <Button onClick={() => navigate('/admin/notification-logs')} variant="outline">
+            <FileText className="h-4 w-4 mr-2" />
+            View Notification Logs
+          </Button>
         </div>
 
         <Card>

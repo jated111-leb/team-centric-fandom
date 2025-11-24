@@ -161,6 +161,65 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_sends: {
+        Row: {
+          away_team: string | null
+          braze_event_type: string
+          braze_schedule_id: string | null
+          campaign_id: string | null
+          competition: string | null
+          created_at: string
+          event_received_at: string
+          external_user_id: string | null
+          home_team: string | null
+          id: string
+          kickoff_utc: string | null
+          match_id: number | null
+          raw_payload: Json | null
+          sent_at: string
+        }
+        Insert: {
+          away_team?: string | null
+          braze_event_type: string
+          braze_schedule_id?: string | null
+          campaign_id?: string | null
+          competition?: string | null
+          created_at?: string
+          event_received_at?: string
+          external_user_id?: string | null
+          home_team?: string | null
+          id?: string
+          kickoff_utc?: string | null
+          match_id?: number | null
+          raw_payload?: Json | null
+          sent_at: string
+        }
+        Update: {
+          away_team?: string | null
+          braze_event_type?: string
+          braze_schedule_id?: string | null
+          campaign_id?: string | null
+          competition?: string | null
+          created_at?: string
+          event_received_at?: string
+          external_user_id?: string | null
+          home_team?: string | null
+          id?: string
+          kickoff_utc?: string | null
+          match_id?: number | null
+          raw_payload?: Json | null
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_sends_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_ledger: {
         Row: {
           braze_schedule_id: string
