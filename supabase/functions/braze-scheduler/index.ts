@@ -65,10 +65,12 @@ Deno.serve(async (req) => {
       .select('*')
       .gte('utc_date', now.toISOString())
       .lte('utc_date', thirtyDaysOut.toISOString())
-      .eq('status', 'SCHEDULED')
+      .in('status', ['SCHEDULED', 'TIMED'])
       .order('utc_date', { ascending: true });
 
     if (matchError) throw matchError;
+
+    console.log(`Fetched ${matches?.length || 0} matches with SCHEDULED or TIMED status`);
 
     // Fetch translations
     const { data: teamTranslations } = await supabase
@@ -98,15 +100,18 @@ Deno.serve(async (req) => {
     for (const match of matches || []) {
       // Only process matches with at least one featured team
       if (!FEATURED_TEAMS.includes(match.home_team) && !FEATURED_TEAMS.includes(match.away_team)) {
+        console.log(`Match ${match.id}: ${match.home_team} vs ${match.away_team} - no featured teams`);
         continue;
       }
+
+      console.log(`Processing match ${match.id}: ${match.home_team} vs ${match.away_team} at ${match.utc_date}`);
 
       const kickoffDate = new Date(match.utc_date);
       const sendAtDate = new Date(kickoffDate.getTime() - SEND_OFFSET_MINUTES * 60 * 1000);
 
       // Skip if send window has passed
       if (sendAtDate <= now) {
-        console.log(`Match ${match.id}: send window passed`);
+        console.log(`Match ${match.id}: send window passed (sendAt: ${sendAtDate.toISOString()}, now: ${now.toISOString()})`);
         skipped++;
         continue;
       }
