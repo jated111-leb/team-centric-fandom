@@ -14,7 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      matches: {
+        Row: {
+          away_team: string
+          away_team_id: number | null
+          channel: string | null
+          competition: string
+          competition_name: string
+          created_at: string
+          home_team: string
+          home_team_id: number | null
+          id: number
+          match_date: string
+          match_time: string | null
+          matchday: string | null
+          priority: string
+          priority_reason: string | null
+          priority_score: number
+          score_away: number | null
+          score_home: number | null
+          stage: string | null
+          status: string
+          studio: string | null
+          updated_at: string
+          utc_date: string
+        }
+        Insert: {
+          away_team: string
+          away_team_id?: number | null
+          channel?: string | null
+          competition: string
+          competition_name: string
+          created_at?: string
+          home_team: string
+          home_team_id?: number | null
+          id: number
+          match_date: string
+          match_time?: string | null
+          matchday?: string | null
+          priority?: string
+          priority_reason?: string | null
+          priority_score?: number
+          score_away?: number | null
+          score_home?: number | null
+          stage?: string | null
+          status?: string
+          studio?: string | null
+          updated_at?: string
+          utc_date: string
+        }
+        Update: {
+          away_team?: string
+          away_team_id?: number | null
+          channel?: string | null
+          competition?: string
+          competition_name?: string
+          created_at?: string
+          home_team?: string
+          home_team_id?: number | null
+          id?: number
+          match_date?: string
+          match_time?: string | null
+          matchday?: string | null
+          priority?: string
+          priority_reason?: string | null
+          priority_score?: number
+          score_away?: number | null
+          score_home?: number | null
+          stage?: string | null
+          status?: string
+          studio?: string | null
+          updated_at?: string
+          utc_date?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

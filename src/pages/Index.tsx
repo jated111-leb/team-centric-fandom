@@ -1,18 +1,82 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ScheduleFilters } from "@/components/ScheduleFilters";
 import { MatchRow } from "@/components/MatchRow";
-import { mockMatches } from "@/lib/mockData";
-import { Calendar, TrendingUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Calendar, TrendingUp, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import type { Match } from "@/types/match";
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCompetition, setSelectedCompetition] = useState("all");
   const [selectedPriority, setSelectedPriority] = useState("all");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const { data: matches = [], isLoading, refetch } = useQuery({
+    queryKey: ['matches'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const fourWeeksFromNow = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from('matches')
+        .select('*')
+        .gte('match_date', today)
+        .lte('match_date', fourWeeksFromNow)
+        .order('match_date', { ascending: true })
+        .order('match_time', { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map((match): Match => ({
+        id: match.id.toString(),
+        competition: match.competition_name,
+        matchday: match.matchday || '',
+        date: match.match_date,
+        time: match.match_time || '',
+        homeTeam: match.home_team,
+        awayTeam: match.away_team,
+        status: match.status as Match['status'],
+        score: match.score_home !== null && match.score_away !== null 
+          ? `${match.score_home}-${match.score_away}` 
+          : '',
+        stage: match.stage || '',
+        priority: match.priority as Match['priority'],
+        priorityScore: match.priority_score,
+        reason: match.priority_reason || '',
+        channel: match.channel || undefined,
+        studio: match.studio || undefined,
+      }));
+    },
+  });
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      toast.info('Fetching latest match data...');
+      
+      const { data, error } = await supabase.functions.invoke('sync-football-data', {
+        body: { daysAhead: 28 }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Updated ${data.total} matches from football-data.org`);
+      await refetch();
+    } catch (error) {
+      console.error('Refresh error:', error);
+      toast.error('Failed to refresh match data');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const filteredMatches = useMemo(() => {
-    return mockMatches.filter((match) => {
+    return matches.filter((match) => {
       const matchesSearch =
         searchQuery === "" ||
         match.homeTeam.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -34,6 +98,17 @@ const Index = () => {
     return { highPriority, total };
   }, [filteredMatches]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading matches...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -46,19 +121,31 @@ const Index = () => {
                 Internal match scheduling & notification management
               </p>
             </div>
-            <div className="flex gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">
-                  <span className="font-semibold text-foreground">{stats.total}</span> matches
-                </span>
+            <div className="flex items-center gap-6">
+              <div className="flex gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <span className="text-muted-foreground">
+                    <span className="font-semibold text-foreground">{stats.total}</span> matches
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-priority-high" />
+                  <span className="text-muted-foreground">
+                    <span className="font-semibold text-foreground">{stats.highPriority}</span> high priority
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-priority-high" />
-                <span className="text-muted-foreground">
-                  <span className="font-semibold text-foreground">{stats.highPriority}</span> high priority
-                </span>
-              </div>
+              <Button 
+                onClick={handleRefresh} 
+                disabled={isRefreshing}
+                variant="outline"
+                size="sm"
+                className="ml-4"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Syncing...' : 'Refresh Data'}
+              </Button>
             </div>
           </div>
         </div>
