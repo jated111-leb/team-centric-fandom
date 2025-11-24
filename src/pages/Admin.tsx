@@ -10,6 +10,7 @@ import { ScheduledNotificationsTable } from '@/components/ScheduledNotifications
 import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
 import { SchedulerStats } from '@/components/SchedulerStats';
 import { AlertMonitor } from '@/components/AlertMonitor';
+import { FeaturedTeamsManager } from '@/components/FeaturedTeamsManager';
 import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
@@ -129,7 +130,7 @@ export default function Admin() {
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                   <li>Runs automatically every 15 minutes via cron job</li>
                   <li>Sends notifications 60 minutes before kickoff</li>
-                  <li>Only for matches featuring the {FEATURED_TEAMS.length} featured teams</li>
+                  <li>Only for matches featuring the configured teams below</li>
                   <li>Uses Braze Connected Attributes (Team 1/2/3)</li>
                   <li>Automatically updates if match times change (with 20min buffer)</li>
                   <li>Reconciles daily to clean up orphaned schedules</li>
@@ -149,26 +150,7 @@ export default function Admin() {
 
         <SchedulerStats />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Featured Teams</CardTitle>
-            <CardDescription>
-              Notifications are sent for matches featuring any of these teams
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {FEATURED_TEAMS.map((team) => (
-                <div
-                  key={team}
-                  className="p-3 rounded-lg border border-border bg-card text-sm"
-                >
-                  {team}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <FeaturedTeamsManager />
 
         <BrazeSchedulesView />
 

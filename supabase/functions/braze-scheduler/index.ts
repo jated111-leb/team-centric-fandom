@@ -84,6 +84,23 @@ Deno.serve(async (req) => {
 
     console.log(`Fetched ${matches?.length || 0} matches with SCHEDULED or TIMED status`);
 
+    // Phase 3: Fetch featured teams from database
+    const { data: featuredTeamsData } = await supabase
+      .from('featured_teams')
+      .select('team_name');
+
+    const FEATURED_TEAMS_FROM_DB = (featuredTeamsData || []).map(t => t.team_name);
+
+    if (FEATURED_TEAMS_FROM_DB.length === 0) {
+      console.log('No featured teams configured - skipping');
+      return new Response(
+        JSON.stringify({ message: 'No featured teams configured', scheduled: 0, updated: 0, skipped: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Found ${FEATURED_TEAMS_FROM_DB.length} featured teams: ${FEATURED_TEAMS_FROM_DB.join(', ')}`);
+
     // Phase 3: Fetch team mappings for canonical name matching
     const { data: teamMappings } = await supabase
       .from('team_mappings')
@@ -131,8 +148,8 @@ Deno.serve(async (req) => {
       const homeCanonical = findCanonicalTeam(match.home_team);
       const awayCanonical = findCanonicalTeam(match.away_team);
       
-      const homeFeatured = homeCanonical && FEATURED_TEAMS.includes(homeCanonical);
-      const awayFeatured = awayCanonical && FEATURED_TEAMS.includes(awayCanonical);
+      const homeFeatured = homeCanonical && FEATURED_TEAMS_FROM_DB.includes(homeCanonical);
+      const awayFeatured = awayCanonical && FEATURED_TEAMS_FROM_DB.includes(awayCanonical);
       
       if (!homeFeatured && !awayFeatured) {
         console.log(`Match ${match.id}: ${match.home_team} vs ${match.away_team} - no featured teams`);
