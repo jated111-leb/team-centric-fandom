@@ -33,8 +33,6 @@ export const MatchRow = ({ match }: MatchRowProps) => {
       <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
         {match.reason || "—"}
       </TableCell>
-      <TableCell className="text-sm">{match.channel || "—"}</TableCell>
-      <TableCell className="text-center">{match.studio || "—"}</TableCell>
     </TableRow>
   );
 };

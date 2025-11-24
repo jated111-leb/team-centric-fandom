@@ -202,14 +202,12 @@ const Index = () => {
                   <TableHead className="font-bold">Priority</TableHead>
                   <TableHead className="font-bold text-center">Score</TableHead>
                   <TableHead className="font-bold">Reason</TableHead>
-                  <TableHead className="font-bold">Channel</TableHead>
-                  <TableHead className="font-bold text-center">Studio</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredMatches.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
                       No matches found matching your filters.
                     </TableCell>
                   </TableRow>
