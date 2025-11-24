@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 
 export default function Admin() {
   const [enabled, setEnabled] = useState(false);
@@ -78,7 +79,7 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         <div>
           <h1 className="text-4xl font-bold text-foreground">Admin Panel</h1>
           <p className="text-muted-foreground mt-2">
@@ -159,6 +160,8 @@ export default function Admin() {
             </div>
           </CardContent>
         </Card>
+
+        <ScheduledNotificationsTable />
       </div>
     </div>
   );
