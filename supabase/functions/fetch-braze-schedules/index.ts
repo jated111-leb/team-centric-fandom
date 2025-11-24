@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.84.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,14 +15,17 @@ serve(async (req) => {
   try {
     const BRAZE_API_KEY = Deno.env.get('BRAZE_API_KEY');
     const BRAZE_REST_ENDPOINT = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const BRAZE_CAMPAIGN_ID = Deno.env.get('BRAZE_CAMPAIGN_ID');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!BRAZE_API_KEY || !BRAZE_REST_ENDPOINT || !BRAZE_CAMPAIGN_ID) {
-      throw new Error('Missing required Braze configuration');
+    if (!BRAZE_API_KEY || !BRAZE_REST_ENDPOINT || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Missing required configuration');
     }
 
+    // Initialize Supabase client
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
     console.log('Fetching scheduled messages from Braze...');
-    console.log('Campaign ID:', BRAZE_CAMPAIGN_ID);
 
     // Calculate end_time (30 days from now) in ISO-8601 format
     const endDate = new Date();
@@ -51,17 +55,33 @@ serve(async (req) => {
     const brazeData = await brazeResponse.json();
     console.log('Braze response:', JSON.stringify(brazeData, null, 2));
 
-    // Get all scheduled broadcasts - the response doesn't include campaign_id
-    // so we'll return all schedules and let the UI handle any filtering needed
-    const scheduledMessages = brazeData.scheduled_broadcasts || [];
+    const allScheduledMessages = brazeData.scheduled_broadcasts || [];
 
-    console.log(`Found ${scheduledMessages.length} scheduled messages total`);
+    // Fetch schedule IDs from our schedule_ledger (these are for our campaign)
+    const { data: ledgerSchedules, error: ledgerError } = await supabase
+      .from('schedule_ledger')
+      .select('braze_schedule_id, match_id, send_at_utc, created_at, updated_at');
+
+    if (ledgerError) {
+      console.error('Error fetching schedule ledger:', ledgerError);
+      throw new Error('Failed to fetch schedule ledger');
+    }
+
+    // Create a Set of our schedule IDs for quick lookup
+    const ourScheduleIds = new Set(ledgerSchedules?.map(s => s.braze_schedule_id) || []);
+
+    // Filter to only schedules that are in our ledger
+    const campaignSchedules = allScheduledMessages.filter((schedule: any) => 
+      ourScheduleIds.has(schedule.id)
+    );
+
+    console.log(`Found ${campaignSchedules.length} scheduled messages for this campaign (out of ${allScheduledMessages.length} total)`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        total_schedules: scheduledMessages.length,
-        schedules: scheduledMessages.map((schedule: any) => ({
+        total_schedules: campaignSchedules.length,
+        schedules: campaignSchedules.map((schedule: any) => ({
           schedule_id: schedule.id,
           name: schedule.name,
           send_at: schedule.next_send_time,
