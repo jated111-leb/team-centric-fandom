@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      competition_translations: {
+        Row: {
+          arabic_name: string
+          competition_code: string
+          created_at: string | null
+          english_name: string
+          id: string
+        }
+        Insert: {
+          arabic_name: string
+          competition_code: string
+          created_at?: string | null
+          english_name: string
+          id?: string
+        }
+        Update: {
+          arabic_name?: string
+          competition_code?: string
+          created_at?: string | null
+          english_name?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      feature_flags: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          enabled: boolean
+          flag_name: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean
+          flag_name: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean
+          flag_name?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       matches: {
         Row: {
           away_team: string
@@ -86,6 +137,65 @@ export type Database = {
           studio?: string | null
           updated_at?: string
           utc_date?: string
+        }
+        Relationships: []
+      }
+      schedule_ledger: {
+        Row: {
+          braze_schedule_id: string
+          created_at: string | null
+          id: string
+          match_id: number
+          send_at_utc: string
+          signature: string
+          updated_at: string | null
+        }
+        Insert: {
+          braze_schedule_id: string
+          created_at?: string | null
+          id?: string
+          match_id: number
+          send_at_utc: string
+          signature: string
+          updated_at?: string | null
+        }
+        Update: {
+          braze_schedule_id?: string
+          created_at?: string | null
+          id?: string
+          match_id?: number
+          send_at_utc?: string
+          signature?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_ledger_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_translations: {
+        Row: {
+          arabic_name: string
+          created_at: string | null
+          id: string
+          team_name: string
+        }
+        Insert: {
+          arabic_name: string
+          created_at?: string | null
+          id?: string
+          team_name: string
+        }
+        Update: {
+          arabic_name?: string
+          created_at?: string | null
+          id?: string
+          team_name?: string
         }
         Relationships: []
       }
