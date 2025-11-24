@@ -68,7 +68,7 @@ export const ScheduledNotificationsTable = () => {
             match_time
           )
         `)
-        .order('send_at_utc', { ascending: false })
+        .order('send_at_utc', { ascending: true })
         .limit(50);
 
       if (error) throw error;
