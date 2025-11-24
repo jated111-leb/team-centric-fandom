@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Info, FileText } from 'lucide-react';
+import { Loader2, Info, FileText, Trash2 } from 'lucide-react';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
 import { SchedulerStats } from '@/components/SchedulerStats';
@@ -22,6 +22,7 @@ export default function Admin() {
   const [campaignId, setCampaignId] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [cleaningUp, setCleaningUp] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -155,6 +156,48 @@ export default function Admin() {
     }
   };
 
+  const cleanupNonFeaturedSchedules = async () => {
+    setCleaningUp(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cleanup-non-featured-schedules`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Cleanup failed');
+      }
+
+      toast({
+        title: 'Cleanup Complete',
+        description: `Deleted ${result.deleted.from_ledger} schedules from database and ${result.deleted.from_braze} from Braze`,
+      });
+
+      // Refresh the data
+      window.location.reload();
+    } catch (error) {
+      console.error('Error cleaning up schedules:', error);
+      toast({
+        title: 'Cleanup Failed',
+        description: error instanceof Error ? error.message : 'Failed to clean up non-featured schedules',
+        variant: 'destructive',
+      });
+    } finally {
+      setCleaningUp(false);
+    }
+  };
+
   if (checkingAuth || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -238,6 +281,43 @@ export default function Admin() {
         <AlertMonitor />
 
         <SchedulerStats />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Cleanup Actions</CardTitle>
+            <CardDescription>
+              Remove schedules for matches not featuring any of the configured teams
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted p-4">
+                <p className="text-sm text-muted-foreground">
+                  This will delete all scheduled notifications for matches that don't involve any featured teams. 
+                  This includes removing them from both the schedule ledger and Braze.
+                </p>
+              </div>
+              <Button
+                onClick={cleanupNonFeaturedSchedules}
+                disabled={cleaningUp}
+                variant="destructive"
+                className="w-full sm:w-auto"
+              >
+                {cleaningUp ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Cleaning up...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clean Up Non-Featured Team Schedules
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <FeaturedTeamsManager />
 
