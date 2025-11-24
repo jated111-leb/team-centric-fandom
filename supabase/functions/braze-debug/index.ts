@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
           total_schedules: ourBroadcasts.length,
           schedules: ourBroadcasts.map((b: any) => ({
             schedule_id: b.schedule_id,
-            send_at: b.send_at,
+            send_at: b.next_send_time,
             match_id: b.trigger_properties?.match_id,
             home: b.trigger_properties?.home_en,
             away: b.trigger_properties?.away_en,
@@ -155,10 +155,135 @@ Deno.serve(async (req) => {
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    } else if (action === 'preview') {
+      // Preview next N upcoming matches from the database
+      const limit = parseInt(url.searchParams.get('limit') || '10');
+      const { data: matches } = await supabase
+        .from('matches')
+        .select('*')
+        .gte('utc_date', new Date().toISOString())
+        .order('utc_date', { ascending: true })
+        .limit(limit);
+
+      return new Response(
+        JSON.stringify({
+          count: matches?.length || 0,
+          matches: matches?.map((m) => ({
+            id: m.id,
+            competition: m.competition,
+            home: m.home_team,
+            away: m.away_team,
+            utc_date: m.utc_date,
+            priority: m.priority,
+          })) || [],
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else if (action === 'nuke') {
+      // Emergency: cancel ALL future schedules for this campaign
+      const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
+      const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
+      const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID');
+
+      if (!brazeApiKey || !brazeEndpoint || !brazeCampaignId) {
+        throw new Error('Missing Braze configuration');
+      }
+
+      const confirm = url.searchParams.get('confirm');
+      if (confirm !== 'yes') {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Must pass ?confirm=yes to execute nuke operation',
+            warning: 'This will cancel ALL future schedules for this campaign' 
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      const daysAhead = parseInt(url.searchParams.get('days') || '365');
+      const endIso = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString();
+
+      const brazeRes = await fetch(
+        `${brazeEndpoint}/messages/scheduled_broadcasts?end_time=${encodeURIComponent(endIso)}`,
+        {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${brazeApiKey}` },
+        }
+      );
+
+      if (!brazeRes.ok) {
+        throw new Error(`Failed to fetch Braze schedules: ${await brazeRes.text()}`);
+      }
+
+      const brazeData = await brazeRes.json();
+      const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
+        b.campaign_id === brazeCampaignId ||
+        b.campaign_api_id === brazeCampaignId ||
+        b.campaign_api_identifier === brazeCampaignId
+      );
+
+      const now = new Date();
+      let cancelled = 0;
+      let skipped = 0;
+      let errors = 0;
+
+      for (const broadcast of ourBroadcasts) {
+        const sendTime = new Date(broadcast.next_send_time);
+        if (sendTime <= now) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          const cancelRes = await fetch(
+            `${brazeEndpoint}/campaigns/trigger/schedule/delete`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${brazeApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                campaign_id: brazeCampaignId,
+                schedule_id: broadcast.schedule_id,
+              }),
+            }
+          );
+
+          if (cancelRes.ok || cancelRes.status === 404) {
+            cancelled++;
+          } else {
+            errors++;
+            console.error(`Failed to cancel ${broadcast.schedule_id}: ${await cancelRes.text()}`);
+          }
+        } catch (error) {
+          errors++;
+          console.error(`Error cancelling ${broadcast.schedule_id}:`, error);
+        }
+      }
+
+      // Clear the ledger
+      await supabase.from('schedule_ledger').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          days_ahead: daysAhead,
+          total_found: ourBroadcasts.length,
+          cancelled,
+          skipped,
+          errors,
+          ledger_cleared: true,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(
-      JSON.stringify({ error: 'Invalid action. Use: consistency, logs, or campaign' }),
+      JSON.stringify({ error: 'Invalid action. Use: consistency, logs, campaign, preview, or nuke' }),
       { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
