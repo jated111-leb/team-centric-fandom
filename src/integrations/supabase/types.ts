@@ -178,6 +178,60 @@ export type Database = {
           },
         ]
       }
+      scheduler_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          function_name: string
+          id: string
+          match_id: number | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          function_name: string
+          id?: string
+          match_id?: number | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          function_name?: string
+          id?: string
+          match_id?: number | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
+      team_mappings: {
+        Row: {
+          canonical_name: string
+          created_at: string
+          id: string
+          pattern: string
+          updated_at: string
+        }
+        Insert: {
+          canonical_name: string
+          created_at?: string
+          id?: string
+          pattern: string
+          updated_at?: string
+        }
+        Update: {
+          canonical_name?: string
+          created_at?: string
+          id?: string
+          pattern?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       team_translations: {
         Row: {
           arabic_name: string
@@ -204,7 +258,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
+      pg_try_advisory_lock: { Args: { key: number }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
