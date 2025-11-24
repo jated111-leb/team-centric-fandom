@@ -1,1 +1,7 @@
 project_id = "howqpclucdljsovsjnrz"
+
+[functions.braze-scheduler]
+verify_jwt = false
+
+[functions.braze-reconcile]
+verify_jwt = false
