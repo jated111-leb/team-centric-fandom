@@ -1,0 +1,266 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, Clock, XCircle, RefreshCw, CheckCircle } from 'lucide-react';
+
+interface SchedulerLog {
+  id: string;
+  function_name: string;
+  match_id: number | null;
+  action: string;
+  reason: string | null;
+  details: any;
+  created_at: string;
+}
+
+interface TimingIssue {
+  match_id: number;
+  scheduled_time: string;
+  kickoff_time: string;
+  minutes_before: number;
+  issue: string;
+}
+
+export function AlertMonitor() {
+  const [errors, setErrors] = useState<SchedulerLog[]>([]);
+  const [timingIssues, setTimingIssues] = useState<TimingIssue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastCheck, setLastCheck] = useState<Date>(new Date());
+
+  useEffect(() => {
+    checkForIssues();
+    
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(checkForIssues, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const checkForIssues = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        checkRecentErrors(),
+        checkTimingIssues(),
+      ]);
+      setLastCheck(new Date());
+    } catch (error) {
+      console.error('Error checking issues:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkRecentErrors = async () => {
+    // Get errors from last 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    const { data, error } = await supabase
+      .from('scheduler_logs')
+      .select('*')
+      .eq('action', 'error')
+      .gte('created_at', twentyFourHoursAgo.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching errors:', error);
+      return;
+    }
+
+    setErrors(data || []);
+  };
+
+  const checkTimingIssues = async () => {
+    // Get all scheduled notifications from ledger
+    const now = new Date();
+    const { data: schedules, error: scheduleError } = await supabase
+      .from('schedule_ledger')
+      .select('match_id, send_at_utc')
+      .gte('send_at_utc', now.toISOString());
+
+    if (scheduleError || !schedules) return;
+
+    // Get corresponding match data
+    const matchIds = schedules.map(s => s.match_id);
+    const { data: matches, error: matchError } = await supabase
+      .from('matches')
+      .select('id, utc_date, home_team, away_team')
+      .in('id', matchIds);
+
+    if (matchError || !matches) return;
+
+    // Check for timing issues
+    const issues: TimingIssue[] = [];
+    
+    for (const schedule of schedules) {
+      const match = matches.find(m => m.id === schedule.match_id);
+      if (!match) continue;
+
+      const kickoffTime = new Date(match.utc_date);
+      const scheduledTime = new Date(schedule.send_at_utc);
+      const minutesBefore = (kickoffTime.getTime() - scheduledTime.getTime()) / (60 * 1000);
+
+      // Flag if notification is scheduled outside 55-65 minute window
+      if (minutesBefore < 55 || minutesBefore > 65) {
+        issues.push({
+          match_id: schedule.match_id,
+          scheduled_time: schedule.send_at_utc,
+          kickoff_time: match.utc_date,
+          minutes_before: Math.round(minutesBefore),
+          issue: minutesBefore < 55 
+            ? `Too close to kickoff (${Math.round(minutesBefore)} min)` 
+            : `Too far from kickoff (${Math.round(minutesBefore)} min)`,
+        });
+      }
+    }
+
+    setTimingIssues(issues);
+  };
+
+  const hasIssues = errors.length > 0 || timingIssues.length > 0;
+
+  return (
+    <Card className={hasIssues ? 'border-destructive' : 'border-border'}>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {hasIssues ? (
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            ) : (
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            )}
+            <div>
+              <CardTitle>System Alerts</CardTitle>
+              <CardDescription>
+                Monitoring scheduler errors and timing issues (Last checked: {lastCheck.toLocaleTimeString()})
+              </CardDescription>
+            </div>
+          </div>
+          <Button
+            onClick={checkForIssues}
+            disabled={loading}
+            size="sm"
+            variant="outline"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!hasIssues && !loading && (
+          <Alert className="border-green-500/20 bg-green-500/10">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <AlertTitle className="text-green-700 dark:text-green-400">All Systems Operational</AlertTitle>
+            <AlertDescription className="text-green-600 dark:text-green-300">
+              No errors or timing issues detected in the last 24 hours.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Timing Issues */}
+        {timingIssues.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-destructive" />
+              <h3 className="font-semibold text-sm text-foreground">
+                Timing Issues ({timingIssues.length})
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {timingIssues.slice(0, 5).map((issue, idx) => (
+                <Alert key={idx} variant="destructive">
+                  <Clock className="h-4 w-4" />
+                  <AlertTitle className="text-sm">
+                    Match #{issue.match_id} - {issue.issue}
+                  </AlertTitle>
+                  <AlertDescription className="text-xs space-y-1">
+                    <div>
+                      <span className="font-medium">Expected:</span> 60 minutes before kickoff
+                    </div>
+                    <div>
+                      <span className="font-medium">Actual:</span> {issue.minutes_before} minutes before
+                    </div>
+                    <div className="text-muted-foreground">
+                      Scheduled: {new Date(issue.scheduled_time).toLocaleString()}
+                    </div>
+                    <div className="text-muted-foreground">
+                      Kickoff: {new Date(issue.kickoff_time).toLocaleString()}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ))}
+              {timingIssues.length > 5 && (
+                <p className="text-xs text-muted-foreground">
+                  And {timingIssues.length - 5} more timing issues...
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Scheduler Errors */}
+        {errors.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-destructive" />
+              <h3 className="font-semibold text-sm text-foreground">
+                Recent Errors ({errors.length})
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {errors.slice(0, 5).map((error) => (
+                <Alert key={error.id} variant="destructive">
+                  <XCircle className="h-4 w-4" />
+                  <AlertTitle className="text-sm flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {error.function_name}
+                    </Badge>
+                    {error.match_id && `Match #${error.match_id}`}
+                  </AlertTitle>
+                  <AlertDescription className="text-xs space-y-1">
+                    <div className="font-medium">{error.reason}</div>
+                    {error.details && (
+                      <div className="text-muted-foreground">
+                        {typeof error.details === 'string' 
+                          ? error.details 
+                          : JSON.stringify(error.details, null, 2)
+                        }
+                      </div>
+                    )}
+                    <div className="text-muted-foreground">
+                      {new Date(error.created_at).toLocaleString()}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ))}
+              {errors.length > 5 && (
+                <p className="text-xs text-muted-foreground">
+                  And {errors.length - 5} more errors...
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Summary Stats */}
+        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
+          <div className="bg-muted rounded-lg p-3">
+            <div className="text-2xl font-bold text-destructive">
+              {errors.length}
+            </div>
+            <div className="text-xs text-muted-foreground">Errors (24h)</div>
+          </div>
+          <div className="bg-muted rounded-lg p-3">
+            <div className="text-2xl font-bold text-destructive">
+              {timingIssues.length}
+            </div>
+            <div className="text-xs text-muted-foreground">Timing Issues</div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

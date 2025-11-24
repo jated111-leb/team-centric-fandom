@@ -9,6 +9,7 @@ import { Loader2, Info } from 'lucide-react';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
 import { SchedulerStats } from '@/components/SchedulerStats';
+import { AlertMonitor } from '@/components/AlertMonitor';
 import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
@@ -143,6 +144,8 @@ export default function Admin() {
             )}
           </CardContent>
         </Card>
+
+        <AlertMonitor />
 
         <SchedulerStats />
 
