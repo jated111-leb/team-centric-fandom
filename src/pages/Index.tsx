@@ -90,7 +90,7 @@ const Index = () => {
 
       return matchesSearch && matchesCompetition && matchesPriority;
     });
-  }, [searchQuery, selectedCompetition, selectedPriority]);
+  }, [matches, searchQuery, selectedCompetition, selectedPriority]);
 
   const stats = useMemo(() => {
     const highPriority = filteredMatches.filter((m) => m.priority === "High").length;
