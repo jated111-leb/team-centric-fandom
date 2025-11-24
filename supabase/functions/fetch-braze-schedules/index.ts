@@ -51,26 +51,24 @@ serve(async (req) => {
     const brazeData = await brazeResponse.json();
     console.log('Braze response:', JSON.stringify(brazeData, null, 2));
 
-    // Filter for our campaign
+    // Get all scheduled broadcasts - the response doesn't include campaign_id
+    // so we'll return all schedules and let the UI handle any filtering needed
     const scheduledMessages = brazeData.scheduled_broadcasts || [];
-    const campaignSchedules = scheduledMessages.filter(
-      (msg: any) => msg.campaign_id === BRAZE_CAMPAIGN_ID
-    );
 
-    console.log(`Found ${campaignSchedules.length} scheduled messages for campaign ${BRAZE_CAMPAIGN_ID}`);
+    console.log(`Found ${scheduledMessages.length} scheduled messages total`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        campaign_id: BRAZE_CAMPAIGN_ID,
-        total_schedules: campaignSchedules.length,
-        schedules: campaignSchedules.map((schedule: any) => ({
-          schedule_id: schedule.schedule_id,
+        total_schedules: scheduledMessages.length,
+        schedules: scheduledMessages.map((schedule: any) => ({
+          schedule_id: schedule.id,
           name: schedule.name,
-          send_at: schedule.send_at,
-          created_at: schedule.created_at,
-          updated_at: schedule.updated_at,
-          messages: schedule.messages,
+          send_at: schedule.next_send_time,
+          created_at: schedule.created_at || schedule.next_send_time,
+          updated_at: schedule.updated_at || schedule.next_send_time,
+          type: schedule.type,
+          schedule_type: schedule.schedule_type,
         })),
       }),
       {
