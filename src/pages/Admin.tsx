@@ -12,6 +12,7 @@ import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
 import { SchedulerStats } from '@/components/SchedulerStats';
 import { AlertMonitor } from '@/components/AlertMonitor';
 import { FeaturedTeamsManager } from '@/components/FeaturedTeamsManager';
+import { NotificationPreview } from '@/components/NotificationPreview';
 import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
@@ -220,10 +221,13 @@ export default function Admin() {
               Manage Braze notification settings and monitor scheduler activity
             </p>
           </div>
-          <Button onClick={() => navigate('/admin/notification-logs')} variant="outline">
-            <FileText className="h-4 w-4 mr-2" />
-            View Notification Logs
-          </Button>
+          <div className="flex gap-2">
+            <NotificationPreview />
+            <Button onClick={() => navigate('/admin/notification-logs')} variant="outline">
+              <FileText className="h-4 w-4 mr-2" />
+              View Notification Logs
+            </Button>
+          </div>
         </div>
 
         <Card>
