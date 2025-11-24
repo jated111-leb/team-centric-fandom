@@ -1,4 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { formatInTimeZone, toZonedTime } from 'npm:date-fns-tz@3.2.0';
+import { format } from 'npm:date-fns@3.6.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -170,9 +172,9 @@ Deno.serve(async (req) => {
       const kickoffDate = new Date(match.utc_date);
       const sendAtDate = new Date(kickoffDate.getTime() - SEND_OFFSET_MINUTES * 60 * 1000);
 
-      // Format kickoff time for Arabic display (Riyadh timezone UTC+3)
-      const riyadhOffset = 3 * 60; // UTC+3 in minutes
-      const riyadhTime = new Date(kickoffDate.getTime() + riyadhOffset * 60 * 1000);
+      // Format kickoff time for Arabic display using Baghdad timezone (Asia/Baghdad)
+      const BAGHDAD_TIMEZONE = 'Asia/Baghdad';
+      const baghdadTime = toZonedTime(kickoffDate, BAGHDAD_TIMEZONE);
       
       // Helper to convert digits to Arabic numerals
       const toArabicDigits = (str: string) => {
@@ -181,20 +183,20 @@ Deno.serve(async (req) => {
       };
       
       // Format kickoff_ar: "الساعة ٨:٠٠ م ٢٥-١١-٢٠٢٥"
-      const hours24 = riyadhTime.getUTCHours();
-      const minutes = riyadhTime.getUTCMinutes();
+      const hours24 = baghdadTime.getHours();
+      const minutes = baghdadTime.getMinutes();
       const hours12 = hours24 % 12 || 12;
       const ampm = hours24 < 12 ? 'ص' : 'م';
-      const day = riyadhTime.getUTCDate();
-      const month = riyadhTime.getUTCMonth() + 1;
-      const year = riyadhTime.getUTCFullYear();
+      const day = baghdadTime.getDate();
+      const month = baghdadTime.getMonth() + 1;
+      const year = baghdadTime.getFullYear();
       
       const timeStr = `${hours12}:${minutes.toString().padStart(2, '0')}`;
       const dateStr = `${day.toString().padStart(2, '0')}-${month.toString().padStart(2, '0')}-${year}`;
       const kickoff_ar = toArabicDigits(`الساعة ${timeStr} ${ampm} ${dateStr}`);
       
-      // Format kickoff_baghdad: "YYYY-MM-DD HH:MM"
-      const kickoff_baghdad = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')} ${hours24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      // Format kickoff_baghdad: "YYYY-MM-DD HH:MM" in Baghdad timezone
+      const kickoff_baghdad = formatInTimeZone(kickoffDate, BAGHDAD_TIMEZONE, 'yyyy-MM-dd HH:mm');
 
       // Skip if send window has passed
       if (sendAtDate <= now) {
