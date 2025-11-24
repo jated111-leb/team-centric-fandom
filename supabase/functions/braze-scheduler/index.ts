@@ -33,6 +33,18 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // Phase 2: Acquire advisory lock to prevent concurrent runs
+    const lockKey = 1001; // Unique identifier for braze-scheduler
+    const { data: lockAcquired } = await supabase.rpc('pg_try_advisory_lock', { key: lockKey });
+    
+    if (!lockAcquired) {
+      console.log('Another scheduler process is running - skipping');
+      return new Response(
+        JSON.stringify({ message: 'Already running', scheduled: 0, updated: 0, skipped: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Check feature flag
     const { data: flag } = await supabase
       .from('feature_flags')
@@ -72,6 +84,23 @@ Deno.serve(async (req) => {
 
     console.log(`Fetched ${matches?.length || 0} matches with SCHEDULED or TIMED status`);
 
+    // Phase 3: Fetch team mappings for canonical name matching
+    const { data: teamMappings } = await supabase
+      .from('team_mappings')
+      .select('*');
+
+    // Helper function to find canonical team name
+    const findCanonicalTeam = (teamName: string): string | null => {
+      const normalized = teamName.toLowerCase();
+      for (const mapping of teamMappings || []) {
+        const regex = new RegExp(mapping.pattern, 'i');
+        if (regex.test(normalized)) {
+          return mapping.canonical_name;
+        }
+      }
+      return null;
+    };
+
     // Fetch translations
     const { data: teamTranslations } = await supabase
       .from('team_translations')
@@ -98,9 +127,24 @@ Deno.serve(async (req) => {
     let skipped = 0;
 
     for (const match of matches || []) {
-      // Only process matches with at least one featured team
-      if (!FEATURED_TEAMS.includes(match.home_team) && !FEATURED_TEAMS.includes(match.away_team)) {
+      // Phase 3: Use canonical team mapping to identify featured teams
+      const homeCanonical = findCanonicalTeam(match.home_team);
+      const awayCanonical = findCanonicalTeam(match.away_team);
+      
+      const homeFeatured = homeCanonical && FEATURED_TEAMS.includes(homeCanonical);
+      const awayFeatured = awayCanonical && FEATURED_TEAMS.includes(awayCanonical);
+      
+      if (!homeFeatured && !awayFeatured) {
         console.log(`Match ${match.id}: ${match.home_team} vs ${match.away_team} - no featured teams`);
+        
+        // Phase 4: Log skip
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-scheduler',
+          match_id: match.id,
+          action: 'skipped',
+          reason: 'No featured teams',
+          details: { home: match.home_team, away: match.away_team },
+        });
         continue;
       }
 
@@ -113,11 +157,23 @@ Deno.serve(async (req) => {
       if (sendAtDate <= now) {
         console.log(`Match ${match.id}: send window passed (sendAt: ${sendAtDate.toISOString()}, now: ${now.toISOString()})`);
         skipped++;
+        
+        // Phase 4: Log skip
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-scheduler',
+          match_id: match.id,
+          action: 'skipped',
+          reason: 'Send window passed',
+          details: { sendAt: sendAtDate.toISOString(), now: now.toISOString() },
+        });
         continue;
       }
 
-      // Build audience for both teams
-      const targetTeams = [match.home_team, match.away_team].filter(t => FEATURED_TEAMS.includes(t));
+      // Build audience for both teams using canonical names
+      const targetTeams = [
+        homeFeatured ? homeCanonical : null,
+        awayFeatured ? awayCanonical : null
+      ].filter(t => t !== null) as string[];
       const audience = {
         OR: targetTeams.flatMap(team => [
           { custom_attribute: { custom_attribute_name: 'Team 1', comparison: 'equals', value: team } },
@@ -163,6 +219,15 @@ Deno.serve(async (req) => {
         if (minutesToSend < UPDATE_BUFFER_MINUTES) {
           console.log(`Match ${match.id}: within update buffer`);
           skipped++;
+          
+          // Phase 4: Log skip
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-scheduler',
+            match_id: match.id,
+            action: 'skipped',
+            reason: 'Within update buffer',
+            details: { minutesToSend, buffer: UPDATE_BUFFER_MINUTES },
+          });
           continue;
         }
 
@@ -201,8 +266,26 @@ Deno.serve(async (req) => {
 
           console.log(`Match ${match.id}: updated schedule ${existingSchedule.braze_schedule_id}`);
           updated++;
+          
+          // Phase 4: Log success
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-scheduler',
+            match_id: match.id,
+            action: 'updated',
+            reason: 'Schedule updated successfully',
+            details: { schedule_id: existingSchedule.braze_schedule_id },
+          });
         } catch (error) {
           console.error(`Error updating schedule for match ${match.id}:`, error);
+          
+          // Phase 4: Log error
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-scheduler',
+            match_id: match.id,
+            action: 'error',
+            reason: 'Failed to update schedule',
+            details: { error: error instanceof Error ? error.message : 'Unknown error' },
+          });
         }
       } else {
         // Create new schedule
@@ -242,13 +325,34 @@ Deno.serve(async (req) => {
 
           console.log(`Match ${match.id}: created schedule ${createData.schedule_id}`);
           scheduled++;
+          
+          // Phase 4: Log success
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-scheduler',
+            match_id: match.id,
+            action: 'created',
+            reason: 'New schedule created successfully',
+            details: { schedule_id: createData.schedule_id },
+          });
         } catch (error) {
           console.error(`Error creating schedule for match ${match.id}:`, error);
+          
+          // Phase 4: Log error
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-scheduler',
+            match_id: match.id,
+            action: 'error',
+            reason: 'Failed to create schedule',
+            details: { error: error instanceof Error ? error.message : 'Unknown error' },
+          });
         }
       }
     }
 
     console.log(`Braze scheduler complete: scheduled=${scheduled}, updated=${updated}, skipped=${skipped}`);
+
+    // Phase 2: Release advisory lock
+    await supabase.rpc('pg_advisory_unlock', { key: lockKey });
 
     return new Response(
       JSON.stringify({ scheduled, updated, skipped }),

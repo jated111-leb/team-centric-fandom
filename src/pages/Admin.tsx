@@ -5,18 +5,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
+import { SchedulerStats } from '@/components/SchedulerStats';
+import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [campaignId, setCampaignId] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchFeatureFlag();
+    setCampaignId(import.meta.env.VITE_BRAZE_CAMPAIGN_ID || 'Not configured');
   }, []);
 
   const fetchFeatureFlag = async () => {
@@ -84,7 +88,7 @@ export default function Admin() {
         <div>
           <h1 className="text-4xl font-bold text-foreground">Admin Panel</h1>
           <p className="text-muted-foreground mt-2">
-            Manage Braze notification settings
+            Manage Braze notification settings and monitor scheduler activity
           </p>
         </div>
 
@@ -116,19 +120,31 @@ export default function Admin() {
             </div>
 
             {enabled && (
-              <div className="rounded-lg bg-muted p-4 space-y-2">
-                <h3 className="font-semibold text-sm">How it works:</h3>
+              <div className="rounded-lg bg-muted p-4 space-y-3">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  How it works
+                </h3>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>Runs automatically every 15 minutes</li>
+                  <li>Runs automatically every 15 minutes via cron job</li>
                   <li>Sends notifications 60 minutes before kickoff</li>
-                  <li>Only for matches featuring the 10 featured teams</li>
+                  <li>Only for matches featuring the {FEATURED_TEAMS.length} featured teams</li>
                   <li>Uses Braze Connected Attributes (Team 1/2/3)</li>
-                  <li>Automatically updates if match times change</li>
+                  <li>Automatically updates if match times change (with 20min buffer)</li>
+                  <li>Reconciles daily to clean up orphaned schedules</li>
+                  <li>Deduplicates by signature and match ID</li>
                 </ul>
+                <div className="border-t border-border pt-3 mt-3">
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-semibold">Campaign ID:</span> {campaignId}
+                  </p>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
+
+        <SchedulerStats />
 
         <Card>
           <CardHeader>
@@ -139,18 +155,7 @@ export default function Admin() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
-              {[
-                'Real Madrid CF',
-                'FC Barcelona',
-                'Manchester City FC',
-                'Manchester United FC',
-                'Liverpool FC',
-                'Arsenal FC',
-                'FC Bayern München',
-                'Paris Saint-Germain FC',
-                'Juventus FC',
-                'Inter Milan',
-              ].map((team) => (
+              {FEATURED_TEAMS.map((team) => (
                 <div
                   key={team}
                   className="p-3 rounded-lg border border-border bg-card text-sm"

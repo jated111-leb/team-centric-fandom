@@ -16,6 +16,18 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // Phase 2: Acquire advisory lock to prevent concurrent runs
+    const lockKey = 1002; // Unique identifier for braze-reconcile
+    const { data: lockAcquired } = await supabase.rpc('pg_try_advisory_lock', { key: lockKey });
+    
+    if (!lockAcquired) {
+      console.log('Another reconcile process is running - skipping');
+      return new Response(
+        JSON.stringify({ message: 'Already running', cancelled: 0, cleaned: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Check feature flag
     const { data: flag } = await supabase
       .from('feature_flags')
@@ -70,15 +82,69 @@ Deno.serve(async (req) => {
     // Fetch our ledger
     const { data: ledgerEntries } = await supabase
       .from('schedule_ledger')
-      .select('braze_schedule_id');
+      .select('braze_schedule_id, signature, match_id');
 
     const knownScheduleIds = new Set(
       ledgerEntries?.map(entry => entry.braze_schedule_id) || []
     );
 
+    // Build set of desired signatures from current ledger
+    const desiredSignatures = new Set(
+      ledgerEntries?.map(entry => entry.signature) || []
+    );
+
+    // Build map of match_id to schedule for match-based deduplication
+    const matchScheduleMap = new Map<string, any[]>();
+    for (const broadcast of ourBroadcasts) {
+      const matchId = broadcast.trigger_properties?.match_id;
+      if (matchId) {
+        if (!matchScheduleMap.has(matchId)) {
+          matchScheduleMap.set(matchId, []);
+        }
+        matchScheduleMap.get(matchId)!.push(broadcast);
+      }
+    }
+
     // Cancel orphaned schedules (in Braze but not in ledger)
     let cancelled = 0;
+    let signatureCancelled = 0;
+    let matchDedupCancelled = 0;
+
+    // Phase 1: Signature-based reconciliation
     for (const broadcast of ourBroadcasts) {
+      const sig = broadcast.trigger_properties?.sig;
+      if (sig && !desiredSignatures.has(sig) && knownScheduleIds.has(broadcast.schedule_id)) {
+        try {
+          const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${brazeApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              campaign_id: brazeCampaignId,
+              schedule_id: broadcast.schedule_id,
+            }),
+          });
+
+          if (cancelRes.ok) {
+            console.log(`Cancelled outdated signature: ${broadcast.schedule_id}`);
+            signatureCancelled++;
+            
+            // Log the action
+            await supabase.from('scheduler_logs').insert({
+              function_name: 'braze-reconcile',
+              action: 'signature_cancelled',
+              reason: 'Signature no longer in desired set',
+              details: { schedule_id: broadcast.schedule_id, sig },
+            });
+          }
+        } catch (error) {
+          console.error(`Error cancelling by signature ${broadcast.schedule_id}:`, error);
+        }
+      }
+
+      // Phase 1: Cancel orphaned schedules (in Braze but not in ledger)
       if (!knownScheduleIds.has(broadcast.schedule_id)) {
         try {
           const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
@@ -96,12 +162,66 @@ Deno.serve(async (req) => {
           if (cancelRes.ok) {
             console.log(`Cancelled orphaned schedule: ${broadcast.schedule_id}`);
             cancelled++;
+            
+            // Log the action
+            await supabase.from('scheduler_logs').insert({
+              function_name: 'braze-reconcile',
+              action: 'orphan_cancelled',
+              reason: 'Schedule not in ledger',
+              details: { schedule_id: broadcast.schedule_id },
+            });
           } else {
             const errorText = await cancelRes.text();
             console.error(`Failed to cancel ${broadcast.schedule_id}: ${errorText}`);
           }
         } catch (error) {
           console.error(`Error cancelling ${broadcast.schedule_id}:`, error);
+        }
+      }
+    }
+
+    // Phase 1: Match-based deduplication - keep only earliest schedule per match
+    for (const [matchId, schedules] of matchScheduleMap.entries()) {
+      if (schedules.length > 1) {
+        // Sort by send time, keep earliest
+        schedules.sort((a, b) => 
+          new Date(a.schedule?.time || a.send_at).getTime() - 
+          new Date(b.schedule?.time || b.send_at).getTime()
+        );
+        
+        const [keep, ...duplicates] = schedules;
+        console.log(`Match ${matchId}: keeping ${keep.schedule_id}, cancelling ${duplicates.length} duplicates`);
+        
+        for (const dup of duplicates) {
+          try {
+            const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${brazeApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                campaign_id: brazeCampaignId,
+                schedule_id: dup.schedule_id,
+              }),
+            });
+
+            if (cancelRes.ok) {
+              console.log(`Cancelled duplicate for match ${matchId}: ${dup.schedule_id}`);
+              matchDedupCancelled++;
+              
+              // Log the action
+              await supabase.from('scheduler_logs').insert({
+                function_name: 'braze-reconcile',
+                match_id: parseInt(matchId),
+                action: 'duplicate_cancelled',
+                reason: 'Multiple schedules for same match',
+                details: { schedule_id: dup.schedule_id, kept: keep.schedule_id },
+              });
+            }
+          } catch (error) {
+            console.error(`Error cancelling duplicate ${dup.schedule_id}:`, error);
+          }
         }
       }
     }
@@ -121,10 +241,19 @@ Deno.serve(async (req) => {
       .select('*', { count: 'exact', head: true })
       .lt('send_at_utc', now.toISOString());
 
-    console.log(`Braze reconcile complete: cancelled=${cancelled}, cleaned=${cleaned || 0}`);
+    console.log(`Braze reconcile complete: cancelled=${cancelled}, signatureCancelled=${signatureCancelled}, matchDedupCancelled=${matchDedupCancelled}, cleaned=${cleaned || 0}`);
+
+    // Phase 2: Release advisory lock
+    await supabase.rpc('pg_advisory_unlock', { key: lockKey });
 
     return new Response(
-      JSON.stringify({ cancelled, cleaned: cleaned || 0 }),
+      JSON.stringify({ 
+        cancelled, 
+        signatureCancelled, 
+        matchDedupCancelled, 
+        cleaned: cleaned || 0,
+        total_cancelled: cancelled + signatureCancelled + matchDedupCancelled
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
