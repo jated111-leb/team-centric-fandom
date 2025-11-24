@@ -65,6 +65,27 @@ export type Database = {
         }
         Relationships: []
       }
+      featured_teams: {
+        Row: {
+          created_at: string
+          id: string
+          team_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          team_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          team_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       matches: {
         Row: {
           away_team: string
