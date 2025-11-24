@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
+import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
 
 export default function Admin() {
   const [enabled, setEnabled] = useState(false);
@@ -160,6 +161,8 @@ export default function Admin() {
             </div>
           </CardContent>
         </Card>
+
+        <BrazeSchedulesView />
 
         <ScheduledNotificationsTable />
       </div>
