@@ -170,6 +170,13 @@ Deno.serve(async (req) => {
       const kickoffDate = new Date(match.utc_date);
       const sendAtDate = new Date(kickoffDate.getTime() - SEND_OFFSET_MINUTES * 60 * 1000);
 
+      // Format kickoff time for Arabic display (Riyadh timezone UTC+3)
+      const riyadhOffset = 3 * 60; // UTC+3 in minutes
+      const riyadhTime = new Date(kickoffDate.getTime() + riyadhOffset * 60 * 1000);
+      const hours = riyadhTime.getUTCHours();
+      const minutes = riyadhTime.getUTCMinutes();
+      const kickoff_ar = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
       // Skip if send window has passed
       if (sendAtDate <= now) {
         console.log(`Match ${match.id}: send window passed (sendAt: ${sendAtDate.toISOString()}, now: ${now.toISOString()})`);
@@ -220,6 +227,7 @@ Deno.serve(async (req) => {
         home_ar: teamArabicMap.get(match.home_team) || match.home_team,
         away_ar: teamArabicMap.get(match.away_team) || match.away_team,
         kickoff_utc: match.utc_date,
+        kickoff_ar: kickoff_ar,
         sig: signature,
       };
 
