@@ -122,15 +122,43 @@ Deno.serve(async (req) => {
 
     console.log(`Gap detection complete: found ${gaps.length} gaps`);
 
+    // AUTO-FIX: If gaps found, trigger scheduler to fix them
+    let schedulerTriggered = false;
+    if (gaps.length > 0) {
+      console.log(`🔧 AUTO-FIX: Triggering braze-scheduler to fix ${gaps.length} gaps...`);
+      try {
+        const { data: schedulerResult, error: schedulerError } = await supabase.functions.invoke('braze-scheduler');
+        if (schedulerError) {
+          console.error('Failed to trigger scheduler for auto-fix:', schedulerError);
+        } else {
+          schedulerTriggered = true;
+          console.log('✅ Scheduler triggered for auto-fix:', schedulerResult);
+          
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'gap-detection',
+            action: 'auto_fix_triggered',
+            reason: `Triggered scheduler to fix ${gaps.length} gaps`,
+            details: {
+              gaps_found: gaps.length,
+              scheduler_result: schedulerResult,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Error triggering scheduler for auto-fix:', error);
+      }
+    }
+
     // Create a summary log
     await supabase.from('scheduler_logs').insert({
       function_name: 'gap-detection',
       action: 'scan_complete',
-      reason: `Scanned ${matches?.length || 0} matches, found ${gaps.length} gaps`,
+      reason: `Scanned ${matches?.length || 0} matches, found ${gaps.length} gaps${schedulerTriggered ? ', triggered scheduler' : ''}`,
       details: {
         total_matches: matches?.length || 0,
         gaps_found: gaps.length,
         scan_window_hours: 48,
+        scheduler_triggered: schedulerTriggered,
       },
     });
 
@@ -139,6 +167,7 @@ Deno.serve(async (req) => {
         gaps,
         total_matches_scanned: matches?.length || 0,
         gaps_found: gaps.length,
+        scheduler_triggered: schedulerTriggered,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

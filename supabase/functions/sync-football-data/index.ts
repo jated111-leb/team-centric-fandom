@@ -184,11 +184,25 @@ Deno.serve(async (req) => {
 
     console.log('Sync completed:', results);
 
+    // Trigger scheduler immediately after sync to catch same-day matches
+    console.log('🔄 Triggering braze-scheduler after sync...');
+    try {
+      const { data: schedulerResult, error: schedulerError } = await supabase.functions.invoke('braze-scheduler');
+      if (schedulerError) {
+        console.error('Failed to trigger scheduler:', schedulerError);
+      } else {
+        console.log('✅ Scheduler triggered successfully:', schedulerResult);
+      }
+    } catch (error) {
+      console.error('Error triggering scheduler:', error);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         results,
-        total: Object.values(results).reduce((a, b) => a + b, 0)
+        total: Object.values(results).reduce((a, b) => a + b, 0),
+        scheduler_triggered: true
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

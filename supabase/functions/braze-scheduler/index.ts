@@ -263,7 +263,7 @@ Deno.serve(async (req) => {
       console.log(`Processing match ${match.id}: ${match.home_team} vs ${match.away_team} at ${match.utc_date}`);
 
       const kickoffDate = new Date(match.utc_date);
-      const sendAtDate = new Date(kickoffDate.getTime() - SEND_OFFSET_MINUTES * 60 * 1000);
+      let sendAtDate = new Date(kickoffDate.getTime() - SEND_OFFSET_MINUTES * 60 * 1000);
 
       // Format kickoff time for Arabic display using Baghdad timezone (Asia/Baghdad)
       const BAGHDAD_TIMEZONE = 'Asia/Baghdad';
@@ -291,20 +291,67 @@ Deno.serve(async (req) => {
       // Format kickoff_baghdad: "YYYY-MM-DD HH:MM" in Baghdad timezone
       const kickoff_baghdad = formatInTimeZone(kickoffDate, BAGHDAD_TIMEZONE, 'yyyy-MM-dd HH:mm');
 
-      // Skip if send window has passed
+      // Check if send window has passed - but add emergency scheduling for close matches
       if (sendAtDate <= now) {
-        console.log(`Match ${match.id}: send window passed (sendAt: ${sendAtDate.toISOString()}, now: ${now.toISOString()})`);
-        skipped++;
-        
-        // Phase 4: Log skip
-        await supabase.from('scheduler_logs').insert({
-          function_name: 'braze-scheduler',
-          match_id: match.id,
-          action: 'skipped',
-          reason: 'Send window passed',
-          details: { sendAt: sendAtDate.toISOString(), now: now.toISOString() },
-        });
-        continue;
+        // Check if kickoff is still in the future - we can still send a last-minute notification
+        if (kickoffDate > now) {
+          const minutesToKickoff = (kickoffDate.getTime() - now.getTime()) / 60000;
+          
+          // If there's at least 30 minutes until kickoff, schedule emergency notification
+          if (minutesToKickoff >= 30) {
+            // Schedule for 25 minutes before kickoff as an emergency fallback
+            sendAtDate = new Date(kickoffDate.getTime() - 25 * 60 * 1000);
+            console.log(`⚡ EMERGENCY SCHEDULE: Match ${match.id} - ${match.home_team} vs ${match.away_team}`);
+            console.log(`   Sending in ${Math.round((sendAtDate.getTime() - now.getTime()) / 60000)} min (25 min before kickoff)`);
+            
+            await supabase.from('scheduler_logs').insert({
+              function_name: 'braze-scheduler',
+              match_id: match.id,
+              action: 'emergency_schedule',
+              reason: `Original window passed, rescheduled ${Math.round((sendAtDate.getTime() - now.getTime()) / 60000)}min from now`,
+              details: {
+                kickoff: match.utc_date,
+                originalSendAt: new Date(kickoffDate.getTime() - SEND_OFFSET_MINUTES * 60 * 1000).toISOString(),
+                emergencySendAt: sendAtDate.toISOString(),
+                minutesToKickoff: Math.round(minutesToKickoff),
+              },
+            });
+            // Don't skip - continue to schedule this emergency notification
+          } else {
+            console.log(`Match ${match.id}: too close to kickoff (${Math.round(minutesToKickoff)} min remaining)`);
+            skipped++;
+            
+            await supabase.from('scheduler_logs').insert({
+              function_name: 'braze-scheduler',
+              match_id: match.id,
+              action: 'skipped',
+              reason: `Too close to kickoff (${Math.round(minutesToKickoff)} min remaining)`,
+              details: {
+                kickoff: match.utc_date,
+                sendAt: sendAtDate.toISOString(),
+                now: now.toISOString(),
+                minutesToKickoff: Math.round(minutesToKickoff),
+              },
+            });
+            continue;
+          }
+        } else {
+          console.log(`Match ${match.id}: match already started`);
+          skipped++;
+          
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-scheduler',
+            match_id: match.id,
+            action: 'skipped',
+            reason: 'Match already started',
+            details: {
+              kickoff: match.utc_date,
+              sendAt: sendAtDate.toISOString(),
+              now: now.toISOString(),
+            },
+          });
+          continue;
+        }
       }
 
       // Build audience for both teams using canonical names
