@@ -163,10 +163,14 @@ Deno.serve(async (req) => {
       console.log(`🔄 Generating Arabic translation for: ${teamName}`);
 
       try {
-        // Call Lovable AI to translate the team name
+        // Call Lovable AI to translate the team name with timeout
         const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
         
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          signal: controller.signal,
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -186,6 +190,8 @@ Deno.serve(async (req) => {
             ],
           }),
         });
+
+        clearTimeout(timeout);
 
         if (!response.ok) {
           console.error(`AI translation failed for ${teamName}: ${response.status}`);
@@ -224,7 +230,8 @@ Deno.serve(async (req) => {
         
         return arabicName;
       } catch (error) {
-        console.error(`Error generating translation for ${teamName}:`, error);
+        const isTimeout = error instanceof Error && error.name === 'AbortError';
+        console.error(`Error generating translation for ${teamName}:`, isTimeout ? 'Timeout' : error);
         return teamName; // Fallback to English
       }
     }
@@ -259,6 +266,22 @@ Deno.serve(async (req) => {
         });
         continue;
       }
+
+      // Log that we're starting to process a featured match
+      await supabase.from('scheduler_logs').insert({
+        function_name: 'braze-scheduler',
+        match_id: match.id,
+        action: 'processing',
+        reason: 'Starting to process featured team match',
+        details: { 
+          home: match.home_team, 
+          away: match.away_team, 
+          homeFeatured, 
+          awayFeatured,
+          homeCanonical: homeCanonical || 'none',
+          awayCanonical: awayCanonical || 'none'
+        },
+      });
 
       console.log(`Processing match ${match.id}: ${match.home_team} vs ${match.away_team} at ${match.utc_date}`);
 
@@ -377,9 +400,34 @@ Deno.serve(async (req) => {
         .eq('match_id', match.id)
         .maybeSingle();
 
-      // Ensure translations exist (will auto-generate if missing)
-      const home_ar = await ensureTeamTranslation(match.home_team, teamArabicMap);
-      const away_ar = await ensureTeamTranslation(match.away_team, teamArabicMap);
+      // Ensure translations exist (will auto-generate if missing) with error handling
+      let home_ar: string;
+      let away_ar: string;
+      
+      try {
+        home_ar = await ensureTeamTranslation(match.home_team, teamArabicMap);
+        away_ar = await ensureTeamTranslation(match.away_team, teamArabicMap);
+      } catch (translationError) {
+        console.error(`Translation failed for match ${match.id}:`, translationError);
+        
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-scheduler',
+          match_id: match.id,
+          action: 'error',
+          reason: 'Translation failed',
+          details: { 
+            error: translationError instanceof Error ? translationError.message : 'Unknown error',
+            home: match.home_team,
+            away: match.away_team 
+          },
+        });
+        
+        // Fallback to English names
+        home_ar = match.home_team;
+        away_ar = match.away_team;
+        
+        console.log(`Using English fallback for match ${match.id}: ${home_ar} vs ${away_ar}`);
+      }
 
       // Build trigger properties
       const triggerProps = {
@@ -442,6 +490,19 @@ Deno.serve(async (req) => {
           if (!updateRes.ok) {
             const errorText = await updateRes.text();
             console.error(`Failed to update schedule for match ${match.id}: ${errorText}`);
+            
+            // Log Braze API update failure
+            await supabase.from('scheduler_logs').insert({
+              function_name: 'braze-scheduler',
+              match_id: match.id,
+              action: 'error',
+              reason: 'Braze API update failed',
+              details: { 
+                error: errorText,
+                status: updateRes.status,
+                schedule_id: existingSchedule.braze_schedule_id 
+              },
+            });
             continue;
           }
 
@@ -499,6 +560,18 @@ Deno.serve(async (req) => {
           if (!createRes.ok) {
             const errorText = await createRes.text();
             console.error(`Failed to create schedule for match ${match.id}: ${errorText}`);
+            
+            // Log Braze API create failure
+            await supabase.from('scheduler_logs').insert({
+              function_name: 'braze-scheduler',
+              match_id: match.id,
+              action: 'error',
+              reason: 'Braze API create failed',
+              details: { 
+                error: errorText,
+                status: createRes.status 
+              },
+            });
             continue;
           }
 
