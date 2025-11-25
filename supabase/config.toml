@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.braze-cleanup-old-schedules]
 verify_jwt = false
 
+[functions.verify-braze-schedules]
+verify_jwt = false
+
 [functions.braze-debug]
 verify_jwt = false
 
