@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Info, FileText, Trash2 } from 'lucide-react';
+import { Loader2, Info, FileText, Trash2, LogOut } from 'lucide-react';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
 import { SchedulerStats } from '@/components/SchedulerStats';
@@ -201,6 +201,23 @@ export default function Admin() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: 'Logged out',
+        description: 'You have been logged out successfully',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to log out',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (checkingAuth || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -224,10 +241,17 @@ export default function Admin() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button onClick={() => navigate('/')} variant="outline">
+              View Schedule
+            </Button>
             <NotificationPreview />
             <Button onClick={() => navigate('/admin/notification-logs')} variant="outline">
               <FileText className="h-4 w-4 mr-2" />
               View Notification Logs
+            </Button>
+            <Button onClick={handleLogout} variant="ghost">
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
             </Button>
           </div>
         </div>
