@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScheduleFilters } from "@/components/ScheduleFilters";
 import { MatchRow } from "@/components/MatchRow";
-import { AdminSetupButton } from "@/components/AdminSetupButton";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar, TrendingUp, RefreshCw, LogOut } from "lucide-react";
 import { toast } from "sonner";
@@ -179,7 +178,6 @@ const Index = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <AdminSetupButton />
                 <Button 
                   onClick={() => window.location.href = '/admin'}
                   variant="outline"
