@@ -141,6 +141,85 @@ Deno.serve(async (req) => {
       compTranslations?.map(c => [c.competition_code, c.english_name]) || []
     );
 
+    // Helper function to generate and save Arabic translation for a team
+    async function ensureTeamTranslation(
+      teamName: string,
+      teamArabicMap: Map<string, string>
+    ): Promise<string> {
+      // Check if translation already exists
+      if (teamArabicMap.has(teamName)) {
+        return teamArabicMap.get(teamName)!;
+      }
+
+      console.log(`🔄 Generating Arabic translation for: ${teamName}`);
+
+      try {
+        // Call Lovable AI to translate the team name
+        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+        
+        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a sports translator specializing in football team names. Translate the given football team name to Arabic. Return ONLY the Arabic translation, nothing else. Use the commonly recognized Arabic name for the team.'
+              },
+              {
+                role: 'user',
+                content: `Translate this football team name to Arabic: ${teamName}`
+              }
+            ],
+          }),
+        });
+
+        if (!response.ok) {
+          console.error(`AI translation failed for ${teamName}: ${response.status}`);
+          return teamName; // Fallback to English
+        }
+
+        const data = await response.json();
+        const arabicName = data.choices[0].message.content.trim();
+
+        // Save translation to database for future use
+        const { error: insertError } = await supabase
+          .from('team_translations')
+          .insert({ team_name: teamName, arabic_name: arabicName })
+          .select()
+          .single();
+
+        if (insertError) {
+          // If duplicate, that's fine - another process might have created it
+          if (insertError.code !== '23505') {
+            console.error(`Error saving translation for ${teamName}:`, insertError);
+          }
+        } else {
+          console.log(`✅ Saved Arabic translation: ${teamName} → ${arabicName}`);
+          
+          // Log the new translation
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-scheduler',
+            action: 'translation_generated',
+            reason: `Auto-translated: ${teamName} → ${arabicName}`,
+            details: { team_name: teamName, arabic_name: arabicName },
+          });
+        }
+
+        // Update the local map
+        teamArabicMap.set(teamName, arabicName);
+        
+        return arabicName;
+      } catch (error) {
+        console.error(`Error generating translation for ${teamName}:`, error);
+        return teamName; // Fallback to English
+      }
+    }
+
     let scheduled = 0;
     let updated = 0;
     let skipped = 0;
@@ -237,6 +316,10 @@ Deno.serve(async (req) => {
         .eq('match_id', match.id)
         .maybeSingle();
 
+      // Ensure translations exist (will auto-generate if missing)
+      const home_ar = await ensureTeamTranslation(match.home_team, teamArabicMap);
+      const away_ar = await ensureTeamTranslation(match.away_team, teamArabicMap);
+
       // Build trigger properties
       const triggerProps = {
         match_id: match.id.toString(),
@@ -245,8 +328,8 @@ Deno.serve(async (req) => {
         competition_ar: compArabicMap.get(match.competition) || match.competition_name,
         home_en: match.home_team,
         away_en: match.away_team,
-        home_ar: teamArabicMap.get(match.home_team) || match.home_team,
-        away_ar: teamArabicMap.get(match.away_team) || match.away_team,
+        home_ar: home_ar,
+        away_ar: away_ar,
         kickoff_utc: match.utc_date,
         kickoff_baghdad: kickoff_baghdad,
         kickoff_ar: kickoff_ar,
