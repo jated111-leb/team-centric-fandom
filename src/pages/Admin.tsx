@@ -14,6 +14,7 @@ import { AlertMonitor } from '@/components/AlertMonitor';
 import { FeaturedTeamsManager } from '@/components/FeaturedTeamsManager';
 import { NotificationPreview } from '@/components/NotificationPreview';
 import { TeamTranslationsManager } from '@/components/TeamTranslationsManager';
+import { GapDetectionAlert } from '@/components/GapDetectionAlert';
 import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
@@ -284,6 +285,8 @@ export default function Admin() {
         </Card>
 
         <AlertMonitor />
+
+        <GapDetectionAlert />
 
         <SchedulerStats />
 

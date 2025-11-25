@@ -21,5 +21,8 @@ verify_jwt = false
 [functions.braze-debug]
 verify_jwt = false
 
+[functions.gap-detection]
+verify_jwt = false
+
 [functions.setup-admin]
 verify_jwt = false

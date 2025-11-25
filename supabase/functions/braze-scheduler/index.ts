@@ -86,6 +86,15 @@ Deno.serve(async (req) => {
 
     console.log(`Fetched ${matches?.length || 0} matches with SCHEDULED or TIMED status`);
 
+    // Log all matches for diagnostics
+    console.log('=== ALL FETCHED MATCHES (Diagnostic) ===');
+    for (const m of matches || []) {
+      const kickoff = new Date(m.utc_date);
+      const hoursUntilKickoff = (kickoff.getTime() - now.getTime()) / 3600000;
+      console.log(`  Match ${m.id}: ${m.home_team} vs ${m.away_team} | Kickoff: ${m.utc_date} (${hoursUntilKickoff.toFixed(1)}h) | Competition: ${m.competition}`);
+    }
+    console.log('=== END DIAGNOSTIC ===');
+
     // Phase 3: Fetch featured teams from database
     const { data: featuredTeamsData } = await supabase
       .from('featured_teams')
@@ -231,6 +240,11 @@ Deno.serve(async (req) => {
       
       const homeFeatured = homeCanonical && FEATURED_TEAMS_FROM_DB.includes(homeCanonical);
       const awayFeatured = awayCanonical && FEATURED_TEAMS_FROM_DB.includes(awayCanonical);
+      
+      // Enhanced diagnostic logging for team mapping
+      console.log(`🔍 Team Mapping Check for Match ${match.id}:`);
+      console.log(`  Home: "${match.home_team}" → Canonical: "${homeCanonical || 'NOT MAPPED'}" → Featured: ${homeFeatured}`);
+      console.log(`  Away: "${match.away_team}" → Canonical: "${awayCanonical || 'NOT MAPPED'}" → Featured: ${awayFeatured}`);
       
       if (!homeFeatured && !awayFeatured) {
         console.log(`Match ${match.id}: ${match.home_team} vs ${match.away_team} - no featured teams`);
@@ -480,6 +494,20 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Braze scheduler complete: scheduled=${scheduled}, updated=${updated}, skipped=${skipped}`);
+
+    // Log summary to database for monitoring
+    await supabase.from('scheduler_logs').insert({
+      function_name: 'braze-scheduler',
+      action: 'run_complete',
+      reason: `Scheduled: ${scheduled}, Updated: ${updated}, Skipped: ${skipped}`,
+      details: { 
+        total_matches_fetched: matches?.length || 0,
+        scheduled,
+        updated,
+        skipped,
+        run_duration_ms: Date.now() - now.getTime()
+      },
+    });
 
     // Post-run deduplication: remove any duplicate fixture schedules
     try {
