@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Filter } from "lucide-react";
+import { ArrowLeft, Download, Filter, LogOut } from "lucide-react";
 import { formatBaghdadTime } from "@/lib/timezone";
 
 interface NotificationSend {
@@ -227,6 +227,23 @@ const NotificationLogs = () => {
     a.click();
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: 'Logged out',
+        description: 'You have been logged out successfully',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to log out',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getEventBadgeVariant = (eventType: string) => {
     if (eventType.includes('send') || eventType.includes('Send')) return "default";
     if (eventType.includes('bounce') || eventType.includes('Bounce')) return "destructive";
@@ -251,10 +268,16 @@ const NotificationLogs = () => {
               <p className="text-muted-foreground">Track all sent notifications in real-time</p>
             </div>
           </div>
-          <Button onClick={exportToCSV} disabled={filteredLogs.length === 0}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={exportToCSV} disabled={filteredLogs.length === 0}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+            <Button onClick={handleLogout} variant="ghost">
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}

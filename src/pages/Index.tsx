@@ -7,7 +7,7 @@ import { ScheduleFilters } from "@/components/ScheduleFilters";
 import { MatchRow } from "@/components/MatchRow";
 import { AdminSetupButton } from "@/components/AdminSetupButton";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar, TrendingUp, RefreshCw } from "lucide-react";
+import { Calendar, TrendingUp, RefreshCw, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import type { Match } from "@/types/match";
 import { FEATURED_TEAMS } from "@/lib/teamConfig";
@@ -107,6 +107,16 @@ const Index = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Failed to log out');
+    }
+  };
+
   const filteredMatches = useMemo(() => {
     return matches.filter((match) => {
       const matchesSearch =
@@ -171,11 +181,11 @@ const Index = () => {
               <div className="flex items-center gap-2">
                 <AdminSetupButton />
                 <Button 
-                  onClick={() => window.location.href = '/auth'}
+                  onClick={() => window.location.href = '/admin'}
                   variant="outline"
                   size="sm"
                 >
-                  Admin Login
+                  Admin Panel
                 </Button>
                 <Button 
                   onClick={handleRefresh} 
@@ -185,6 +195,14 @@ const Index = () => {
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                   {isRefreshing ? 'Syncing...' : 'Refresh Data'}
+                </Button>
+                <Button 
+                  onClick={handleLogout}
+                  variant="ghost"
+                  size="sm"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
                 </Button>
               </div>
             </div>
