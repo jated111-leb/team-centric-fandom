@@ -22,11 +22,6 @@ const COMPETITION_CONFIG = {
     color: "bg-[hsl(25,90%,55%)] text-white border-[hsl(25,90%,55%)]",
     label: "Ligue 1"
   },
-  Bundesliga: {
-    icon: Zap,
-    color: "bg-[hsl(0,85%,60%)] text-white border-[hsl(0,85%,60%)]",
-    label: "Bundesliga"
-  },
   Dutch_League_starzplay: {
     icon: Trophy,
     color: "bg-[hsl(30,90%,50%)] text-white border-[hsl(30,90%,50%)]",

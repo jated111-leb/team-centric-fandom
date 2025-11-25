@@ -13,7 +13,6 @@ const COMPETITION_CODES = {
   'PL': 'Premier_League',
   'SA': 'Serie_A',
   'FL1': 'Ligue_1',
-  'BL1': 'Bundesliga',
   'DED': 'Dutch_League_starzplay',
   'CL': 'Champions_League',
   'EL': 'Europa_League',
