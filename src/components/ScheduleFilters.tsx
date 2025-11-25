@@ -23,7 +23,6 @@ const competitions: Competition[] = [
   "Premier_League",
   "Serie_A",
   "Ligue_1",
-  "Bundesliga",
   "Dutch_League_starzplay",
   "Champions_League",
   "Europa_League",
