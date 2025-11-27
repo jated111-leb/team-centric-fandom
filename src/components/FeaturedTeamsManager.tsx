@@ -29,6 +29,7 @@ const teamNameSchema = z
 interface FeaturedTeam {
   id: string;
   team_name: string;
+  braze_attribute_value: string | null;
   created_at: string;
 }
 
@@ -40,6 +41,8 @@ export function FeaturedTeamsManager() {
   const [teamToDelete, setTeamToDelete] = useState<FeaturedTeam | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
+  const [editingBrazeValue, setEditingBrazeValue] = useState<{ [key: string]: string }>({});
+  const [updatingBrazeValue, setUpdatingBrazeValue] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export function FeaturedTeamsManager() {
     try {
       const { data, error } = await supabase
         .from('featured_teams')
-        .select('*')
+        .select('id, team_name, braze_attribute_value, created_at')
         .order('team_name', { ascending: true });
 
       if (error) throw error;
@@ -163,6 +166,39 @@ export function FeaturedTeamsManager() {
     }
   };
 
+  const updateBrazeValue = async (teamId: string, newValue: string) => {
+    setUpdatingBrazeValue(teamId);
+    try {
+      const { error } = await supabase
+        .from('featured_teams')
+        .update({ braze_attribute_value: newValue.trim() || null })
+        .eq('id', teamId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Braze Value Updated',
+        description: 'The Braze attribute value has been updated',
+      });
+
+      // Clear editing state
+      const newEditingState = { ...editingBrazeValue };
+      delete newEditingState[teamId];
+      setEditingBrazeValue(newEditingState);
+
+      fetchTeams();
+    } catch (error) {
+      console.error('Error updating Braze value:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update Braze value',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingBrazeValue(null);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -227,21 +263,51 @@ export function FeaturedTeamsManager() {
           </div>
 
           {/* Teams List */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-3">
             {teams.map((team) => (
               <div
                 key={team.id}
-                className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
+                className="p-4 rounded-lg border border-border bg-card space-y-2"
               >
-                <span className="text-sm font-medium">{team.team_name}</span>
-                <Button
-                  onClick={() => setTeamToDelete(team)}
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{team.team_name}</span>
+                  <Button
+                    onClick={() => setTeamToDelete(team)}
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      Braze Attribute Value {!team.braze_attribute_value && <AlertCircle className="inline h-3 w-3 text-yellow-500" />}
+                    </label>
+                    <Input
+                      value={editingBrazeValue[team.id] ?? team.braze_attribute_value ?? ''}
+                      onChange={(e) => setEditingBrazeValue({ ...editingBrazeValue, [team.id]: e.target.value })}
+                      placeholder="e.g., Real Madrid"
+                      className="h-8 text-sm"
+                      disabled={updatingBrazeValue === team.id}
+                    />
+                  </div>
+                  {editingBrazeValue[team.id] !== undefined && editingBrazeValue[team.id] !== (team.braze_attribute_value ?? '') && (
+                    <Button
+                      onClick={() => updateBrazeValue(team.id, editingBrazeValue[team.id])}
+                      size="sm"
+                      disabled={updatingBrazeValue === team.id}
+                      className="h-8 mt-5"
+                    >
+                      {updatingBrazeValue === team.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        'Save'
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
