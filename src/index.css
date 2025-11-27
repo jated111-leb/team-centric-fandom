@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -37,16 +38,16 @@ All colors MUST be HSL.
     --ring: 215 70% 25%;
 
     --radius: 0.5rem;
-    
+
     /* Sports-specific tokens */
     --priority-high: 0 85% 60%;
     --priority-medium: 35 100% 50%;
     --priority-low: 215 20% 65%;
-    
+
     --status-scheduled: 160 60% 45%;
     --status-live: 0 85% 60%;
     --status-finished: 215 15% 50%;
-    
+
     --gradient-header: linear-gradient(135deg, hsl(215 70% 25%), hsl(215 60% 35%));
     --shadow-card: 0 2px 8px -2px hsl(215 70% 25% / 0.12);
     --shadow-elevated: 0 8px 24px -8px hsl(215 70% 25% / 0.18);
@@ -66,6 +67,8 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --font-sans: Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   }
 
   .dark {
@@ -96,11 +99,11 @@ All colors MUST be HSL.
     --border: 215 25% 20%;
     --input: 215 25% 20%;
     --ring: 160 60% 45%;
-    
+
     --priority-high: 0 85% 60%;
     --priority-medium: 35 100% 55%;
     --priority-low: 215 15% 60%;
-    
+
     --gradient-header: linear-gradient(135deg, hsl(215 30% 12%), hsl(215 25% 18%));
     --shadow-card: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
     --shadow-elevated: 0 8px 24px -8px hsl(0 0% 0% / 0.5);
@@ -112,6 +115,7 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --font-sans: Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   }
 }
 
