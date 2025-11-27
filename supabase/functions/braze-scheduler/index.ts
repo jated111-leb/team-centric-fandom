@@ -95,12 +95,17 @@ Deno.serve(async (req) => {
     }
     console.log('=== END DIAGNOSTIC ===');
 
-    // Phase 3: Fetch featured teams from database
+    // Phase 3: Fetch featured teams from database with Braze attribute values
     const { data: featuredTeamsData } = await supabase
       .from('featured_teams')
-      .select('team_name');
+      .select('team_name, braze_attribute_value');
 
     const FEATURED_TEAMS_FROM_DB = (featuredTeamsData || []).map(t => t.team_name);
+    
+    // Create mapping from canonical name to Braze attribute value
+    const brazeAttributeMap = new Map(
+      (featuredTeamsData || []).map(t => [t.team_name, t.braze_attribute_value || t.team_name])
+    );
 
     if (FEATURED_TEAMS_FROM_DB.length === 0) {
       console.log('No featured teams configured - skipping');
@@ -377,13 +382,23 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Build audience for both teams using canonical names
+      // Build audience for both teams using Braze attribute values
       const targetTeams = [
         homeFeatured ? homeCanonical : null,
         awayFeatured ? awayCanonical : null
       ].filter(t => t !== null) as string[];
+      
+      // Convert canonical names to Braze attribute values for audience targeting
+      const brazeTargetTeams = targetTeams.map(team => {
+        const brazeValue = brazeAttributeMap.get(team) || team;
+        if (!brazeAttributeMap.get(team)) {
+          console.warn(`⚠️ No Braze attribute value for ${team} - using canonical name as fallback`);
+        }
+        return brazeValue;
+      });
+      
       const audience = {
-        OR: targetTeams.flatMap(team => [
+        OR: brazeTargetTeams.flatMap(team => [
           { custom_attribute: { custom_attribute_name: 'Team 1', comparison: 'equals', value: team } },
           { custom_attribute: { custom_attribute_name: 'Team 2', comparison: 'equals', value: team } },
           { custom_attribute: { custom_attribute_name: 'Team 3', comparison: 'equals', value: team } },

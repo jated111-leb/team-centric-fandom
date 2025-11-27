@@ -67,18 +67,21 @@ export type Database = {
       }
       featured_teams: {
         Row: {
+          braze_attribute_value: string | null
           created_at: string
           id: string
           team_name: string
           updated_at: string
         }
         Insert: {
+          braze_attribute_value?: string | null
           created_at?: string
           id?: string
           team_name: string
           updated_at?: string
         }
         Update: {
+          braze_attribute_value?: string | null
           created_at?: string
           id?: string
           team_name?: string
