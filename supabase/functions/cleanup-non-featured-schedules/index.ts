@@ -16,6 +16,11 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const brazeApiKey = Deno.env.get('BRAZE_API_KEY')!;
     const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT')!;
+    const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID')!;
+
+    if (!brazeCampaignId) {
+      throw new Error('Missing BRAZE_CAMPAIGN_ID environment variable');
+    }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -32,6 +37,28 @@ Deno.serve(async (req) => {
 
     const featuredTeamNames = featuredTeams.map(t => t.team_name);
     console.log(`Featured teams: ${featuredTeamNames.join(', ')}`);
+
+    // Get team mappings for canonical name resolution
+    const { data: teamMappings, error: mappingsError } = await supabase
+      .from('team_mappings')
+      .select('pattern, canonical_name');
+
+    if (mappingsError) {
+      throw new Error(`Failed to fetch team mappings: ${mappingsError.message}`);
+    }
+
+    console.log(`Loaded ${teamMappings.length} team mappings`);
+
+    // Helper function to resolve team to canonical name
+    const resolveCanonicalTeam = (teamName: string): string => {
+      for (const mapping of teamMappings) {
+        const regex = new RegExp(mapping.pattern, 'i');
+        if (regex.test(teamName)) {
+          return mapping.canonical_name;
+        }
+      }
+      return 'none';
+    };
 
     // Find all schedules for matches that don't involve any featured teams
     const { data: schedules, error: schedulesError } = await supabase
@@ -52,13 +79,20 @@ Deno.serve(async (req) => {
 
     console.log(`Total schedules in ledger: ${schedules.length}`);
 
-    // Filter to non-featured team schedules
+    // Filter to non-featured team schedules using canonical team matching
     const nonFeaturedSchedules = schedules.filter(schedule => {
       const match = schedule.matches as any;
       if (!match) return false;
       
-      const homeTeamFeatured = featuredTeamNames.includes(match.home_team);
-      const awayTeamFeatured = featuredTeamNames.includes(match.away_team);
+      // Resolve teams to canonical names
+      const homeCanonical = resolveCanonicalTeam(match.home_team);
+      const awayCanonical = resolveCanonicalTeam(match.away_team);
+      
+      // Check if canonical names match featured teams
+      const homeTeamFeatured = featuredTeamNames.includes(homeCanonical);
+      const awayTeamFeatured = featuredTeamNames.includes(awayCanonical);
+      
+      console.log(`Match ${schedule.match_id}: ${match.home_team} (${homeCanonical}) vs ${match.away_team} (${awayCanonical}) - Home Featured: ${homeTeamFeatured}, Away Featured: ${awayTeamFeatured}`);
       
       // Delete if neither team is featured
       return !homeTeamFeatured && !awayTeamFeatured;
@@ -77,10 +111,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Delete from Braze in batches
+    // Delete from Braze first, then from schedule_ledger (safeguard to prevent orphans)
     const brazeDeleteUrl = `${brazeEndpoint}/campaigns/trigger/schedule/delete`;
-    const deletedFromBraze: string[] = [];
-    const failedBrazeDeletes: Array<{ schedule_id: string; error: string }> = [];
+    const successfullyDeletedSchedules: Array<{ id: string; braze_schedule_id: string }> = [];
+    const failedBrazeDeletes: Array<{ schedule_id: string; match_id: number; error: string }> = [];
 
     for (const schedule of nonFeaturedSchedules) {
       try {
@@ -91,6 +125,7 @@ Deno.serve(async (req) => {
             'Authorization': `Bearer ${brazeApiKey}`,
           },
           body: JSON.stringify({
+            campaign_id: brazeCampaignId,  // FIX: Added campaign_id
             schedule_id: schedule.braze_schedule_id,
           }),
         });
@@ -100,11 +135,16 @@ Deno.serve(async (req) => {
           console.error(`Failed to delete from Braze: ${schedule.braze_schedule_id}`, errorText);
           failedBrazeDeletes.push({
             schedule_id: schedule.braze_schedule_id,
+            match_id: schedule.match_id,
             error: errorText,
           });
         } else {
-          deletedFromBraze.push(schedule.braze_schedule_id);
-          console.log(`Deleted from Braze: ${schedule.braze_schedule_id}`);
+          // FIX: Only track as successful if Braze deletion succeeded
+          successfullyDeletedSchedules.push({
+            id: schedule.id,
+            braze_schedule_id: schedule.braze_schedule_id,
+          });
+          console.log(`✅ Deleted from Braze: ${schedule.braze_schedule_id} for match ${schedule.match_id}`);
         }
         
         // Rate limit: 50ms delay between requests
@@ -114,34 +154,43 @@ Deno.serve(async (req) => {
         console.error(`Error deleting from Braze: ${schedule.braze_schedule_id}`, error);
         failedBrazeDeletes.push({
           schedule_id: schedule.braze_schedule_id,
+          match_id: schedule.match_id,
           error: errorMessage,
         });
       }
     }
 
-    // Delete from schedule_ledger
-    const scheduleIds = nonFeaturedSchedules.map(s => s.id);
-    const { error: deleteError } = await supabase
-      .from('schedule_ledger')
-      .delete()
-      .in('id', scheduleIds);
+    console.log(`Successfully deleted ${successfullyDeletedSchedules.length} schedules from Braze`);
+    console.log(`Failed to delete ${failedBrazeDeletes.length} schedules from Braze`);
 
-    if (deleteError) {
-      console.error('Failed to delete from schedule_ledger:', deleteError);
-      throw new Error(`Failed to delete from schedule_ledger: ${deleteError.message}`);
+    // FIX: Only delete from schedule_ledger if Braze deletion was successful (safeguard)
+    let deletedFromLedgerCount = 0;
+    if (successfullyDeletedSchedules.length > 0) {
+      const scheduleIds = successfullyDeletedSchedules.map(s => s.id);
+      const { error: deleteError } = await supabase
+        .from('schedule_ledger')
+        .delete()
+        .in('id', scheduleIds);
+
+      if (deleteError) {
+        console.error('Failed to delete from schedule_ledger:', deleteError);
+        throw new Error(`Failed to delete from schedule_ledger: ${deleteError.message}`);
+      }
+
+      deletedFromLedgerCount = scheduleIds.length;
+      console.log(`✅ Deleted ${deletedFromLedgerCount} schedules from schedule_ledger`);
     }
-
-    console.log(`Deleted ${scheduleIds.length} schedules from schedule_ledger`);
 
     // Log the cleanup action
     await supabase.from('scheduler_logs').insert({
       function_name: 'cleanup-non-featured-schedules',
       action: 'cleanup',
-      reason: `Deleted ${nonFeaturedSchedules.length} non-featured team schedules`,
+      reason: `Processed ${nonFeaturedSchedules.length} non-featured schedules: ${successfullyDeletedSchedules.length} deleted, ${failedBrazeDeletes.length} failed`,
       details: {
-        deleted_from_braze: deletedFromBraze.length,
+        total_non_featured: nonFeaturedSchedules.length,
+        deleted_from_braze: successfullyDeletedSchedules.length,
+        deleted_from_ledger: deletedFromLedgerCount,
         failed_braze_deletes: failedBrazeDeletes.length,
-        deleted_from_ledger: scheduleIds.length,
         failed_braze_details: failedBrazeDeletes.slice(0, 10), // Log first 10 failures
       },
     });
@@ -149,10 +198,11 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Cleanup completed',
+        message: 'Cleanup completed with canonical team mapping',
+        processed: nonFeaturedSchedules.length,
         deleted: {
-          from_braze: deletedFromBraze.length,
-          from_ledger: scheduleIds.length,
+          from_braze: successfullyDeletedSchedules.length,
+          from_ledger: deletedFromLedgerCount,
         },
         failed: {
           braze_deletes: failedBrazeDeletes.length,
