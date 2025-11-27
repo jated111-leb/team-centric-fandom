@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBaghdadTime } from "@/lib/timezone";
 
@@ -27,6 +28,13 @@ interface ScheduledNotification {
 export const ScheduledNotificationsTable = () => {
   const [notifications, setNotifications] = useState<ScheduledNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationResults, setVerificationResults] = useState<{
+    total: number;
+    verified: string[];
+    missing: string[];
+    errors: { schedule_id: string; error: string }[];
+  } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -86,6 +94,63 @@ export const ScheduledNotificationsTable = () => {
     }
   };
 
+  const verifySchedules = async () => {
+    setVerifying(true);
+    setVerificationResults(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to verify schedules",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-braze-schedules`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Verification failed');
+      }
+
+      setVerificationResults(result);
+      
+      if (result.missing.length > 0) {
+        toast({
+          title: "Verification complete",
+          description: `${result.verified.length} schedules verified, ${result.missing.length} missing in Braze`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "All schedules verified",
+          description: `All ${result.verified.length} schedules exist in Braze`,
+        });
+      }
+    } catch (error) {
+      console.error('Error verifying schedules:', error);
+      toast({
+        title: "Verification failed",
+        description: error instanceof Error ? error.message : "Failed to verify schedules",
+        variant: "destructive",
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const getStatusBadge = (sendAtUtc: string) => {
     const sendTime = new Date(sendAtUtc);
     const now = new Date();
@@ -110,10 +175,64 @@ export const ScheduledNotificationsTable = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Scheduled Notifications</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Showing {notifications.length} most recent scheduled notifications
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Scheduled Notifications (Source of Truth)</CardTitle>
+            <CardDescription>
+              Showing {notifications.length} most recent scheduled notifications from the database
+            </CardDescription>
+          </div>
+          <Button 
+            onClick={verifySchedules} 
+            disabled={verifying || notifications.length === 0}
+            variant="outline"
+          >
+            {verifying ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Verify with Braze
+              </>
+            )}
+          </Button>
+        </div>
+        
+        {verificationResults && (
+          <div className="mt-4 p-4 rounded-lg border bg-muted/50 space-y-2">
+            <h4 className="font-semibold text-sm">Verification Results</h4>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span><strong>{verificationResults.verified.length}</strong> Verified</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <span><strong>{verificationResults.missing.length}</strong> Missing</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <span><strong>{verificationResults.errors.length}</strong> Errors</span>
+              </div>
+            </div>
+            {verificationResults.missing.length > 0 && (
+              <div className="text-xs text-muted-foreground mt-2">
+                <p className="font-medium">Missing schedule IDs:</p>
+                <ul className="list-disc list-inside mt-1">
+                  {verificationResults.missing.slice(0, 5).map((id) => (
+                    <li key={id}><code className="text-xs">{id.substring(0, 12)}...</code></li>
+                  ))}
+                  {verificationResults.missing.length > 5 && (
+                    <li>... and {verificationResults.missing.length - 5} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {notifications.length === 0 ? (

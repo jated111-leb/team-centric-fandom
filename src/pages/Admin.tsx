@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Info, FileText, Trash2, LogOut } from 'lucide-react';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
-import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
 import { SchedulerStats } from '@/components/SchedulerStats';
 import { AlertMonitor } from '@/components/AlertMonitor';
 import { FeaturedTeamsManager } from '@/components/FeaturedTeamsManager';
@@ -357,8 +356,6 @@ export default function Admin() {
         <FeaturedTeamsManager />
 
         <TeamTranslationsManager />
-
-        <BrazeSchedulesView />
 
         <ScheduledNotificationsTable />
       </div>
