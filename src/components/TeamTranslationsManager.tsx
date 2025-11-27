@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Trash2, Languages } from 'lucide-react';
+import { Loader2, Plus, Trash2, Languages, Pencil, X, Check } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 
@@ -28,6 +28,9 @@ export function TeamTranslationsManager() {
   const [newTeamName, setNewTeamName] = useState('');
   const [newArabicName, setNewArabicName] = useState('');
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingArabicName, setEditingArabicName] = useState('');
+  const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -164,6 +167,64 @@ export function TeamTranslationsManager() {
     }
   };
 
+  const updateTranslation = async (id: string) => {
+    if (!editingArabicName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Arabic name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (editingArabicName.length > 100) {
+      toast({
+        title: 'Error',
+        description: 'Arabic name must be less than 100 characters',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('team_translations')
+        .update({ arabic_name: editingArabicName.trim() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Translation updated successfully',
+      });
+
+      setEditingId(null);
+      setEditingArabicName('');
+      fetchTranslations();
+    } catch (error) {
+      console.error('Error updating translation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update translation',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const startEditing = (translation: TeamTranslation) => {
+    setEditingId(translation.id);
+    setEditingArabicName(translation.arabic_name);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingArabicName('');
+  };
+
   const deleteTranslation = async (id: string) => {
     try {
       const { error } = await supabase
@@ -283,7 +344,7 @@ export function TeamTranslationsManager() {
                 <TableHead>English Name</TableHead>
                 <TableHead>Arabic Name</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="w-[80px]">Actions</TableHead>
+                <TableHead className="w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -297,18 +358,68 @@ export function TeamTranslationsManager() {
                 translations.map((translation) => (
                   <TableRow key={translation.id}>
                     <TableCell className="font-medium">{translation.team_name}</TableCell>
-                    <TableCell dir="rtl">{translation.arabic_name}</TableCell>
+                    <TableCell dir="rtl">
+                      {editingId === translation.id ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editingArabicName}
+                            onChange={(e) => setEditingArabicName(e.target.value)}
+                            dir="rtl"
+                            className="h-8"
+                            disabled={updating}
+                            maxLength={100}
+                            autoFocus
+                          />
+                        </div>
+                      ) : (
+                        translation.arabic_name
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(translation.created_at).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteTranslation(translation.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {editingId === translation.id ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => updateTranslation(translation.id)}
+                            disabled={updating}
+                          >
+                            {updating ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="h-4 w-4 text-green-600" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={cancelEditing}
+                            disabled={updating}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => startEditing(translation)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteTranslation(translation.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
