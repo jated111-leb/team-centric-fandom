@@ -521,17 +521,21 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Update ledger
+          const updateData = await updateRes.json();
+
+          // Update ledger with new dispatch_id and send_id if provided
           await supabase
             .from('schedule_ledger')
             .update({
+              dispatch_id: updateData.dispatch_id || existingSchedule.dispatch_id,
+              send_id: updateData.send_id || existingSchedule.send_id,
               signature,
               send_at_utc: sendAtDate.toISOString(),
               updated_at: now.toISOString(),
             })
             .eq('id', existingSchedule.id);
 
-          console.log(`Match ${match.id}: updated schedule ${existingSchedule.braze_schedule_id}`);
+          console.log(`Match ${match.id}: updated schedule ${existingSchedule.braze_schedule_id} (dispatch: ${updateData.dispatch_id}, send: ${updateData.send_id})`);
           updated++;
           
           // Phase 4: Log success
@@ -592,17 +596,19 @@ Deno.serve(async (req) => {
 
           const createData = await createRes.json();
 
-          // Store in ledger
+          // Store in ledger with dispatch_id and send_id from Braze response
           await supabase
             .from('schedule_ledger')
             .insert({
               match_id: match.id,
               braze_schedule_id: createData.schedule_id,
+              dispatch_id: createData.dispatch_id || null,
+              send_id: createData.send_id || null,
               signature,
               send_at_utc: sendAtDate.toISOString(),
             });
 
-          console.log(`Match ${match.id}: created schedule ${createData.schedule_id}`);
+          console.log(`Match ${match.id}: created schedule ${createData.schedule_id} (dispatch: ${createData.dispatch_id}, send: ${createData.send_id})`);
           scheduled++;
           
           // Phase 4: Log success

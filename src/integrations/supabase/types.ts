@@ -227,27 +227,33 @@ export type Database = {
         Row: {
           braze_schedule_id: string
           created_at: string | null
+          dispatch_id: string | null
           id: string
           match_id: number
           send_at_utc: string
+          send_id: string | null
           signature: string
           updated_at: string | null
         }
         Insert: {
           braze_schedule_id: string
           created_at?: string | null
+          dispatch_id?: string | null
           id?: string
           match_id: number
           send_at_utc: string
+          send_id?: string | null
           signature: string
           updated_at?: string | null
         }
         Update: {
           braze_schedule_id?: string
           created_at?: string | null
+          dispatch_id?: string | null
           id?: string
           match_id?: number
           send_at_utc?: string
+          send_id?: string | null
           signature?: string
           updated_at?: string | null
         }
