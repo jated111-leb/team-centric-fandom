@@ -9,7 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Calendar, TrendingUp, RefreshCw, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import type { Match } from "@/types/match";
-import { FEATURED_TEAMS } from "@/lib/teamConfig";
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,13 +17,30 @@ const Index = () => {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Fetch featured teams from database
+  const { data: featuredTeamsData = [] } = useQuery({
+    queryKey: ['featured-teams'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('featured_teams')
+        .select('team_name');
+      
+      if (error) throw error;
+      return data.map(t => t.team_name);
+    },
+  });
+
   const { data: matches = [], isLoading, refetch } = useQuery({
-    queryKey: ['matches', selectedTeams],
+    queryKey: ['matches', selectedTeams, featuredTeamsData],
     queryFn: async () => {
       const today = new Date().toISOString().split('T')[0];
       const fourWeeksFromNow = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      const teamsToFilter = selectedTeams.length > 0 ? selectedTeams : Array.from(FEATURED_TEAMS);
+      const teamsToFilter = selectedTeams.length > 0 
+        ? selectedTeams 
+        : featuredTeamsData.length > 0 
+          ? featuredTeamsData 
+          : [];
 
       const { data, error } = await supabase
         .from('matches')

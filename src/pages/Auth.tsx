@@ -25,19 +25,41 @@ export default function Auth() {
     // Check if already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate('/admin');
+        checkRoleAndRedirect(session.user.id);
       }
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate('/admin');
+        checkRoleAndRedirect(session.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const checkRoleAndRedirect = (userId: string) => {
+    // Defer Supabase call to avoid auth callback deadlock
+    setTimeout(async () => {
+      try {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (roleData?.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error checking role:', error);
+        navigate('/');
+      }
+    }, 0);
+  };
 
   const validateEmail = (value: string): boolean => {
     try {
