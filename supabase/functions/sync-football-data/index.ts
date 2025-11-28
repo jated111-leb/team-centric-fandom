@@ -5,7 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const FOOTBALL_API_KEY = '09b6f8e470f44fe78b608dc5662a363e';
 const FOOTBALL_API_BASE = 'https://api.football-data.org/v4';
 
 const COMPETITION_CODES = {
@@ -118,7 +117,45 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const footballApiKey = Deno.env.get('FOOTBALL_API_KEY')!;
+    
+    if (!footballApiKey) {
+      throw new Error('Missing FOOTBALL_API_KEY environment variable');
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Verify admin role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid token or user not found' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (roleError || !roleData || roleData.role !== 'admin') {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { daysAhead = 30, competitions = Object.keys(COMPETITION_CODES) } = await req.json().catch(() => ({}));
 
@@ -141,7 +178,7 @@ Deno.serve(async (req) => {
           `${FOOTBALL_API_BASE}/competitions/${compCode}/matches?dateFrom=${dateFrom.toISOString().split('T')[0]}&dateTo=${dateTo.toISOString().split('T')[0]}`,
           {
             headers: {
-              'X-Auth-Token': FOOTBALL_API_KEY
+              'X-Auth-Token': footballApiKey
             }
           }
         );
