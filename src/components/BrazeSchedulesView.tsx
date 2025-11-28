@@ -25,6 +25,15 @@ interface BrazeSchedule {
   created_at: string;
   updated_at: string;
   messages?: any;
+  trigger_properties?: {
+    match_id?: number;
+    home_en?: string;
+    away_en?: string;
+    competition_key?: string;
+    kickoff_utc?: string;
+  };
+  dispatch_id?: string;
+  send_id?: string;
 }
 
 export const BrazeSchedulesView = () => {
@@ -156,11 +165,11 @@ export const BrazeSchedulesView = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Schedule ID</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Match Details</TableHead>
                   <TableHead>Send Time (Baghdad)</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Last Updated</TableHead>
+                  <TableHead>Dispatch ID</TableHead>
+                  <TableHead>Send ID</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -172,8 +181,20 @@ export const BrazeSchedulesView = () => {
                         {schedule.schedule_id.substring(0, 12)}...
                       </code>
                     </TableCell>
-                    <TableCell className="font-medium">
-                      {schedule.name || 'Unnamed'}
+                    <TableCell>
+                      {schedule.trigger_properties ? (
+                        <div className="space-y-1">
+                          <div className="font-medium text-sm">
+                            {schedule.trigger_properties.home_en} vs {schedule.trigger_properties.away_en}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {schedule.trigger_properties.competition_key}
+                            {schedule.trigger_properties.match_id && ` • Match ${schedule.trigger_properties.match_id}`}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">{schedule.name || 'No details'}</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div>{formatBaghdadTime(new Date(schedule.send_at), 'MMM dd, yyyy HH:mm')}</div>
@@ -182,11 +203,23 @@ export const BrazeSchedulesView = () => {
                     <TableCell>
                       {getStatusBadge(schedule.send_at)}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatBaghdadTime(new Date(schedule.created_at), 'MMM dd, HH:mm')}
+                    <TableCell>
+                      {schedule.dispatch_id ? (
+                        <code className="text-xs bg-muted px-2 py-1 rounded">
+                          {schedule.dispatch_id.substring(0, 8)}...
+                        </code>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatBaghdadTime(new Date(schedule.updated_at), 'MMM dd, HH:mm')}
+                    <TableCell>
+                      {schedule.send_id ? (
+                        <code className="text-xs bg-muted px-2 py-1 rounded">
+                          {schedule.send_id.substring(0, 8)}...
+                        </code>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
