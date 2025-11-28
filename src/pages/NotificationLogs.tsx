@@ -96,9 +96,9 @@ const NotificationLogs = () => {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (roleData?.role !== 'admin') {
+      if (!roleData || roleData.role !== 'admin') {
         toast({
           title: "Access Denied",
           description: "You must be an admin to view notification logs.",
