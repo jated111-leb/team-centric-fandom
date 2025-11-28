@@ -1,37 +1,43 @@
 project_id = "howqpclucdljsovsjnrz"
 
 [functions.braze-scheduler]
-verify_jwt = false
+verify_jwt = true
 
 [functions.braze-reconcile]
-verify_jwt = false
+verify_jwt = true
 
 [functions.braze-dedupe-fixtures]
-verify_jwt = false
+verify_jwt = true
 
 [functions.braze-webhook]
 verify_jwt = false
 
 [functions.fetch-braze-schedules]
-verify_jwt = false
+verify_jwt = true
 
 [functions.delete-braze-schedule]
-verify_jwt = false
+verify_jwt = true
 
 [functions.braze-cleanup-old-schedules]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-braze-schedules]
-verify_jwt = false
+verify_jwt = true
 
 [functions.add-admin]
-verify_jwt = false
+verify_jwt = true
 
 [functions.braze-debug]
-verify_jwt = false
+verify_jwt = true
 
 [functions.gap-detection]
-verify_jwt = false
+verify_jwt = true
 
 [functions.setup-admin]
 verify_jwt = false
+
+[functions.sync-football-data]
+verify_jwt = true
+
+[functions.cleanup-non-featured-schedules]
+verify_jwt = true
