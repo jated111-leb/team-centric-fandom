@@ -89,6 +89,9 @@ serve(async (req) => {
           updated_at: schedule.updated_at || schedule.next_send_time,
           type: schedule.type,
           schedule_type: schedule.schedule_type,
+          trigger_properties: schedule.trigger_properties || null,
+          dispatch_id: schedule.dispatch_id || null,
+          send_id: schedule.send_id || null,
         })),
       }),
       {
