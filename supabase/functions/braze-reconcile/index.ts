@@ -226,22 +226,44 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Clean up past matches from ledger
+    // Mark past matches as 'sent' instead of deleting for audit trail
+    const { error: updateError } = await supabase
+      .from('schedule_ledger')
+      .update({ status: 'sent' })
+      .lt('send_at_utc', now.toISOString())
+      .eq('status', 'pending');
+
+    if (updateError) {
+      console.error('Error marking past ledger entries as sent:', updateError);
+    }
+
+    // Get count of entries marked as sent
+    const { count: markedAsSent } = await supabase
+      .from('schedule_ledger')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'sent');
+
+    console.log(`Marked ${markedAsSent || 0} entries as 'sent'`);
+
+    // Only delete entries older than 30 days for cleanup
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const { error: deleteError } = await supabase
       .from('schedule_ledger')
       .delete()
-      .lt('send_at_utc', now.toISOString());
+      .lt('send_at_utc', thirtyDaysAgo.toISOString());
 
     if (deleteError) {
-      console.error('Error cleaning past ledger entries:', deleteError);
+      console.error('Error deleting old ledger entries:', deleteError);
     }
 
-    const { count: cleaned } = await supabase
+    const { count: deleted } = await supabase
       .from('schedule_ledger')
       .select('*', { count: 'exact', head: true })
-      .lt('send_at_utc', now.toISOString());
+      .lt('send_at_utc', thirtyDaysAgo.toISOString());
 
-    console.log(`Braze reconcile complete: cancelled=${cancelled}, signatureCancelled=${signatureCancelled}, matchDedupCancelled=${matchDedupCancelled}, cleaned=${cleaned || 0}`);
+    console.log(`Deleted ${deleted || 0} entries older than 30 days`);
+
+    console.log(`Braze reconcile complete: cancelled=${cancelled}, signatureCancelled=${signatureCancelled}, matchDedupCancelled=${matchDedupCancelled}, markedAsSent=${markedAsSent || 0}, deleted=${deleted || 0}`);
 
     // Phase 2: Release advisory lock
     await supabase.rpc('pg_advisory_unlock', { key: lockKey });
@@ -251,7 +273,8 @@ Deno.serve(async (req) => {
         cancelled, 
         signatureCancelled, 
         matchDedupCancelled, 
-        cleaned: cleaned || 0,
+        markedAsSent: markedAsSent || 0,
+        deleted: deleted || 0,
         total_cancelled: cancelled + signatureCancelled + matchDedupCancelled
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -233,6 +233,7 @@ export type Database = {
           send_at_utc: string
           send_id: string | null
           signature: string
+          status: Database["public"]["Enums"]["schedule_status"]
           updated_at: string | null
         }
         Insert: {
@@ -244,6 +245,7 @@ export type Database = {
           send_at_utc: string
           send_id?: string | null
           signature: string
+          status?: Database["public"]["Enums"]["schedule_status"]
           updated_at?: string | null
         }
         Update: {
@@ -255,6 +257,7 @@ export type Database = {
           send_at_utc?: string
           send_id?: string | null
           signature?: string
+          status?: Database["public"]["Enums"]["schedule_status"]
           updated_at?: string | null
         }
         Relationships: [
@@ -380,6 +383,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      schedule_status: "pending" | "sent" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -508,6 +512,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      schedule_status: ["pending", "sent", "cancelled"],
     },
   },
 } as const
