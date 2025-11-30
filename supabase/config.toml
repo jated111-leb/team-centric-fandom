@@ -33,9 +33,6 @@ verify_jwt = true
 [functions.gap-detection]
 verify_jwt = true
 
-[functions.setup-admin]
-verify_jwt = false
-
 [functions.sync-football-data]
 verify_jwt = true
 
