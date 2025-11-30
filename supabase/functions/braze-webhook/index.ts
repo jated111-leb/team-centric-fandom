@@ -20,6 +20,7 @@ interface BrazeWebhookEvent {
     canvas_name?: string;
     canvas_variation_id?: string;
     canvas_step_id?: string;
+    canvas_step_name?: string;
     send_id?: string;
     dispatch_id?: string;
     device_id?: string;
@@ -50,8 +51,27 @@ serve(async (req) => {
       try {
         // Extract relevant data from event
         const externalUserId = event.external_user_id || event.user_id || 'unknown';
+        const userIdSource = event.external_user_id ? 'external_user_id' : event.user_id ? 'user_id' : 'unknown';
         const eventType = event.event_type || 'unknown';
         const sentAt = event.time ? new Date(event.time * 1000).toISOString() : new Date().toISOString();
+        
+        console.log(`👤 User: ${externalUserId} (from ${userIdSource})`);
+        
+        // Handle both Campaign and Canvas sources
+        const campaignId = event.campaign_id || null;
+        const canvasId = event.canvas_id || null;
+        const canvasName = event.canvas_name || null;
+        const canvasStepName = event.canvas_step_name || null;
+        const sourceType = canvasId ? 'canvas' : 'campaign';
+        
+        if (canvasId) {
+          console.log(`🎨 Canvas event: ${canvasName} (${canvasId})`);
+          if (canvasStepName) {
+            console.log(`   Step: ${canvasStepName}`);
+          }
+        } else if (campaignId) {
+          console.log(`📢 Campaign event: ${event.campaign_name || 'unnamed'} (${campaignId})`);
+        }
         
         // Extract trigger properties if available
         const properties = event.properties || {};
@@ -108,7 +128,11 @@ serve(async (req) => {
           braze_event_type: eventType,
           match_id: matchId,
           braze_schedule_id: sendId || dispatchId || null,
-          campaign_id: event.campaign_id || null,
+          campaign_id: campaignId,
+          canvas_id: canvasId,
+          canvas_name: canvasName,
+          canvas_step_name: canvasStepName,
+          source_type: sourceType,
           home_team: homeTeam,
           away_team: awayTeam,
           competition: competition,

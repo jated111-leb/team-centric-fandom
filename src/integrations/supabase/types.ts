@@ -170,6 +170,9 @@ export type Database = {
           braze_event_type: string
           braze_schedule_id: string | null
           campaign_id: string | null
+          canvas_id: string | null
+          canvas_name: string | null
+          canvas_step_name: string | null
           competition: string | null
           created_at: string
           event_received_at: string
@@ -180,12 +183,16 @@ export type Database = {
           match_id: number | null
           raw_payload: Json | null
           sent_at: string
+          source_type: string | null
         }
         Insert: {
           away_team?: string | null
           braze_event_type: string
           braze_schedule_id?: string | null
           campaign_id?: string | null
+          canvas_id?: string | null
+          canvas_name?: string | null
+          canvas_step_name?: string | null
           competition?: string | null
           created_at?: string
           event_received_at?: string
@@ -196,12 +203,16 @@ export type Database = {
           match_id?: number | null
           raw_payload?: Json | null
           sent_at: string
+          source_type?: string | null
         }
         Update: {
           away_team?: string | null
           braze_event_type?: string
           braze_schedule_id?: string | null
           campaign_id?: string | null
+          canvas_id?: string | null
+          canvas_name?: string | null
+          canvas_step_name?: string | null
           competition?: string | null
           created_at?: string
           event_received_at?: string
@@ -212,6 +223,7 @@ export type Database = {
           match_id?: number | null
           raw_payload?: Json | null
           sent_at?: string
+          source_type?: string | null
         }
         Relationships: [
           {
