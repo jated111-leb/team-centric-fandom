@@ -62,16 +62,57 @@ serve(async (req) => {
           matchId = parseInt(properties.match_id, 10);
         }
 
+        let homeTeam = properties.home_team || null;
+        let awayTeam = properties.away_team || null;
+        let competition = properties.competition || null;
+        let kickoffUtc = properties.kickoff_utc || null;
+
+        // If no match details from properties, try to look them up via dispatch_id
+        const dispatchId = event.dispatch_id || null;
+        const sendId = event.send_id || null;
+
+        if (!matchId && (dispatchId || sendId)) {
+          console.log(`🔍 Looking up match details for dispatch_id: ${dispatchId}, send_id: ${sendId}`);
+          
+          const { data: ledgerEntry } = await supabase
+            .from('schedule_ledger')
+            .select('match_id')
+            .or(`dispatch_id.eq.${dispatchId},send_id.eq.${sendId}`)
+            .maybeSingle();
+
+          if (ledgerEntry?.match_id) {
+            matchId = ledgerEntry.match_id;
+            console.log(`✅ Found match_id ${matchId} from dispatch_id lookup`);
+
+            // Fetch match details
+            const { data: matchData } = await supabase
+              .from('matches')
+              .select('home_team, away_team, competition, utc_date')
+              .eq('id', matchId)
+              .maybeSingle();
+
+            if (matchData) {
+              homeTeam = matchData.home_team;
+              awayTeam = matchData.away_team;
+              competition = matchData.competition;
+              kickoffUtc = matchData.utc_date;
+              console.log(`✅ Correlated match details: ${homeTeam} vs ${awayTeam}`);
+            }
+          } else {
+            console.log(`⚠️ No match found in schedule_ledger for dispatch_id: ${dispatchId}, send_id: ${sendId}`);
+          }
+        }
+
         const notificationData = {
           external_user_id: externalUserId,
           braze_event_type: eventType,
           match_id: matchId,
-          braze_schedule_id: event.send_id || event.dispatch_id || null,
+          braze_schedule_id: sendId || dispatchId || null,
           campaign_id: event.campaign_id || null,
-          home_team: properties.home_team || null,
-          away_team: properties.away_team || null,
-          competition: properties.competition || null,
-          kickoff_utc: properties.kickoff_utc || null,
+          home_team: homeTeam,
+          away_team: awayTeam,
+          competition: competition,
+          kickoff_utc: kickoffUtc,
           sent_at: sentAt,
           raw_payload: event,
         };
