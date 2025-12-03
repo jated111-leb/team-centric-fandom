@@ -38,3 +38,9 @@ verify_jwt = true
 
 [functions.cleanup-non-featured-schedules]
 verify_jwt = true
+
+[functions.pre-send-verification]
+verify_jwt = true
+
+[functions.get-braze-config]
+verify_jwt = true

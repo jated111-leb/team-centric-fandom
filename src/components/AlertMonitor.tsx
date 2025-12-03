@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Clock, XCircle, RefreshCw, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Clock, XCircle, RefreshCw, CheckCircle, Bell, ShieldAlert } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SchedulerLog {
   id: string;
@@ -24,10 +25,31 @@ interface TimingIssue {
   issue: string;
 }
 
+interface StalePendingSchedule {
+  match_id: number;
+  schedule_id: string;
+  send_at_utc: string;
+  home_team: string;
+  away_team: string;
+  hours_overdue: number;
+}
+
+interface MissingSchedule {
+  match_id: number;
+  schedule_id: string;
+  send_at_utc: string;
+  home_team: string;
+  away_team: string;
+  hours_until_send: number;
+}
+
 export function AlertMonitor() {
   const [errors, setErrors] = useState<SchedulerLog[]>([]);
   const [timingIssues, setTimingIssues] = useState<TimingIssue[]>([]);
+  const [stalePending, setStalePending] = useState<StalePendingSchedule[]>([]);
+  const [missingSchedules, setMissingSchedules] = useState<MissingSchedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
   const [lastCheck, setLastCheck] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -44,6 +66,7 @@ export function AlertMonitor() {
       await Promise.all([
         checkRecentErrors(),
         checkTimingIssues(),
+        checkStalePending(),
       ]);
       setLastCheck(new Date());
     } catch (error) {
@@ -78,12 +101,18 @@ export function AlertMonitor() {
     const { data: schedules, error: scheduleError } = await supabase
       .from('schedule_ledger')
       .select('match_id, send_at_utc')
+      .eq('status', 'pending')
       .gte('send_at_utc', now.toISOString());
 
     if (scheduleError || !schedules) return;
 
     // Get corresponding match data
     const matchIds = schedules.map(s => s.match_id);
+    if (matchIds.length === 0) {
+      setTimingIssues([]);
+      return;
+    }
+
     const { data: matches, error: matchError } = await supabase
       .from('matches')
       .select('id, utc_date, home_team, away_team')
@@ -119,14 +148,134 @@ export function AlertMonitor() {
     setTimingIssues(issues);
   };
 
-  const hasIssues = errors.length > 0 || timingIssues.length > 0;
+  const checkStalePending = async () => {
+    // Find schedules where send_at_utc has passed but status is still pending
+    const now = new Date();
+    
+    const { data: staleSchedules, error } = await supabase
+      .from('schedule_ledger')
+      .select('match_id, braze_schedule_id, send_at_utc, status')
+      .eq('status', 'pending')
+      .lt('send_at_utc', now.toISOString());
+
+    if (error || !staleSchedules) {
+      console.error('Error fetching stale schedules:', error);
+      return;
+    }
+
+    if (staleSchedules.length === 0) {
+      setStalePending([]);
+      return;
+    }
+
+    // Get match details
+    const matchIds = staleSchedules.map(s => s.match_id);
+    const { data: matches } = await supabase
+      .from('matches')
+      .select('id, home_team, away_team')
+      .in('id', matchIds);
+
+    // Check if notification_sends exists for these matches
+    const { data: sends } = await supabase
+      .from('notification_sends')
+      .select('match_id')
+      .in('match_id', matchIds);
+
+    const sendsSet = new Set(sends?.map(s => s.match_id) || []);
+
+    const stale: StalePendingSchedule[] = [];
+    for (const schedule of staleSchedules) {
+      // Only flag if no webhook was received
+      if (!sendsSet.has(schedule.match_id)) {
+        const match = matches?.find(m => m.id === schedule.match_id);
+        const sendAtDate = new Date(schedule.send_at_utc);
+        const hoursOverdue = Math.round((now.getTime() - sendAtDate.getTime()) / (60 * 60 * 1000));
+        
+        stale.push({
+          match_id: schedule.match_id,
+          schedule_id: schedule.braze_schedule_id,
+          send_at_utc: schedule.send_at_utc,
+          home_team: match?.home_team || 'Unknown',
+          away_team: match?.away_team || 'Unknown',
+          hours_overdue: hoursOverdue,
+        });
+      }
+    }
+
+    setStalePending(stale);
+  };
+
+  const runVerification = async () => {
+    setVerifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-braze-schedules');
+      
+      if (error) {
+        toast.error('Verification failed', { description: error.message });
+        return;
+      }
+
+      // Update missing schedules from verification result
+      if (data?.alerts?.missing_from_braze) {
+        const now = new Date();
+        const missing = data.alerts.missing_from_braze.map((s: any) => ({
+          match_id: s.match_id,
+          schedule_id: s.schedule_id,
+          send_at_utc: s.send_at_utc,
+          home_team: s.home_team,
+          away_team: s.away_team,
+          hours_until_send: Math.round((new Date(s.send_at_utc).getTime() - now.getTime()) / (60 * 60 * 1000)),
+        }));
+        setMissingSchedules(missing);
+      }
+
+      toast.success('Verification complete', {
+        description: `Verified: ${data.summary?.verified_in_braze || 0}, Missing: ${data.summary?.missing_from_braze || 0}, Stale: ${data.summary?.past_no_webhook || 0}`,
+      });
+
+      // Refresh all data
+      await checkForIssues();
+    } catch (error) {
+      toast.error('Verification failed', { description: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const runPreSendVerification = async () => {
+    setVerifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('pre-send-verification');
+      
+      if (error) {
+        toast.error('Pre-send verification failed', { description: error.message });
+        return;
+      }
+
+      toast.success('Pre-send verification complete', {
+        description: `Checked: ${data?.checked || 0}, Verified: ${data?.verified || 0}, Recreated: ${data?.recreated || 0}`,
+      });
+
+      // Refresh all data
+      await checkForIssues();
+    } catch (error) {
+      toast.error('Pre-send verification failed', { description: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const hasIssues = errors.length > 0 || timingIssues.length > 0 || stalePending.length > 0 || missingSchedules.length > 0;
+  const hasCritical = stalePending.length > 0 || missingSchedules.length > 0;
 
   return (
-    <Card className={hasIssues ? 'border-destructive' : 'border-border'}>
+    <Card className={hasCritical ? 'border-destructive border-2' : hasIssues ? 'border-destructive' : 'border-border'}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {hasIssues ? (
+            {hasCritical ? (
+              <ShieldAlert className="h-5 w-5 text-destructive animate-pulse" />
+            ) : hasIssues ? (
               <AlertTriangle className="h-5 w-5 text-destructive" />
             ) : (
               <CheckCircle className="h-5 w-5 text-green-500" />
@@ -134,19 +283,39 @@ export function AlertMonitor() {
             <div>
               <CardTitle>System Alerts</CardTitle>
               <CardDescription>
-                Monitoring scheduler errors and timing issues (Last checked: {lastCheck.toLocaleTimeString()})
+                Monitoring scheduler errors, timing issues, and missed notifications (Last checked: {lastCheck.toLocaleTimeString()})
               </CardDescription>
             </div>
           </div>
-          <Button
-            onClick={checkForIssues}
-            disabled={loading}
-            size="sm"
-            variant="outline"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={runPreSendVerification}
+              disabled={loading || verifying}
+              size="sm"
+              variant="outline"
+            >
+              <Bell className={`h-4 w-4 mr-2 ${verifying ? 'animate-pulse' : ''}`} />
+              Pre-Send Check
+            </Button>
+            <Button
+              onClick={runVerification}
+              disabled={loading || verifying}
+              size="sm"
+              variant="outline"
+            >
+              <ShieldAlert className={`h-4 w-4 mr-2 ${verifying ? 'animate-spin' : ''}`} />
+              Full Verify
+            </Button>
+            <Button
+              onClick={checkForIssues}
+              disabled={loading || verifying}
+              size="sm"
+              variant="outline"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -155,9 +324,83 @@ export function AlertMonitor() {
             <CheckCircle className="h-4 w-4 text-green-500" />
             <AlertTitle className="text-green-700 dark:text-green-400">All Systems Operational</AlertTitle>
             <AlertDescription className="text-green-600 dark:text-green-300">
-              No errors or timing issues detected in the last 24 hours.
+              No errors, timing issues, or missed notifications detected.
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* CRITICAL: Stale Pending (Missed Notifications) */}
+        {stalePending.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-destructive" />
+              <h3 className="font-semibold text-sm text-destructive">
+                CRITICAL: Missed Notifications ({stalePending.length})
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {stalePending.map((schedule, idx) => (
+                <Alert key={idx} variant="destructive" className="border-2">
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertTitle className="text-sm">
+                    Match #{schedule.match_id} - {schedule.home_team} vs {schedule.away_team}
+                  </AlertTitle>
+                  <AlertDescription className="text-xs space-y-1">
+                    <div className="font-medium text-destructive">
+                      No webhook received - notification may not have been sent!
+                    </div>
+                    <div>
+                      <span className="font-medium">Schedule ID:</span> {schedule.schedule_id}
+                    </div>
+                    <div>
+                      <span className="font-medium">Was scheduled for:</span> {new Date(schedule.send_at_utc).toLocaleString()}
+                    </div>
+                    <div>
+                      <span className="font-medium">Overdue by:</span> {schedule.hours_overdue} hours
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Missing from Braze (Future schedules) */}
+        {missingSchedules.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <h3 className="font-semibold text-sm text-destructive">
+                Missing from Braze ({missingSchedules.length})
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {missingSchedules.slice(0, 5).map((schedule, idx) => (
+                <Alert key={idx} variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle className="text-sm">
+                    Match #{schedule.match_id} - {schedule.home_team} vs {schedule.away_team}
+                  </AlertTitle>
+                  <AlertDescription className="text-xs space-y-1">
+                    <div className="font-medium">
+                      Schedule exists in ledger but NOT in Braze!
+                    </div>
+                    <div>
+                      <span className="font-medium">Scheduled for:</span> {new Date(schedule.send_at_utc).toLocaleString()}
+                    </div>
+                    <div>
+                      <span className="font-medium">Time until send:</span> {schedule.hours_until_send} hours
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ))}
+              {missingSchedules.length > 5 && (
+                <p className="text-xs text-muted-foreground">
+                  And {missingSchedules.length - 5} more missing schedules...
+                </p>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Timing Issues */}
@@ -246,7 +489,19 @@ export function AlertMonitor() {
         )}
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
+        <div className="grid grid-cols-4 gap-3 pt-4 border-t border-border">
+          <div className={`rounded-lg p-3 ${stalePending.length > 0 ? 'bg-destructive/20' : 'bg-muted'}`}>
+            <div className={`text-2xl font-bold ${stalePending.length > 0 ? 'text-destructive' : 'text-foreground'}`}>
+              {stalePending.length}
+            </div>
+            <div className="text-xs text-muted-foreground">Missed</div>
+          </div>
+          <div className={`rounded-lg p-3 ${missingSchedules.length > 0 ? 'bg-destructive/20' : 'bg-muted'}`}>
+            <div className={`text-2xl font-bold ${missingSchedules.length > 0 ? 'text-destructive' : 'text-foreground'}`}>
+              {missingSchedules.length}
+            </div>
+            <div className="text-xs text-muted-foreground">Missing</div>
+          </div>
           <div className="bg-muted rounded-lg p-3">
             <div className="text-2xl font-bold text-destructive">
               {errors.length}
