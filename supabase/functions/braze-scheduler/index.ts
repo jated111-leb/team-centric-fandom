@@ -23,29 +23,49 @@ const FEATURED_TEAMS = [
 
 const SEND_OFFSET_MINUTES = 60; // Send 60 minutes before kickoff
 const UPDATE_BUFFER_MINUTES = 20; // Don't update schedules within 20 minutes of send time
+const LOCK_TIMEOUT_MINUTES = 5; // Lock expires after 5 minutes
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
 
-    // Phase 2: Acquire advisory lock to prevent concurrent runs
-    const lockKey = 1001; // Unique identifier for braze-scheduler
-    const { data: lockAcquired } = await supabase.rpc('pg_try_advisory_lock', { key: lockKey });
+  const lockId = crypto.randomUUID();
+  let lockAcquired = false;
+
+  try {
+    // Acquire row-level lock using scheduler_locks table
+    const lockExpiry = new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
+    const lockCutoff = new Date(Date.now() - LOCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
     
-    if (!lockAcquired) {
+    // Try to acquire lock: update only if no lock exists or lock has expired
+    const { data: lockResult, error: lockError } = await supabase
+      .from('scheduler_locks')
+      .update({ 
+        locked_at: new Date().toISOString(),
+        locked_by: lockId,
+        expires_at: lockExpiry
+      })
+      .eq('lock_name', 'braze-scheduler')
+      .or(`locked_at.is.null,expires_at.lt.${new Date().toISOString()}`)
+      .select()
+      .maybeSingle();
+
+    if (lockError || !lockResult) {
       console.log('Another scheduler process is running - skipping');
       return new Response(
         JSON.stringify({ message: 'Already running', scheduled: 0, updated: 0, skipped: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    lockAcquired = true;
+    console.log(`Lock acquired: ${lockId}`);
 
     // Check feature flag
     const { data: flag } = await supabase
@@ -86,16 +106,7 @@ Deno.serve(async (req) => {
 
     console.log(`Fetched ${matches?.length || 0} matches with SCHEDULED or TIMED status`);
 
-    // Log all matches for diagnostics
-    console.log('=== ALL FETCHED MATCHES (Diagnostic) ===');
-    for (const m of matches || []) {
-      const kickoff = new Date(m.utc_date);
-      const hoursUntilKickoff = (kickoff.getTime() - now.getTime()) / 3600000;
-      console.log(`  Match ${m.id}: ${m.home_team} vs ${m.away_team} | Kickoff: ${m.utc_date} (${hoursUntilKickoff.toFixed(1)}h) | Competition: ${m.competition}`);
-    }
-    console.log('=== END DIAGNOSTIC ===');
-
-    // Phase 3: Fetch featured teams from database with Braze attribute values
+    // Fetch featured teams from database with Braze attribute values
     const { data: featuredTeamsData } = await supabase
       .from('featured_teams')
       .select('team_name, braze_attribute_value');
@@ -117,7 +128,7 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${FEATURED_TEAMS_FROM_DB.length} featured teams: ${FEATURED_TEAMS_FROM_DB.join(', ')}`);
 
-    // Phase 3: Fetch team mappings for canonical name matching
+    // Fetch team mappings for canonical name matching
     const { data: teamMappings } = await supabase
       .from('team_mappings')
       .select('*');
@@ -159,7 +170,7 @@ Deno.serve(async (req) => {
     async function ensureTeamTranslation(
       teamName: string,
       teamArabicMap: Map<string, string>
-    ): Promise<string> {
+    ): Promise<string | null> {
       // Check if translation already exists
       if (teamArabicMap.has(teamName)) {
         return teamArabicMap.get(teamName)!;
@@ -172,7 +183,7 @@ Deno.serve(async (req) => {
         const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
         
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout (increased from 10)
         
         const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           signal: controller.signal,
@@ -200,7 +211,7 @@ Deno.serve(async (req) => {
 
         if (!response.ok) {
           console.error(`AI translation failed for ${teamName}: ${response.status}`);
-          return teamName; // Fallback to English
+          return null; // Return null to indicate failure - DO NOT fall back to English
         }
 
         const data = await response.json();
@@ -237,7 +248,7 @@ Deno.serve(async (req) => {
       } catch (error) {
         const isTimeout = error instanceof Error && error.name === 'AbortError';
         console.error(`Error generating translation for ${teamName}:`, isTimeout ? 'Timeout' : error);
-        return teamName; // Fallback to English
+        return null; // Return null to indicate failure - DO NOT fall back to English
       }
     }
 
@@ -246,7 +257,7 @@ Deno.serve(async (req) => {
     let skipped = 0;
 
     for (const match of matches || []) {
-      // Phase 3: Use canonical team mapping to identify featured teams
+      // Use canonical team mapping to identify featured teams
       const homeCanonical = findCanonicalTeam(match.home_team);
       const awayCanonical = findCanonicalTeam(match.away_team);
       
@@ -260,33 +271,8 @@ Deno.serve(async (req) => {
       
       if (!homeFeatured && !awayFeatured) {
         console.log(`Match ${match.id}: ${match.home_team} vs ${match.away_team} - no featured teams`);
-        
-        // Phase 4: Log skip
-        await supabase.from('scheduler_logs').insert({
-          function_name: 'braze-scheduler',
-          match_id: match.id,
-          action: 'skipped',
-          reason: 'No featured teams',
-          details: { home: match.home_team, away: match.away_team },
-        });
         continue;
       }
-
-      // Log that we're starting to process a featured match
-      await supabase.from('scheduler_logs').insert({
-        function_name: 'braze-scheduler',
-        match_id: match.id,
-        action: 'processing',
-        reason: 'Starting to process featured team match',
-        details: { 
-          home: match.home_team, 
-          away: match.away_team, 
-          homeFeatured, 
-          awayFeatured,
-          homeCanonical: homeCanonical || 'none',
-          awayCanonical: awayCanonical || 'none'
-        },
-      });
 
       console.log(`Processing match ${match.id}: ${match.home_team} vs ${match.away_team} at ${match.utc_date}`);
 
@@ -338,6 +324,30 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Ensure translations exist BEFORE any Braze API calls
+      // If translation fails, skip this match entirely - no English fallback
+      const home_ar = await ensureTeamTranslation(match.home_team, teamArabicMap);
+      const away_ar = await ensureTeamTranslation(match.away_team, teamArabicMap);
+      
+      if (!home_ar || !away_ar) {
+        console.error(`Match ${match.id}: Missing Arabic translation - skipping to prevent inconsistent content`);
+        skipped++;
+        
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-scheduler',
+          match_id: match.id,
+          action: 'skipped',
+          reason: 'Translation unavailable',
+          details: { 
+            home: match.home_team, 
+            away: match.away_team,
+            home_ar_available: !!home_ar,
+            away_ar_available: !!away_ar
+          },
+        });
+        continue;
+      }
+
       // Build audience for both teams using Braze attribute values
       const targetTeams = [
         homeFeatured ? homeCanonical : null,
@@ -364,41 +374,14 @@ Deno.serve(async (req) => {
       // Create signature for deduplication
       const signature = `${sendAtDate.toISOString()}|${targetTeams.sort().join('+')}`;
 
-      // Check if schedule already exists
+      // PRE-FLIGHT CHECK: Check if schedule already exists in ledger
+      // This is now protected by a unique index on (match_id) WHERE status IN ('pending', 'sent')
       const { data: existingSchedule } = await supabase
         .from('schedule_ledger')
         .select('*')
         .eq('match_id', match.id)
+        .in('status', ['pending', 'sent'])
         .maybeSingle();
-
-      // Ensure translations exist (will auto-generate if missing) with error handling
-      let home_ar: string;
-      let away_ar: string;
-      
-      try {
-        home_ar = await ensureTeamTranslation(match.home_team, teamArabicMap);
-        away_ar = await ensureTeamTranslation(match.away_team, teamArabicMap);
-      } catch (translationError) {
-        console.error(`Translation failed for match ${match.id}:`, translationError);
-        
-        await supabase.from('scheduler_logs').insert({
-          function_name: 'braze-scheduler',
-          match_id: match.id,
-          action: 'error',
-          reason: 'Translation failed',
-          details: { 
-            error: translationError instanceof Error ? translationError.message : 'Unknown error',
-            home: match.home_team,
-            away: match.away_team 
-          },
-        });
-        
-        // Fallback to English names
-        home_ar = match.home_team;
-        away_ar = match.away_team;
-        
-        console.log(`Using English fallback for match ${match.id}: ${home_ar} vs ${away_ar}`);
-      }
 
       // Build trigger properties
       const triggerProps = {
@@ -430,7 +413,6 @@ Deno.serve(async (req) => {
           console.log(`Match ${match.id}: within update buffer`);
           skipped++;
           
-          // Phase 4: Log skip
           await supabase.from('scheduler_logs').insert({
             function_name: 'braze-scheduler',
             match_id: match.id,
@@ -462,7 +444,6 @@ Deno.serve(async (req) => {
             const errorText = await updateRes.text();
             console.error(`Failed to update schedule for match ${match.id}: ${errorText}`);
             
-            // Log Braze API update failure
             await supabase.from('scheduler_logs').insert({
               function_name: 'braze-scheduler',
               match_id: match.id,
@@ -491,10 +472,9 @@ Deno.serve(async (req) => {
             })
             .eq('id', existingSchedule.id);
 
-          console.log(`Match ${match.id}: updated schedule ${existingSchedule.braze_schedule_id} (dispatch: ${updateData.dispatch_id}, send: ${updateData.send_id})`);
+          console.log(`Match ${match.id}: updated schedule ${existingSchedule.braze_schedule_id}`);
           updated++;
           
-          // Phase 4: Log success
           await supabase.from('scheduler_logs').insert({
             function_name: 'braze-scheduler',
             match_id: match.id,
@@ -505,7 +485,6 @@ Deno.serve(async (req) => {
         } catch (error) {
           console.error(`Error updating schedule for match ${match.id}:`, error);
           
-          // Phase 4: Log error
           await supabase.from('scheduler_logs').insert({
             function_name: 'braze-scheduler',
             match_id: match.id,
@@ -516,6 +495,30 @@ Deno.serve(async (req) => {
         }
       } else {
         // Create new schedule
+        // STEP 1: Reserve slot in ledger FIRST (protected by unique index)
+        const reservationId = crypto.randomUUID();
+        const { error: insertError } = await supabase
+          .from('schedule_ledger')
+          .insert({
+            match_id: match.id,
+            braze_schedule_id: `pending-${reservationId}`, // Temporary placeholder
+            signature,
+            send_at_utc: sendAtDate.toISOString(),
+            status: 'pending',
+          });
+
+        if (insertError) {
+          // If duplicate key error, another process already created the schedule
+          if (insertError.code === '23505') {
+            console.log(`Match ${match.id}: schedule already being created by another process`);
+            skipped++;
+            continue;
+          }
+          console.error(`Failed to reserve ledger slot for match ${match.id}:`, insertError);
+          continue;
+        }
+
+        // STEP 2: Call Braze API to create schedule
         try {
           const createRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/create`, {
             method: 'POST',
@@ -536,7 +539,13 @@ Deno.serve(async (req) => {
             const errorText = await createRes.text();
             console.error(`Failed to create schedule for match ${match.id}: ${errorText}`);
             
-            // Log Braze API create failure
+            // ROLLBACK: Delete the reservation since Braze call failed
+            await supabase
+              .from('schedule_ledger')
+              .delete()
+              .eq('match_id', match.id)
+              .eq('braze_schedule_id', `pending-${reservationId}`);
+            
             await supabase.from('scheduler_logs').insert({
               function_name: 'braze-scheduler',
               match_id: match.id,
@@ -552,22 +561,20 @@ Deno.serve(async (req) => {
 
           const createData = await createRes.json();
 
-          // Store in ledger with dispatch_id and send_id from Braze response
+          // STEP 3: Update ledger with actual Braze schedule ID
           await supabase
             .from('schedule_ledger')
-            .insert({
-              match_id: match.id,
+            .update({
               braze_schedule_id: createData.schedule_id,
               dispatch_id: createData.dispatch_id || null,
               send_id: createData.send_id || null,
-              signature,
-              send_at_utc: sendAtDate.toISOString(),
-            });
+            })
+            .eq('match_id', match.id)
+            .eq('braze_schedule_id', `pending-${reservationId}`);
 
-          console.log(`Match ${match.id}: created schedule ${createData.schedule_id} (dispatch: ${createData.dispatch_id}, send: ${createData.send_id})`);
+          console.log(`Match ${match.id}: created schedule ${createData.schedule_id}`);
           scheduled++;
           
-          // Phase 4: Log success
           await supabase.from('scheduler_logs').insert({
             function_name: 'braze-scheduler',
             match_id: match.id,
@@ -578,7 +585,13 @@ Deno.serve(async (req) => {
         } catch (error) {
           console.error(`Error creating schedule for match ${match.id}:`, error);
           
-          // Phase 4: Log error
+          // ROLLBACK: Delete the reservation since Braze call failed
+          await supabase
+            .from('schedule_ledger')
+            .delete()
+            .eq('match_id', match.id)
+            .eq('braze_schedule_id', `pending-${reservationId}`);
+          
           await supabase.from('scheduler_logs').insert({
             function_name: 'braze-scheduler',
             match_id: match.id,
@@ -606,12 +619,9 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Post-run deduplication: remove any duplicate fixture schedules
+    // Post-run deduplication: remove any duplicate fixture schedules from Braze
     try {
       console.log('Running post-run deduplication...');
-      const brazeApiKey = Deno.env.get('BRAZE_API_KEY')!;
-      const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT')!;
-      const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID')!;
       const daysAhead = 365;
       const endIso = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString();
 
@@ -628,42 +638,53 @@ Deno.serve(async (req) => {
           b.campaign_api_identifier === brazeCampaignId
         );
 
-        const byFixture = new Map<string, any[]>();
-        const now = new Date();
-
+        // Group by match_id for deduplication
+        const byMatchId = new Map<string, any[]>();
         for (const broadcast of ourBroadcasts) {
-          const sendTime = new Date(broadcast.next_send_time);
-          if (sendTime <= now) continue;
-
-          const props = broadcast.trigger_properties || {};
-          const key = [
-            String(props.competition_key || '').toLowerCase(),
-            String(props.kickoff_utc || '').slice(0, 16),
-            String(props.home_en || '').toLowerCase(),
-            String(props.away_en || '').toLowerCase()
-          ].join('|');
-
-          if (!key.replace(/\|/g, '').length) continue;
-          if (!byFixture.has(key)) byFixture.set(key, []);
-          byFixture.get(key)!.push(broadcast);
+          const matchId = broadcast.trigger_properties?.match_id;
+          if (matchId) {
+            if (!byMatchId.has(matchId)) byMatchId.set(matchId, []);
+            byMatchId.get(matchId)!.push(broadcast);
+          }
         }
 
         let deduped = 0;
-        for (const [fixtureKey, schedules] of byFixture.entries()) {
+        for (const [matchId, schedules] of byMatchId.entries()) {
           if (schedules.length <= 1) continue;
-          schedules.sort((a, b) => new Date(a.next_send_time).getTime() - new Date(b.next_send_time).getTime());
-          const duplicates = schedules.slice(1);
-
-          for (const dup of duplicates) {
+          
+          // Sort by creation/send time, keep the one in our ledger
+          const { data: ledgerEntry } = await supabase
+            .from('schedule_ledger')
+            .select('braze_schedule_id')
+            .eq('match_id', parseInt(matchId))
+            .maybeSingle();
+          
+          for (const schedule of schedules) {
+            // Keep the one that matches our ledger
+            if (ledgerEntry && schedule.schedule_id === ledgerEntry.braze_schedule_id) {
+              continue;
+            }
+            
             try {
               const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${brazeApiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ campaign_id: brazeCampaignId, schedule_id: dup.schedule_id }),
+                body: JSON.stringify({ campaign_id: brazeCampaignId, schedule_id: schedule.schedule_id }),
               });
-              if (cancelRes.ok || cancelRes.status === 404) deduped++;
+              if (cancelRes.ok || cancelRes.status === 404) {
+                deduped++;
+                console.log(`Dedupe: cancelled duplicate ${schedule.schedule_id} for match ${matchId}`);
+                
+                await supabase.from('scheduler_logs').insert({
+                  function_name: 'braze-scheduler',
+                  match_id: parseInt(matchId),
+                  action: 'duplicate_cancelled',
+                  reason: 'Post-run deduplication',
+                  details: { schedule_id: schedule.schedule_id },
+                });
+              }
             } catch (e) {
-              console.error(`Dedupe cancel failed for ${dup.schedule_id}:`, e);
+              console.error(`Dedupe cancel failed for ${schedule.schedule_id}:`, e);
             }
           }
         }
@@ -672,9 +693,6 @@ Deno.serve(async (req) => {
     } catch (error) {
       console.error('Post-run deduplication failed:', error);
     }
-
-    // Phase 2: Release advisory lock
-    await supabase.rpc('pg_advisory_unlock', { key: lockKey });
 
     return new Response(
       JSON.stringify({ scheduled, updated, skipped }),
@@ -689,5 +707,15 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
+  } finally {
+    // Always release the lock
+    if (lockAcquired) {
+      await supabase
+        .from('scheduler_locks')
+        .update({ locked_at: null, locked_by: null, expires_at: null })
+        .eq('lock_name', 'braze-scheduler')
+        .eq('locked_by', lockId);
+      console.log(`Lock released: ${lockId}`);
+    }
   }
 });

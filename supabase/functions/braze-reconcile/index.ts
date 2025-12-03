@@ -5,28 +5,48 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const LOCK_TIMEOUT_MINUTES = 5;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
 
-    // Phase 2: Acquire advisory lock to prevent concurrent runs
-    const lockKey = 1002; // Unique identifier for braze-reconcile
-    const { data: lockAcquired } = await supabase.rpc('pg_try_advisory_lock', { key: lockKey });
+  const lockId = crypto.randomUUID();
+  let lockAcquired = false;
+
+  try {
+    // Acquire row-level lock using scheduler_locks table
+    const lockExpiry = new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
     
-    if (!lockAcquired) {
+    // Try to acquire lock: update only if no lock exists or lock has expired
+    const { data: lockResult, error: lockError } = await supabase
+      .from('scheduler_locks')
+      .update({ 
+        locked_at: new Date().toISOString(),
+        locked_by: lockId,
+        expires_at: lockExpiry
+      })
+      .eq('lock_name', 'braze-reconcile')
+      .or(`locked_at.is.null,expires_at.lt.${new Date().toISOString()}`)
+      .select()
+      .maybeSingle();
+
+    if (lockError || !lockResult) {
       console.log('Another reconcile process is running - skipping');
       return new Response(
         JSON.stringify({ message: 'Already running', cancelled: 0, cleaned: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    lockAcquired = true;
+    console.log(`Lock acquired: ${lockId}`);
 
     // Check feature flag
     const { data: flag } = await supabase
@@ -180,19 +200,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Phase 1: Match-based deduplication - keep only earliest schedule per match
+    // Phase 1: Match-based deduplication - keep only the one in ledger per match
     for (const [matchId, schedules] of matchScheduleMap.entries()) {
       if (schedules.length > 1) {
-        // Sort by send time, keep earliest
-        schedules.sort((a, b) => 
-          new Date(a.schedule?.time || a.send_at).getTime() - 
-          new Date(b.schedule?.time || b.send_at).getTime()
-        );
+        // Find the one in our ledger
+        const { data: ledgerEntry } = await supabase
+          .from('schedule_ledger')
+          .select('braze_schedule_id')
+          .eq('match_id', parseInt(matchId))
+          .maybeSingle();
         
-        const [keep, ...duplicates] = schedules;
-        console.log(`Match ${matchId}: keeping ${keep.schedule_id}, cancelling ${duplicates.length} duplicates`);
-        
-        for (const dup of duplicates) {
+        for (const schedule of schedules) {
+          // Keep the one that matches our ledger
+          if (ledgerEntry && schedule.schedule_id === ledgerEntry.braze_schedule_id) {
+            continue;
+          }
+          
           try {
             const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
               method: 'POST',
@@ -202,12 +225,12 @@ Deno.serve(async (req) => {
               },
               body: JSON.stringify({
                 campaign_id: brazeCampaignId,
-                schedule_id: dup.schedule_id,
+                schedule_id: schedule.schedule_id,
               }),
             });
 
             if (cancelRes.ok) {
-              console.log(`Cancelled duplicate for match ${matchId}: ${dup.schedule_id}`);
+              console.log(`Cancelled duplicate for match ${matchId}: ${schedule.schedule_id}`);
               matchDedupCancelled++;
               
               // Log the action
@@ -216,11 +239,11 @@ Deno.serve(async (req) => {
                 match_id: parseInt(matchId),
                 action: 'duplicate_cancelled',
                 reason: 'Multiple schedules for same match',
-                details: { schedule_id: dup.schedule_id, kept: keep.schedule_id },
+                details: { schedule_id: schedule.schedule_id, kept: ledgerEntry?.braze_schedule_id },
               });
             }
           } catch (error) {
-            console.error(`Error cancelling duplicate ${dup.schedule_id}:`, error);
+            console.error(`Error cancelling duplicate ${schedule.schedule_id}:`, error);
           }
         }
       }
@@ -265,9 +288,6 @@ Deno.serve(async (req) => {
 
     console.log(`Braze reconcile complete: cancelled=${cancelled}, signatureCancelled=${signatureCancelled}, matchDedupCancelled=${matchDedupCancelled}, markedAsSent=${markedAsSent || 0}, deleted=${deleted || 0}`);
 
-    // Phase 2: Release advisory lock
-    await supabase.rpc('pg_advisory_unlock', { key: lockKey });
-
     return new Response(
       JSON.stringify({ 
         cancelled, 
@@ -288,5 +308,15 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
+  } finally {
+    // Always release the lock
+    if (lockAcquired) {
+      await supabase
+        .from('scheduler_locks')
+        .update({ locked_at: null, locked_by: null, expires_at: null })
+        .eq('lock_name', 'braze-reconcile')
+        .eq('locked_by', lockId);
+      console.log(`Lock released: ${lockId}`);
+    }
   }
 });
