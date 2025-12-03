@@ -87,24 +87,68 @@ serve(async (req) => {
         let competition = properties.competition || null;
         let kickoffUtc = properties.kickoff_utc || null;
 
-        // If no match details from properties, try to look them up via dispatch_id
+        // If no match details from properties, try to look them up
         const dispatchId = event.dispatch_id || null;
         const sendId = event.send_id || null;
 
-        if (!matchId && (dispatchId || sendId)) {
+        if (!matchId) {
           console.log(`🔍 Looking up match details for dispatch_id: ${dispatchId}, send_id: ${sendId}`);
           
-          const { data: ledgerEntry } = await supabase
-            .from('schedule_ledger')
-            .select('match_id')
-            .or(`dispatch_id.eq.${dispatchId},send_id.eq.${sendId}`)
-            .maybeSingle();
+          // Strategy 1: Try to match by dispatch_id or send_id
+          if (dispatchId || sendId) {
+            const orConditions = [];
+            if (dispatchId) orConditions.push(`dispatch_id.eq.${dispatchId}`);
+            if (sendId) orConditions.push(`send_id.eq.${sendId}`);
+            
+            const { data: ledgerEntry } = await supabase
+              .from('schedule_ledger')
+              .select('match_id')
+              .or(orConditions.join(','))
+              .maybeSingle();
 
-          if (ledgerEntry?.match_id) {
-            matchId = ledgerEntry.match_id;
-            console.log(`✅ Found match_id ${matchId} from dispatch_id lookup`);
+            if (ledgerEntry?.match_id) {
+              matchId = ledgerEntry.match_id;
+              console.log(`✅ Found match_id ${matchId} from dispatch_id/send_id lookup`);
+            }
+          }
 
-            // Fetch match details
+          // Strategy 2: Time-based correlation - find schedules sent within 2 minutes of this event
+          if (!matchId) {
+            const sentAtTime = new Date(sentAt);
+            const windowStart = new Date(sentAtTime.getTime() - 2 * 60 * 1000).toISOString(); // 2 min before
+            const windowEnd = new Date(sentAtTime.getTime() + 2 * 60 * 1000).toISOString(); // 2 min after
+            
+            console.log(`🕐 Time-based correlation: looking for schedules between ${windowStart} and ${windowEnd}`);
+            
+            const { data: timeMatchedEntries } = await supabase
+              .from('schedule_ledger')
+              .select('match_id, send_at_utc')
+              .gte('send_at_utc', windowStart)
+              .lte('send_at_utc', windowEnd)
+              .in('status', ['pending', 'sent']);
+
+            if (timeMatchedEntries && timeMatchedEntries.length > 0) {
+              // If multiple matches, pick the closest one
+              let closestEntry = timeMatchedEntries[0];
+              let closestDiff = Math.abs(sentAtTime.getTime() - new Date(closestEntry.send_at_utc).getTime());
+              
+              for (const entry of timeMatchedEntries) {
+                const diff = Math.abs(sentAtTime.getTime() - new Date(entry.send_at_utc).getTime());
+                if (diff < closestDiff) {
+                  closestEntry = entry;
+                  closestDiff = diff;
+                }
+              }
+              
+              matchId = closestEntry.match_id;
+              console.log(`✅ Found match_id ${matchId} via time correlation (diff: ${closestDiff}ms)`);
+            } else {
+              console.log(`⚠️ No schedule_ledger entries found in time window`);
+            }
+          }
+
+          // Fetch match details if we found a match_id
+          if (matchId) {
             const { data: matchData } = await supabase
               .from('matches')
               .select('home_team, away_team, competition, utc_date')
@@ -119,7 +163,7 @@ serve(async (req) => {
               console.log(`✅ Correlated match details: ${homeTeam} vs ${awayTeam}`);
             }
           } else {
-            console.log(`⚠️ No match found in schedule_ledger for dispatch_id: ${dispatchId}, send_id: ${sendId}`);
+            console.log(`⚠️ Could not correlate notification to any match`);
           }
         }
 
