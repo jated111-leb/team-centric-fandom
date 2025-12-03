@@ -47,6 +47,9 @@ serve(async (req) => {
     const payload: BrazeWebhookEvent = await req.json();
     console.log(`Processing ${payload.events?.length || 0} events`);
 
+    // Track match_ids that received webhooks for status update
+    const matchIdsWithWebhooks = new Set<number>();
+
     const insertPromises = payload.events.map(async (event) => {
       try {
         // Extract relevant data from event
@@ -167,6 +170,11 @@ serve(async (req) => {
           }
         }
 
+        // Track match_id for status update
+        if (matchId) {
+          matchIdsWithWebhooks.add(matchId);
+        }
+
         const notificationData = {
           external_user_id: externalUserId,
           braze_event_type: eventType,
@@ -203,10 +211,41 @@ serve(async (req) => {
 
     await Promise.allSettled(insertPromises);
 
+    // Update schedule_ledger status to 'sent' for all matches that received webhooks
+    if (matchIdsWithWebhooks.size > 0) {
+      const matchIdsArray = Array.from(matchIdsWithWebhooks);
+      console.log(`📊 Updating status to 'sent' for ${matchIdsArray.length} matches: ${matchIdsArray.join(', ')}`);
+      
+      const { error: updateError, data: updatedRecords } = await supabase
+        .from('schedule_ledger')
+        .update({ status: 'sent' })
+        .in('match_id', matchIdsArray)
+        .eq('status', 'pending')
+        .select('match_id, braze_schedule_id');
+
+      if (updateError) {
+        console.error('❌ Error updating schedule_ledger status:', updateError);
+      } else {
+        console.log(`✅ Updated ${updatedRecords?.length || 0} schedule_ledger entries to 'sent'`);
+        
+        // Log the status updates
+        for (const record of updatedRecords || []) {
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-webhook',
+            match_id: record.match_id,
+            action: 'webhook_received',
+            reason: 'Webhook confirmed notification sent',
+            details: { schedule_id: record.braze_schedule_id },
+          });
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        processed: payload.events?.length || 0 
+        processed: payload.events?.length || 0,
+        matches_confirmed: matchIdsWithWebhooks.size
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

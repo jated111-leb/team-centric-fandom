@@ -404,6 +404,19 @@ Deno.serve(async (req) => {
         if (existingSchedule.signature === signature) {
           console.log(`Match ${match.id}: unchanged`);
           skipped++;
+          
+          // Log skipped unchanged schedules for monitoring
+          await supabase.from('scheduler_logs').insert({
+            function_name: 'braze-scheduler',
+            match_id: match.id,
+            action: 'skipped_unchanged',
+            reason: 'Schedule exists and unchanged',
+            details: { 
+              schedule_id: existingSchedule.braze_schedule_id,
+              send_at_utc: existingSchedule.send_at_utc,
+              signature
+            },
+          });
           continue;
         }
 
