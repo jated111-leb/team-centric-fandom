@@ -282,6 +282,27 @@ export type Database = {
           },
         ]
       }
+      scheduler_locks: {
+        Row: {
+          expires_at: string | null
+          lock_name: string
+          locked_at: string | null
+          locked_by: string | null
+        }
+        Insert: {
+          expires_at?: string | null
+          lock_name: string
+          locked_at?: string | null
+          locked_by?: string | null
+        }
+        Update: {
+          expires_at?: string | null
+          lock_name?: string
+          locked_at?: string | null
+          locked_by?: string | null
+        }
+        Relationships: []
+      }
       scheduler_logs: {
         Row: {
           action: string
