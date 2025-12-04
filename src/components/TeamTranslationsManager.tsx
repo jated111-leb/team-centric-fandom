@@ -170,6 +170,9 @@ export function TeamTranslationsManager() {
       // but are similar (potential inconsistencies from manual edits)
       const inconsistentList: InconsistentTranslation[] = [];
       
+      // Create a set of all translated team names for quick lookup
+      const translatedTeamNames = new Set(translationsData?.map(t => t.team_name) || []);
+      
       translationsData?.forEach(trans => {
         if (!matchTeams.has(trans.team_name)) {
           // Check if there's a similar team in matches
@@ -183,7 +186,8 @@ export function TeamTranslationsManager() {
             ) && transLower !== mtLower;
           });
 
-          if (similarTeam) {
+          // Only flag as inconsistent if the similar match team doesn't already have its own translation
+          if (similarTeam && !translatedTeamNames.has(similarTeam)) {
             inconsistentList.push({
               team_name: trans.team_name,
               arabic_name: trans.arabic_name,
