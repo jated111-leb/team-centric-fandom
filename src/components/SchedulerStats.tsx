@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Play, RefreshCw, Bug } from 'lucide-react';
+import { Loader2, Play } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface SchedulerLog {
@@ -19,7 +19,6 @@ export function SchedulerStats() {
   const [logs, setLogs] = useState<SchedulerLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [runningScheduler, setRunningScheduler] = useState(false);
-  const [runningReconcile, setRunningReconcile] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,76 +64,6 @@ export function SchedulerStats() {
       });
     } finally {
       setRunningScheduler(false);
-    }
-  };
-
-  const runReconcile = async () => {
-    setRunningReconcile(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('braze-reconcile');
-      
-      if (error) throw error;
-      
-      toast({
-        title: 'Reconcile Complete',
-        description: `Total cancelled: ${data.total_cancelled || 0}, Cleaned: ${data.cleaned}`,
-      });
-      
-      fetchLogs();
-    } catch (error) {
-      console.error('Error running reconcile:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to run reconcile',
-        variant: 'destructive',
-      });
-    } finally {
-      setRunningReconcile(false);
-    }
-  };
-
-  const runDedupe = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('braze-dedupe-fixtures');
-      
-      if (error) throw error;
-      
-      toast({
-        title: 'Deduplication Complete',
-        description: `Removed ${data.cancelled_count} duplicate schedules across ${data.total_fixtures} fixtures`,
-      });
-      
-      fetchLogs();
-    } catch (error) {
-      console.error('Error running dedupe:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to run deduplication',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const openDebugConsole = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('braze-debug', {
-        body: { action: 'consistency' },
-      });
-      
-      if (error) throw error;
-      
-      console.log('Debug consistency check:', data);
-      toast({
-        title: 'Debug Data',
-        description: `Braze: ${data.total_in_braze}, Ledger: ${data.total_in_ledger}, Mismatches: ${data.in_braze_only + data.in_ledger_only}`,
-      });
-    } catch (error) {
-      console.error('Error running debug:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to run debug check',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -185,35 +114,6 @@ export function SchedulerStats() {
                 <Play className="h-4 w-4 mr-2" />
               )}
               Run Scheduler
-            </Button>
-            <Button
-              onClick={runReconcile}
-              disabled={runningReconcile}
-              size="sm"
-              variant="outline"
-            >
-              {runningReconcile ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Run Reconcile
-            </Button>
-            <Button
-              onClick={runDedupe}
-              size="sm"
-              variant="outline"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Dedupe Fixtures
-            </Button>
-            <Button
-              onClick={openDebugConsole}
-              size="sm"
-              variant="outline"
-            >
-              <Bug className="h-4 w-4 mr-2" />
-              Debug
             </Button>
           </div>
         </div>
