@@ -125,18 +125,30 @@ export const ScheduledNotificationsTable = () => {
         throw new Error(result.error || 'Verification failed');
       }
 
-      setVerificationResults(result);
+      // Ensure arrays exist with defaults
+      const verified = result.verified || [];
+      const missing = result.missing || [];
+      const errors = result.errors || [];
       
-      if (result.missing.length > 0) {
+      const normalizedResults = {
+        total: result.total || verified.length + missing.length,
+        verified,
+        missing,
+        errors,
+      };
+
+      setVerificationResults(normalizedResults);
+      
+      if (missing.length > 0) {
         toast({
           title: "Verification complete",
-          description: `${result.verified.length} schedules verified, ${result.missing.length} missing in Braze`,
+          description: `${verified.length} schedules verified, ${missing.length} missing in Braze`,
           variant: "destructive",
         });
       } else {
         toast({
           title: "All schedules verified",
-          description: `All ${result.verified.length} schedules exist in Braze`,
+          description: `All ${verified.length} schedules exist in Braze`,
         });
       }
     } catch (error) {
