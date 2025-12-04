@@ -178,9 +178,29 @@ export const ScheduledNotificationsTable = () => {
         return;
       }
 
-      // Step 1: Clear pending schedules from ledger
+      // Step 1: Force release any stuck locks
       toast({
-        title: "Step 1/2: Clearing pending schedules...",
+        title: "Step 1/3: Releasing locks...",
+        description: "Clearing any stuck scheduler locks",
+      });
+
+      const { error: lockError } = await supabase
+        .from('scheduler_locks')
+        .update({ 
+          locked_at: null, 
+          locked_by: null, 
+          expires_at: null 
+        })
+        .eq('lock_name', 'braze-scheduler');
+
+      if (lockError) {
+        console.warn('Failed to release lock:', lockError);
+        // Continue anyway - lock might not exist
+      }
+
+      // Step 2: Clear pending schedules from ledger
+      toast({
+        title: "Step 2/3: Clearing pending schedules...",
         description: "Removing entries that don't exist in Braze",
       });
 
@@ -194,11 +214,11 @@ export const ScheduledNotificationsTable = () => {
       }
 
       toast({
-        title: "Step 2/2: Triggering scheduler...",
+        title: "Step 3/3: Triggering scheduler...",
         description: "Creating fresh schedules in Braze",
       });
 
-      // Step 2: Trigger the scheduler to create fresh schedules
+      // Step 3: Trigger the scheduler to create fresh schedules
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/braze-scheduler`,
         {
@@ -213,12 +233,12 @@ export const ScheduledNotificationsTable = () => {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Scheduler failed');
+        throw new Error(result.error || result.message || 'Scheduler failed');
       }
 
       toast({
         title: "Reset complete!",
-        description: `Cleared pending entries and scheduled ${result.scheduled || 0} new notifications`,
+        description: `Scheduled ${result.scheduled || 0} notifications (${result.updated || 0} updated, ${result.skipped || 0} skipped)`,
       });
 
       // Refresh the table

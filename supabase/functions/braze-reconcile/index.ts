@@ -21,32 +21,53 @@ Deno.serve(async (req) => {
   let lockAcquired = false;
 
   try {
-    // Acquire row-level lock using scheduler_locks table
+    // Acquire row-level lock using scheduler_locks table with two-step approach
     const lockExpiry = new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
+    const lockCheckTime = new Date();
     
-    // Try to acquire lock: update only if no lock exists or lock has expired
-    const { data: lockResult, error: lockError } = await supabase
+    // Step 1: Check current lock state
+    const { data: currentLock, error: checkError } = await supabase
       .from('scheduler_locks')
-      .update({ 
-        locked_at: new Date().toISOString(),
-        locked_by: lockId,
-        expires_at: lockExpiry
-      })
+      .select('locked_at, locked_by, expires_at')
       .eq('lock_name', 'braze-reconcile')
-      .or(`locked_at.is.null,expires_at.lt.${new Date().toISOString()}`)
-      .select()
       .maybeSingle();
 
-    if (lockError || !lockResult) {
-      console.log('Another reconcile process is running - skipping');
+    if (checkError) {
+      console.error('Error checking lock state:', checkError);
+      throw new Error('Failed to check lock state');
+    }
+
+    // Step 2: Determine if we can acquire the lock
+    const canAcquire = 
+      !currentLock?.locked_at || 
+      !currentLock?.expires_at ||
+      new Date(currentLock.expires_at) < lockCheckTime;
+
+    if (!canAcquire) {
+      console.log(`Another reconcile process is running - skipping (locked by: ${currentLock?.locked_by}, expires: ${currentLock?.expires_at})`);
       return new Response(
         JSON.stringify({ message: 'Already running', cancelled: 0, cleaned: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Step 3: Acquire the lock with simple update
+    const { error: lockError } = await supabase
+      .from('scheduler_locks')
+      .update({ 
+        locked_at: lockCheckTime.toISOString(),
+        locked_by: lockId,
+        expires_at: lockExpiry
+      })
+      .eq('lock_name', 'braze-reconcile');
+
+    if (lockError) {
+      console.error('Error acquiring lock:', lockError);
+      throw new Error('Failed to acquire lock');
+    }
+
     lockAcquired = true;
-    console.log(`Lock acquired: ${lockId}`);
+    console.log(`Lock acquired: ${lockId}, expires: ${lockExpiry}`);
 
     // Check if scheduler is currently running - avoid conflicts
     const { data: schedulerLock } = await supabase
