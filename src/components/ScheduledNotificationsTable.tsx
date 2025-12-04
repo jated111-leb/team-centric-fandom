@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, XCircle, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { formatBaghdadTime } from "@/lib/timezone";
 
 interface ScheduledNotification {
@@ -29,6 +30,7 @@ export const ScheduledNotificationsTable = () => {
   const [notifications, setNotifications] = useState<ScheduledNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [verificationResults, setVerificationResults] = useState<{
     total: number;
     verified: any[];
@@ -163,6 +165,78 @@ export const ScheduledNotificationsTable = () => {
     }
   };
 
+  const resetSchedules = async () => {
+    setResetting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to reset schedules",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 1: Clear pending schedules from ledger
+      toast({
+        title: "Step 1/2: Clearing pending schedules...",
+        description: "Removing entries that don't exist in Braze",
+      });
+
+      const { error: deleteError } = await supabase
+        .from('schedule_ledger')
+        .delete()
+        .eq('status', 'pending');
+
+      if (deleteError) {
+        throw new Error(`Failed to clear ledger: ${deleteError.message}`);
+      }
+
+      toast({
+        title: "Step 2/2: Triggering scheduler...",
+        description: "Creating fresh schedules in Braze",
+      });
+
+      // Step 2: Trigger the scheduler to create fresh schedules
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/braze-scheduler`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Scheduler failed');
+      }
+
+      toast({
+        title: "Reset complete!",
+        description: `Cleared pending entries and scheduled ${result.scheduled || 0} new notifications`,
+      });
+
+      // Refresh the table
+      fetchNotifications();
+      setVerificationResults(null);
+
+    } catch (error) {
+      console.error('Error resetting schedules:', error);
+      toast({
+        title: "Reset failed",
+        description: error instanceof Error ? error.message : "Failed to reset schedules",
+        variant: "destructive",
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const getStatusBadge = (sendAtUtc: string) => {
     const sendTime = new Date(sendAtUtc);
     const now = new Date();
@@ -211,6 +285,41 @@ export const ScheduledNotificationsTable = () => {
               </>
             )}
           </Button>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="destructive"
+                disabled={resetting || notifications.length === 0}
+              >
+                {resetting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCcw className="mr-2 h-4 w-4" />
+                    Reset Schedules
+                  </>
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reset All Schedules?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will clear all pending schedules from the database and trigger a fresh scheduler run to recreate them in Braze. Use this when schedules are out of sync.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={resetSchedules}>
+                  Reset Schedules
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         
         {verificationResults && (
