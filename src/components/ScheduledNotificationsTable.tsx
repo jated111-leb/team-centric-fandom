@@ -31,9 +31,9 @@ export const ScheduledNotificationsTable = () => {
   const [verifying, setVerifying] = useState(false);
   const [verificationResults, setVerificationResults] = useState<{
     total: number;
-    verified: string[];
-    missing: string[];
-    errors: { schedule_id: string; error: string }[];
+    verified: any[];
+    missing: any[];
+    errors: any[];
   } | null>(null);
   const { toast } = useToast();
 
@@ -234,8 +234,11 @@ export const ScheduledNotificationsTable = () => {
               <div className="text-xs text-muted-foreground mt-2">
                 <p className="font-medium">Missing schedule IDs:</p>
                 <ul className="list-disc list-inside mt-1">
-                  {verificationResults.missing.slice(0, 5).map((id) => (
-                    <li key={id}><code className="text-xs">{id.substring(0, 12)}...</code></li>
+                  {verificationResults.missing.slice(0, 5).map((item, idx) => (
+                    <li key={item.schedule_id || idx}>
+                      <code className="text-xs">{String(item.schedule_id || item).substring(0, 12)}...</code>
+                      {item.home_team && <span className="ml-2 text-muted-foreground">({item.home_team} vs {item.away_team})</span>}
+                    </li>
                   ))}
                   {verificationResults.missing.length > 5 && (
                     <li>... and {verificationResults.missing.length - 5} more</li>
