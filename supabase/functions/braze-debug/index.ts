@@ -44,20 +44,19 @@ Deno.serve(async (req) => {
         throw new Error(`Failed to fetch Braze schedules: ${await brazeRes.text()}`);
       }
 
-      const brazeData = await brazeRes.json();
-      const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-        b.campaign_id === brazeCampaignId ||
-        b.campaign_api_id === brazeCampaignId ||
-        b.campaign_api_identifier === brazeCampaignId
-      );
-
-      // Fetch from ledger
+      // Fetch from ledger first to get our schedule IDs
       const { data: ledger } = await supabase
         .from('schedule_ledger')
         .select('*')
         .gte('send_at_utc', new Date().toISOString());
 
       const ledgerIds = new Set(ledger?.map(l => l.braze_schedule_id) || []);
+
+      const brazeData = await brazeRes.json();
+      // Filter by matching schedule_id to our ledger entries (not by campaign_id)
+      const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
+        ledgerIds.has(b.id) || ledgerIds.has(b.schedule_id)
+      );
       const brazeIds = new Set(ourBroadcasts.map((b: any) => b.schedule_id));
 
       const inBrazeOnly = ourBroadcasts.filter((b: any) => !ledgerIds.has(b.schedule_id));
@@ -132,11 +131,16 @@ Deno.serve(async (req) => {
         throw new Error(`Failed to fetch Braze schedules: ${await brazeRes.text()}`);
       }
 
+      // Fetch ledger to match by schedule_id
+      const { data: ledger } = await supabase
+        .from('schedule_ledger')
+        .select('braze_schedule_id');
+      const ledgerIds = new Set(ledger?.map(l => l.braze_schedule_id) || []);
+
       const brazeData = await brazeRes.json();
+      // Filter by matching schedule_id to our ledger entries
       const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-        b.campaign_id === brazeCampaignId ||
-        b.campaign_api_id === brazeCampaignId ||
-        b.campaign_api_identifier === brazeCampaignId
+        ledgerIds.has(b.id) || ledgerIds.has(b.schedule_id)
       );
 
       return new Response(
@@ -218,11 +222,16 @@ Deno.serve(async (req) => {
         throw new Error(`Failed to fetch Braze schedules: ${await brazeRes.text()}`);
       }
 
+      // Fetch ledger to match by schedule_id
+      const { data: ledger } = await supabase
+        .from('schedule_ledger')
+        .select('braze_schedule_id');
+      const ledgerIds = new Set(ledger?.map(l => l.braze_schedule_id) || []);
+
       const brazeData = await brazeRes.json();
+      // Filter by matching schedule_id to our ledger entries
       const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-        b.campaign_id === brazeCampaignId ||
-        b.campaign_api_id === brazeCampaignId ||
-        b.campaign_api_identifier === brazeCampaignId
+        ledgerIds.has(b.id) || ledgerIds.has(b.schedule_id)
       );
 
       const now = new Date();
