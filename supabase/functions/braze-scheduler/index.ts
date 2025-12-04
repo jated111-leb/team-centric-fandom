@@ -398,8 +398,9 @@ Deno.serve(async (req) => {
         ])
       };
 
-      // Create signature for deduplication
-      const signature = `${sendAtDate.toISOString()}|${targetTeams.sort().join('+')}`;
+      // Create signature for deduplication - includes Arabic translations for content freshness
+      // If Arabic names change, signature changes, triggering an update to Braze
+      const signature = `${sendAtDate.toISOString()}|${targetTeams.sort().join('+')}|${home_ar}|${away_ar}`;
 
       // PRE-FLIGHT CHECK: Check if schedule already exists in ledger
       // This is now protected by a unique index on (match_id) WHERE status IN ('pending', 'sent')

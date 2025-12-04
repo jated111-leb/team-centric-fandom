@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Trash2, Languages, Pencil, X, Check } from 'lucide-react';
+import { Loader2, Plus, Trash2, Languages, Pencil, X, Check, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface TeamTranslation {
   id: string;
@@ -21,9 +22,17 @@ interface UntranslatedTeam {
   match_count: number;
 }
 
+interface InconsistentTranslation {
+  team_name: string;
+  arabic_name: string;
+  match_team_name: string;
+  similarity: string;
+}
+
 export function TeamTranslationsManager() {
   const [translations, setTranslations] = useState<TeamTranslation[]>([]);
   const [untranslated, setUntranslated] = useState<UntranslatedTeam[]>([]);
+  const [inconsistent, setInconsistent] = useState<InconsistentTranslation[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTeamName, setNewTeamName] = useState('');
   const [newArabicName, setNewArabicName] = useState('');
@@ -31,11 +40,13 @@ export function TeamTranslationsManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingArabicName, setEditingArabicName] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [forceRefreshing, setForceRefreshing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchTranslations();
     fetchUntranslatedTeams();
+    fetchInconsistentTranslations();
 
     // Subscribe to real-time updates
     const channel = supabase
@@ -50,6 +61,7 @@ export function TeamTranslationsManager() {
         () => {
           fetchTranslations();
           fetchUntranslatedTeams();
+          fetchInconsistentTranslations();
         }
       )
       .subscribe();
@@ -122,6 +134,93 @@ export function TeamTranslationsManager() {
       setUntranslated(untranslatedList);
     } catch (error) {
       console.error('Error fetching untranslated teams:', error);
+    }
+  };
+
+  const fetchInconsistentTranslations = async () => {
+    try {
+      // Get all unique team names from matches
+      const now = new Date();
+      const thirtyDaysOut = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      const { data: matches, error: matchError } = await supabase
+        .from('matches')
+        .select('home_team, away_team')
+        .gte('utc_date', now.toISOString())
+        .lte('utc_date', thirtyDaysOut.toISOString())
+        .in('status', ['SCHEDULED', 'TIMED']);
+
+      if (matchError) throw matchError;
+
+      // Get all translations
+      const { data: translationsData, error: transError } = await supabase
+        .from('team_translations')
+        .select('*');
+
+      if (transError) throw transError;
+
+      // Get unique match team names
+      const matchTeams = new Set<string>();
+      matches?.forEach(m => {
+        matchTeams.add(m.home_team);
+        matchTeams.add(m.away_team);
+      });
+
+      // Find translations that don't exactly match any match team name
+      // but are similar (potential inconsistencies from manual edits)
+      const inconsistentList: InconsistentTranslation[] = [];
+      
+      translationsData?.forEach(trans => {
+        if (!matchTeams.has(trans.team_name)) {
+          // Check if there's a similar team in matches
+          const similarTeam = Array.from(matchTeams).find(mt => {
+            const transLower = trans.team_name.toLowerCase();
+            const mtLower = mt.toLowerCase();
+            // Check for partial matches
+            return (
+              transLower.includes(mtLower.split(' ')[0]) ||
+              mtLower.includes(transLower.split(' ')[0])
+            ) && transLower !== mtLower;
+          });
+
+          if (similarTeam) {
+            inconsistentList.push({
+              team_name: trans.team_name,
+              arabic_name: trans.arabic_name,
+              match_team_name: similarTeam,
+              similarity: 'partial_match'
+            });
+          }
+        }
+      });
+
+      setInconsistent(inconsistentList);
+    } catch (error) {
+      console.error('Error checking translation consistency:', error);
+    }
+  };
+
+  const forceRefreshSchedules = async () => {
+    setForceRefreshing(true);
+    try {
+      // Invoke braze-scheduler to refresh all pending schedules
+      const { data, error } = await supabase.functions.invoke('braze-scheduler');
+
+      if (error) throw error;
+
+      toast({
+        title: 'Schedules Refreshed',
+        description: `Updated: ${data?.updated || 0}, Scheduled: ${data?.scheduled || 0}, Skipped: ${data?.skipped || 0}`,
+      });
+    } catch (error) {
+      console.error('Error refreshing schedules:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh schedules',
+        variant: 'destructive',
+      });
+    } finally {
+      setForceRefreshing(false);
     }
   };
 
@@ -311,6 +410,60 @@ export function TeamTranslationsManager() {
             )}
           </Button>
         </div>
+
+        {/* Force Refresh Button */}
+        <Alert>
+          <RefreshCw className="h-4 w-4" />
+          <AlertTitle>Force Refresh Schedules</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p className="text-sm">
+              After editing Arabic translations, click this button to update all pending Braze notifications with the new content.
+            </p>
+            <Button 
+              onClick={forceRefreshSchedules} 
+              disabled={forceRefreshing}
+              variant="outline"
+              size="sm"
+            >
+              {forceRefreshing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh All Pending Schedules
+                </>
+              )}
+            </Button>
+          </AlertDescription>
+        </Alert>
+
+        {/* Inconsistent translations warning */}
+        {inconsistent.length > 0 && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Potential Translation Inconsistencies ({inconsistent.length})</AlertTitle>
+            <AlertDescription>
+              <p className="text-sm mb-3">
+                These translations have team names that don't exactly match any upcoming match team names. They may need to be updated.
+              </p>
+              <div className="space-y-2">
+                {inconsistent.slice(0, 5).map((item, idx) => (
+                  <div key={idx} className="text-sm bg-background/50 p-2 rounded">
+                    <span className="font-mono">"{item.team_name}"</span> → 
+                    <span className="font-mono ml-1">"{item.match_team_name}"</span>
+                    <span className="text-muted-foreground ml-2">(possible match)</span>
+                  </div>
+                ))}
+                {inconsistent.length > 5 && (
+                  <p className="text-sm text-muted-foreground">+{inconsistent.length - 5} more</p>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Untranslated teams warning */}
         {untranslated.length > 0 && (
