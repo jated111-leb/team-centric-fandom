@@ -11,15 +11,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
-    const brazeRestEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!brazeApiKey || !brazeRestEndpoint || !brazeCampaignId) {
-      throw new Error('Missing required Braze configuration');
-    }
 
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing required Supabase configuration');
@@ -28,9 +21,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const now = new Date();
 
-    console.log('🔍 Verifying Braze schedules...');
+    console.log('🔍 Verifying Braze schedules using dispatch_id verification...');
 
-    // Fetch all schedule ledger entries first
+    // Fetch all schedule ledger entries
     const { data: schedules, error: fetchError } = await supabase
       .from('schedule_ledger')
       .select('*, matches(home_team, away_team, utc_date)')
@@ -42,58 +35,31 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${schedules?.length || 0} schedules in ledger to verify`);
 
-    // Build set of ledger schedule IDs for matching
-    const ledgerScheduleIds = new Set(schedules?.map(s => s.braze_schedule_id) || []);
-
-    // Fetch future scheduled broadcasts from Braze
-    const daysAhead = 90;
-    const endIso = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString();
-    
-    const brazeRes = await fetch(
-      `${brazeRestEndpoint}/messages/scheduled_broadcasts?end_time=${encodeURIComponent(endIso)}`,
-      { method: 'GET', headers: { 'Authorization': `Bearer ${brazeApiKey}` } }
-    );
-
-    let brazeScheduleIds = new Set<string>();
-    
-    if (brazeRes.ok) {
-      const brazeData = await brazeRes.json();
-      // Filter by matching schedule_id to our ledger entries (not by campaign_id)
-      const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-        ledgerScheduleIds.has(b.id) || ledgerScheduleIds.has(b.schedule_id)
-      );
-      
-      for (const broadcast of ourBroadcasts) {
-        brazeScheduleIds.add(broadcast.id || broadcast.schedule_id);
-      }
-      
-      console.log(`Found ${brazeScheduleIds.size} matching schedules in Braze (out of ${brazeData.scheduled_broadcasts?.length || 0} total)`);
-    } else {
-      console.warn('Failed to fetch Braze scheduled broadcasts:', await brazeRes.text());
-    }
-
     const results = {
       total: schedules?.length || 0,
-      verified_in_braze: [] as any[],
-      missing_from_braze: [] as any[],
-      past_with_webhook: [] as any[],
-      past_no_webhook: [] as any[], // STALE PENDING - Critical alerts
-      future_pending: [] as any[],
+      confirmed: [] as any[],           // Has dispatch_id = Braze accepted it
+      missing_dispatch_id: [] as any[], // No dispatch_id = creation may have failed
+      past_with_webhook: [] as any[],   // Past + status='sent' or has notification_sends
+      stale_pending: [] as any[],       // Past + no webhook received
+      future_pending: [] as any[],      // Future schedules
     };
 
     for (const schedule of schedules || []) {
       const sendAtDate = new Date(schedule.send_at_utc);
       const isPast = sendAtDate < now;
       const match = schedule.matches;
+      const hasDispatchId = !!schedule.dispatch_id;
       
       const scheduleInfo = {
         schedule_id: schedule.braze_schedule_id,
+        dispatch_id: schedule.dispatch_id,
         match_id: schedule.match_id,
         status: schedule.status,
         send_at_utc: schedule.send_at_utc,
         home_team: match?.home_team || 'Unknown',
         away_team: match?.away_team || 'Unknown',
         kickoff_utc: match?.utc_date || null,
+        has_dispatch_id: hasDispatchId,
       };
 
       if (isPast) {
@@ -101,7 +67,6 @@ Deno.serve(async (req) => {
         if (schedule.status === 'sent') {
           results.past_with_webhook.push(scheduleInfo);
         } else {
-          // STALE PENDING - send time passed but no webhook received
           // Check if notification_sends has any entries for this match
           const { data: sends } = await supabase
             .from('notification_sends')
@@ -113,43 +78,43 @@ Deno.serve(async (req) => {
             // Has webhook but status wasn't updated
             results.past_with_webhook.push({ ...scheduleInfo, note: 'Has webhooks but status not updated' });
           } else {
-            // CRITICAL: No webhook received
-            results.past_no_webhook.push(scheduleInfo);
+            // STALE: No webhook received
+            results.stale_pending.push(scheduleInfo);
             console.warn(`⚠️ STALE PENDING: Match ${schedule.match_id} (${match?.home_team} vs ${match?.away_team}) - no webhook received!`);
           }
         }
       } else {
-        // For future schedules, verify they exist in Braze
-        if (brazeScheduleIds.has(schedule.braze_schedule_id)) {
-          results.verified_in_braze.push(scheduleInfo);
+        // For future schedules, verify based on dispatch_id
+        if (hasDispatchId) {
+          results.confirmed.push(scheduleInfo);
         } else {
-          results.missing_from_braze.push(scheduleInfo);
-          console.warn(`❌ MISSING FROM BRAZE: Match ${schedule.match_id} (${match?.home_team} vs ${match?.away_team}) - schedule ${schedule.braze_schedule_id} not found!`);
+          results.missing_dispatch_id.push(scheduleInfo);
+          console.warn(`❌ MISSING DISPATCH_ID: Match ${schedule.match_id} (${match?.home_team} vs ${match?.away_team}) - schedule may not exist in Braze!`);
         }
         results.future_pending.push(scheduleInfo);
       }
     }
 
     // Log critical alerts
-    if (results.past_no_webhook.length > 0) {
+    if (results.stale_pending.length > 0) {
       await supabase.from('scheduler_logs').insert({
         function_name: 'verify-braze-schedules',
         action: 'stale_pending_detected',
-        reason: `Found ${results.past_no_webhook.length} schedules with no webhook received`,
+        reason: `Found ${results.stale_pending.length} schedules with no webhook received`,
         details: { 
-          stale_schedules: results.past_no_webhook,
+          stale_schedules: results.stale_pending,
           checked_at: now.toISOString()
         },
       });
     }
 
-    if (results.missing_from_braze.length > 0) {
+    if (results.missing_dispatch_id.length > 0) {
       await supabase.from('scheduler_logs').insert({
         function_name: 'verify-braze-schedules',
-        action: 'missing_from_braze_detected',
-        reason: `Found ${results.missing_from_braze.length} future schedules missing from Braze`,
+        action: 'missing_dispatch_id_detected',
+        reason: `Found ${results.missing_dispatch_id.length} future schedules without dispatch_id`,
         details: { 
-          missing_schedules: results.missing_from_braze,
+          missing_schedules: results.missing_dispatch_id,
           checked_at: now.toISOString()
         },
       });
@@ -157,10 +122,10 @@ Deno.serve(async (req) => {
 
     console.log('Verification complete:', {
       total: results.total,
-      verified_in_braze: results.verified_in_braze.length,
-      missing_from_braze: results.missing_from_braze.length,
+      confirmed: results.confirmed.length,
+      missing_dispatch_id: results.missing_dispatch_id.length,
       past_with_webhook: results.past_with_webhook.length,
-      past_no_webhook: results.past_no_webhook.length,
+      stale_pending: results.stale_pending.length,
     });
 
     return new Response(
@@ -168,14 +133,14 @@ Deno.serve(async (req) => {
         success: true,
         summary: {
           total: results.total,
-          verified_in_braze: results.verified_in_braze.length,
-          missing_from_braze: results.missing_from_braze.length,
+          confirmed: results.confirmed.length,
+          missing_dispatch_id: results.missing_dispatch_id.length,
           past_with_webhook: results.past_with_webhook.length,
-          past_no_webhook: results.past_no_webhook.length,
+          stale_pending: results.stale_pending.length,
         },
         alerts: {
-          stale_pending: results.past_no_webhook,
-          missing_from_braze: results.missing_from_braze,
+          stale_pending: results.stale_pending,
+          missing_dispatch_id: results.missing_dispatch_id,
         },
         details: results,
       }),
