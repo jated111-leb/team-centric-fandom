@@ -23,7 +23,7 @@ const FEATURED_TEAMS = [
 
 const SEND_OFFSET_MINUTES = 60; // Send 60 minutes before kickoff
 const UPDATE_BUFFER_MINUTES = 20; // Don't update schedules within 20 minutes of send time
-const LOCK_TIMEOUT_MINUTES = 5; // Lock expires after 5 minutes
+const LOCK_TIMEOUT_MINUTES = 10; // Lock expires after 10 minutes (increased for safety)
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -632,80 +632,9 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Post-run deduplication: remove any duplicate fixture schedules from Braze
-    try {
-      console.log('Running post-run deduplication...');
-      const daysAhead = 365;
-      const endIso = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString();
-
-      const brazeRes = await fetch(
-        `${brazeEndpoint}/messages/scheduled_broadcasts?end_time=${encodeURIComponent(endIso)}`,
-        { method: 'GET', headers: { 'Authorization': `Bearer ${brazeApiKey}` } }
-      );
-
-      if (brazeRes.ok) {
-        const brazeData = await brazeRes.json();
-        const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-          b.campaign_id === brazeCampaignId ||
-          b.campaign_api_id === brazeCampaignId ||
-          b.campaign_api_identifier === brazeCampaignId
-        );
-
-        // Group by match_id for deduplication
-        const byMatchId = new Map<string, any[]>();
-        for (const broadcast of ourBroadcasts) {
-          const matchId = broadcast.trigger_properties?.match_id;
-          if (matchId) {
-            if (!byMatchId.has(matchId)) byMatchId.set(matchId, []);
-            byMatchId.get(matchId)!.push(broadcast);
-          }
-        }
-
-        let deduped = 0;
-        for (const [matchId, schedules] of byMatchId.entries()) {
-          if (schedules.length <= 1) continue;
-          
-          // Sort by creation/send time, keep the one in our ledger
-          const { data: ledgerEntry } = await supabase
-            .from('schedule_ledger')
-            .select('braze_schedule_id')
-            .eq('match_id', parseInt(matchId))
-            .maybeSingle();
-          
-          for (const schedule of schedules) {
-            // Keep the one that matches our ledger
-            if (ledgerEntry && schedule.schedule_id === ledgerEntry.braze_schedule_id) {
-              continue;
-            }
-            
-            try {
-              const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${brazeApiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ campaign_id: brazeCampaignId, schedule_id: schedule.schedule_id }),
-              });
-              if (cancelRes.ok || cancelRes.status === 404) {
-                deduped++;
-                console.log(`Dedupe: cancelled duplicate ${schedule.schedule_id} for match ${matchId}`);
-                
-                await supabase.from('scheduler_logs').insert({
-                  function_name: 'braze-scheduler',
-                  match_id: parseInt(matchId),
-                  action: 'duplicate_cancelled',
-                  reason: 'Post-run deduplication',
-                  details: { schedule_id: schedule.schedule_id },
-                });
-              }
-            } catch (e) {
-              console.error(`Dedupe cancel failed for ${schedule.schedule_id}:`, e);
-            }
-          }
-        }
-        console.log(`Post-run deduplication complete: removed ${deduped} duplicate schedules`);
-      }
-    } catch (error) {
-      console.error('Post-run deduplication failed:', error);
-    }
+    // NOTE: Post-run deduplication removed - it was dangerous and could delete correct schedules
+    // The unique database constraint on match_id already prevents duplicates
+    // Use braze-reconcile or braze-dedupe-fixtures for controlled deduplication if needed
 
     return new Response(
       JSON.stringify({ scheduled, updated, skipped }),

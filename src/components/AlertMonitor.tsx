@@ -43,13 +43,24 @@ interface MissingSchedule {
   hours_until_send: number;
 }
 
+interface CountDiscrepancy {
+  ledger_pending: number;
+  braze_scheduled: number;
+  discrepancy: number;
+  orphaned_in_braze: number;
+  missing_from_braze: number;
+  duplicate_matches: { match_id: string; count: number }[];
+}
+
 export function AlertMonitor() {
   const [errors, setErrors] = useState<SchedulerLog[]>([]);
   const [timingIssues, setTimingIssues] = useState<TimingIssue[]>([]);
   const [stalePending, setStalePending] = useState<StalePendingSchedule[]>([]);
   const [missingSchedules, setMissingSchedules] = useState<MissingSchedule[]>([]);
+  const [countDiscrepancy, setCountDiscrepancy] = useState<CountDiscrepancy | null>(null);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [lastCheck, setLastCheck] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -265,7 +276,45 @@ export function AlertMonitor() {
     }
   };
 
-  const hasIssues = errors.length > 0 || timingIssues.length > 0 || stalePending.length > 0 || missingSchedules.length > 0;
+  const runCountReconciliation = async () => {
+    setReconciling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reconcile-counts');
+      
+      if (error) {
+        toast.error('Count reconciliation failed', { description: error.message });
+        return;
+      }
+
+      if (data?.counts) {
+        setCountDiscrepancy({
+          ledger_pending: data.counts.ledger_pending,
+          braze_scheduled: data.counts.braze_scheduled,
+          discrepancy: data.counts.discrepancy,
+          orphaned_in_braze: data.issues?.orphaned_in_braze?.length || 0,
+          missing_from_braze: data.issues?.missing_from_braze?.length || 0,
+          duplicate_matches: data.issues?.duplicate_matches || [],
+        });
+      }
+
+      const hasIssuesFound = data?.has_issues;
+      if (hasIssuesFound) {
+        toast.warning('Count discrepancy detected', {
+          description: `Ledger: ${data.counts.ledger_pending}, Braze: ${data.counts.braze_scheduled}`,
+        });
+      } else {
+        toast.success('Counts match', {
+          description: `${data.counts.ledger_pending} schedules in sync`,
+        });
+      }
+    } catch (error) {
+      toast.error('Reconciliation failed', { description: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      setReconciling(false);
+    }
+  };
+
+  const hasIssues = errors.length > 0 || timingIssues.length > 0 || stalePending.length > 0 || missingSchedules.length > 0 || (countDiscrepancy?.discrepancy !== 0 && countDiscrepancy !== null);
   const hasCritical = stalePending.length > 0 || missingSchedules.length > 0;
 
   return (
@@ -289,31 +338,39 @@ export function AlertMonitor() {
           </div>
           <div className="flex gap-2">
             <Button
+              onClick={runCountReconciliation}
+              disabled={loading || verifying || reconciling}
+              size="sm"
+              variant="outline"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${reconciling ? 'animate-spin' : ''}`} />
+              Counts
+            </Button>
+            <Button
               onClick={runPreSendVerification}
-              disabled={loading || verifying}
+              disabled={loading || verifying || reconciling}
               size="sm"
               variant="outline"
             >
               <Bell className={`h-4 w-4 mr-2 ${verifying ? 'animate-pulse' : ''}`} />
-              Pre-Send Check
+              Pre-Send
             </Button>
             <Button
               onClick={runVerification}
-              disabled={loading || verifying}
+              disabled={loading || verifying || reconciling}
               size="sm"
               variant="outline"
             >
               <ShieldAlert className={`h-4 w-4 mr-2 ${verifying ? 'animate-spin' : ''}`} />
-              Full Verify
+              Verify
             </Button>
             <Button
               onClick={checkForIssues}
-              disabled={loading || verifying}
+              disabled={loading || verifying || reconciling}
               size="sm"
               variant="outline"
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
             </Button>
           </div>
         </div>
@@ -400,6 +457,52 @@ export function AlertMonitor() {
                 </p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Count Discrepancy */}
+        {countDiscrepancy && countDiscrepancy.discrepancy !== 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <h3 className="font-semibold text-sm text-destructive">
+                Count Mismatch
+              </h3>
+            </div>
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-sm">
+                Ledger vs Braze Count Mismatch
+              </AlertTitle>
+              <AlertDescription className="text-xs space-y-1">
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  <div>
+                    <span className="font-medium">Ledger:</span> {countDiscrepancy.ledger_pending}
+                  </div>
+                  <div>
+                    <span className="font-medium">Braze:</span> {countDiscrepancy.braze_scheduled}
+                  </div>
+                  <div>
+                    <span className="font-medium">Diff:</span> {countDiscrepancy.discrepancy}
+                  </div>
+                </div>
+                {countDiscrepancy.orphaned_in_braze > 0 && (
+                  <div className="text-destructive">
+                    {countDiscrepancy.orphaned_in_braze} orphaned in Braze (not in ledger)
+                  </div>
+                )}
+                {countDiscrepancy.missing_from_braze > 0 && (
+                  <div className="text-destructive">
+                    {countDiscrepancy.missing_from_braze} missing from Braze (in ledger)
+                  </div>
+                )}
+                {countDiscrepancy.duplicate_matches.length > 0 && (
+                  <div className="text-destructive">
+                    {countDiscrepancy.duplicate_matches.length} matches with duplicate schedules
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
           </div>
         )}
 

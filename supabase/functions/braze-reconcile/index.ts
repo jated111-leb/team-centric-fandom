@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const LOCK_TIMEOUT_MINUTES = 5;
+const LOCK_TIMEOUT_MINUTES = 10; // Increased for safety
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -47,6 +47,24 @@ Deno.serve(async (req) => {
 
     lockAcquired = true;
     console.log(`Lock acquired: ${lockId}`);
+
+    // Check if scheduler is currently running - avoid conflicts
+    const { data: schedulerLock } = await supabase
+      .from('scheduler_locks')
+      .select('locked_at, expires_at')
+      .eq('lock_name', 'braze-scheduler')
+      .maybeSingle();
+
+    if (schedulerLock?.locked_at && schedulerLock?.expires_at) {
+      const expiresAt = new Date(schedulerLock.expires_at);
+      if (expiresAt > new Date()) {
+        console.log('Scheduler is currently running - skipping reconcile to avoid conflicts');
+        return new Response(
+          JSON.stringify({ message: 'Scheduler running, skipped', cancelled: 0, cleaned: 0 }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     // Check feature flag
     const { data: flag } = await supabase
