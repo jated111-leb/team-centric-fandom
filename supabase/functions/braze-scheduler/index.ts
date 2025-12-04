@@ -269,6 +269,33 @@ Deno.serve(async (req) => {
       console.log(`  Home: "${match.home_team}" → Canonical: "${homeCanonical || 'NOT MAPPED'}" → Featured: ${homeFeatured}`);
       console.log(`  Away: "${match.away_team}" → Canonical: "${awayCanonical || 'NOT MAPPED'}" → Featured: ${awayFeatured}`);
       
+      // VALIDATION: Check for potential featured teams that aren't mapped
+      // This catches scenarios where a team SHOULD be featured but mapping is missing
+      const homeInHardcodedList = FEATURED_TEAMS.some(t => match.home_team.toLowerCase().includes(t.toLowerCase().split(' ')[0]));
+      const awayInHardcodedList = FEATURED_TEAMS.some(t => match.away_team.toLowerCase().includes(t.toLowerCase().split(' ')[0]));
+      
+      if (homeInHardcodedList && !homeCanonical) {
+        console.warn(`⚠️ UNMATCHED FEATURED TEAM: "${match.home_team}" appears to be a featured team but has no mapping!`);
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-scheduler',
+          match_id: match.id,
+          action: 'unmatched_featured_team',
+          reason: `Team "${match.home_team}" appears to be featured but has no team_mapping`,
+          details: { team: match.home_team, position: 'home', match_date: match.match_date },
+        });
+      }
+      
+      if (awayInHardcodedList && !awayCanonical) {
+        console.warn(`⚠️ UNMATCHED FEATURED TEAM: "${match.away_team}" appears to be a featured team but has no mapping!`);
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-scheduler',
+          match_id: match.id,
+          action: 'unmatched_featured_team',
+          reason: `Team "${match.away_team}" appears to be featured but has no team_mapping`,
+          details: { team: match.away_team, position: 'away', match_date: match.match_date },
+        });
+      }
+      
       if (!homeFeatured && !awayFeatured) {
         console.log(`Match ${match.id}: ${match.home_team} vs ${match.away_team} - no featured teams`);
         continue;

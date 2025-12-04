@@ -17,6 +17,7 @@ import { GapDetectionAlert } from '@/components/GapDetectionAlert';
 import { AdminManagement } from '@/components/AdminManagement';
 import { LedgerHealthCheck } from '@/components/LedgerHealthCheck';
 import { BrazeSchedulesView } from '@/components/BrazeSchedulesView';
+import { TeamMappingTester } from '@/components/TeamMappingTester';
 import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
@@ -360,6 +361,8 @@ export default function Admin() {
         </Card>
 
         <FeaturedTeamsManager />
+
+        <TeamMappingTester />
 
         <TeamTranslationsManager />
 
