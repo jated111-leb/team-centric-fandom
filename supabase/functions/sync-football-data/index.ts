@@ -196,6 +196,39 @@ Deno.serve(async (req) => {
         for (const match of matches) {
           const matchData = formatMatchForDB(match, compCode, compName);
 
+          // DUPLICATE DETECTION: Check for potential duplicate matches (same teams/date, different ID)
+          const matchDate = new Date(match.utcDate).toISOString().split('T')[0];
+          const { data: potentialDupes } = await supabase
+            .from('matches')
+            .select('id, home_team, away_team, match_date, utc_date')
+            .eq('home_team', match.homeTeam.name)
+            .eq('away_team', match.awayTeam.name)
+            .eq('match_date', matchDate)
+            .neq('id', match.id);
+
+          if (potentialDupes && potentialDupes.length > 0) {
+            console.warn(`⚠️ POTENTIAL DUPLICATE MATCH DETECTED:`);
+            console.warn(`  New: ID ${match.id} - ${match.homeTeam.name} vs ${match.awayTeam.name} @ ${match.utcDate}`);
+            potentialDupes.forEach(dupe => {
+              console.warn(`  Existing: ID ${dupe.id} - ${dupe.home_team} vs ${dupe.away_team} @ ${dupe.utc_date}`);
+            });
+            
+            // Log to scheduler_logs for alerting
+            await supabase.from('scheduler_logs').insert({
+              function_name: 'sync-football-data',
+              match_id: match.id,
+              action: 'potential_duplicate_match',
+              reason: `Match may be duplicate of ID(s): ${potentialDupes.map(d => d.id).join(', ')}`,
+              details: {
+                new_match_id: match.id,
+                existing_match_ids: potentialDupes.map(d => d.id),
+                home_team: match.homeTeam.name,
+                away_team: match.awayTeam.name,
+                match_date: matchDate,
+              },
+            });
+          }
+
           const { error } = await supabase
             .from('matches')
             .upsert(matchData, {
