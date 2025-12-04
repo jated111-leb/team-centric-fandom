@@ -125,10 +125,10 @@ export const ScheduledNotificationsTable = () => {
         throw new Error(result.error || 'Verification failed');
       }
 
-      // Ensure arrays exist with defaults
-      const verified = result.verified || [];
-      const missing = result.missing || [];
-      const errors = result.errors || [];
+      // Extract from result.details (verify-braze-schedules response structure)
+      const verified = result.details?.verified_in_braze || [];
+      const missing = result.details?.missing_from_braze || [];
+      const errors = result.alerts?.stale_pending || [];
       
       const normalizedResults = {
         total: result.total || verified.length + missing.length,

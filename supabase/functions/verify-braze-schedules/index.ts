@@ -30,8 +30,23 @@ Deno.serve(async (req) => {
 
     console.log('🔍 Verifying Braze schedules...');
 
+    // Fetch all schedule ledger entries first
+    const { data: schedules, error: fetchError } = await supabase
+      .from('schedule_ledger')
+      .select('*, matches(home_team, away_team, utc_date)')
+      .order('send_at_utc', { ascending: true });
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch schedule_ledger: ${fetchError.message}`);
+    }
+
+    console.log(`Found ${schedules?.length || 0} schedules in ledger to verify`);
+
+    // Build set of ledger schedule IDs for matching
+    const ledgerScheduleIds = new Set(schedules?.map(s => s.braze_schedule_id) || []);
+
     // Fetch future scheduled broadcasts from Braze
-    const daysAhead = 30;
+    const daysAhead = 90;
     const endIso = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString();
     
     const brazeRes = await fetch(
@@ -43,32 +58,19 @@ Deno.serve(async (req) => {
     
     if (brazeRes.ok) {
       const brazeData = await brazeRes.json();
+      // Filter by matching schedule_id to our ledger entries (not by campaign_id)
       const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-        b.campaign_id === brazeCampaignId ||
-        b.campaign_api_id === brazeCampaignId ||
-        b.campaign_api_identifier === brazeCampaignId
+        ledgerScheduleIds.has(b.id) || ledgerScheduleIds.has(b.schedule_id)
       );
       
       for (const broadcast of ourBroadcasts) {
-        brazeScheduleIds.add(broadcast.schedule_id);
+        brazeScheduleIds.add(broadcast.id || broadcast.schedule_id);
       }
       
-      console.log(`Found ${brazeScheduleIds.size} active schedules in Braze`);
+      console.log(`Found ${brazeScheduleIds.size} matching schedules in Braze (out of ${brazeData.scheduled_broadcasts?.length || 0} total)`);
     } else {
       console.warn('Failed to fetch Braze scheduled broadcasts:', await brazeRes.text());
     }
-
-    // Fetch all schedule ledger entries
-    const { data: schedules, error: fetchError } = await supabase
-      .from('schedule_ledger')
-      .select('*, matches(home_team, away_team, utc_date)')
-      .order('send_at_utc', { ascending: true });
-
-    if (fetchError) {
-      throw new Error(`Failed to fetch schedule_ledger: ${fetchError.message}`);
-    }
-
-    console.log(`Found ${schedules?.length || 0} schedules in ledger to verify`);
 
     const results = {
       total: schedules?.length || 0,
