@@ -33,9 +33,9 @@ export const ScheduledNotificationsTable = () => {
   const [resetting, setResetting] = useState(false);
   const [verificationResults, setVerificationResults] = useState<{
     total: number;
-    verified: any[];
-    missing: any[];
-    errors: any[];
+    confirmed: any[];
+    missing_dispatch_id: any[];
+    stale_pending: any[];
   } | null>(null);
   const { toast } = useToast();
 
@@ -128,29 +128,29 @@ export const ScheduledNotificationsTable = () => {
       }
 
       // Extract from result.details (verify-braze-schedules response structure)
-      const verified = result.details?.verified_in_braze || [];
-      const missing = result.details?.missing_from_braze || [];
-      const errors = result.alerts?.stale_pending || [];
+      const confirmed = result.details?.confirmed || [];
+      const missing_dispatch_id = result.details?.missing_dispatch_id || [];
+      const stale_pending = result.alerts?.stale_pending || [];
       
       const normalizedResults = {
-        total: result.total || verified.length + missing.length,
-        verified,
-        missing,
-        errors,
+        total: result.summary?.total || confirmed.length,
+        confirmed,
+        missing_dispatch_id,
+        stale_pending,
       };
 
       setVerificationResults(normalizedResults);
       
-      if (missing.length > 0) {
+      if (missing_dispatch_id.length > 0 || stale_pending.length > 0) {
         toast({
-          title: "Verification complete",
-          description: `${verified.length} schedules verified, ${missing.length} missing in Braze`,
+          title: "Issues detected",
+          description: `${missing_dispatch_id.length} missing dispatch_id, ${stale_pending.length} stale`,
           variant: "destructive",
         });
       } else {
         toast({
-          title: "All schedules verified",
-          description: `All ${verified.length} schedules exist in Braze`,
+          title: "All schedules confirmed",
+          description: `All ${confirmed.length} schedules have valid dispatch_id`,
         });
       }
     } catch (error) {
@@ -348,29 +348,29 @@ export const ScheduledNotificationsTable = () => {
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span><strong>{verificationResults.verified.length}</strong> Verified</span>
+                <span><strong>{verificationResults.confirmed.length}</strong> Confirmed</span>
               </div>
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <span><strong>{verificationResults.missing.length}</strong> Missing</span>
+                <span><strong>{verificationResults.missing_dispatch_id.length}</strong> Missing ID</span>
               </div>
               <div className="flex items-center gap-2">
                 <XCircle className="h-4 w-4 text-red-600" />
-                <span><strong>{verificationResults.errors.length}</strong> Errors</span>
+                <span><strong>{verificationResults.stale_pending.length}</strong> Stale</span>
               </div>
             </div>
-            {verificationResults.missing.length > 0 && (
+            {verificationResults.missing_dispatch_id.length > 0 && (
               <div className="text-xs text-muted-foreground mt-2">
-                <p className="font-medium">Missing schedule IDs:</p>
+                <p className="font-medium">Missing dispatch_id:</p>
                 <ul className="list-disc list-inside mt-1">
-                  {verificationResults.missing.slice(0, 5).map((item, idx) => (
+                  {verificationResults.missing_dispatch_id.slice(0, 5).map((item, idx) => (
                     <li key={item.schedule_id || idx}>
                       <code className="text-xs">{String(item.schedule_id || item).substring(0, 12)}...</code>
                       {item.home_team && <span className="ml-2 text-muted-foreground">({item.home_team} vs {item.away_team})</span>}
                     </li>
                   ))}
-                  {verificationResults.missing.length > 5 && (
-                    <li>... and {verificationResults.missing.length - 5} more</li>
+                  {verificationResults.missing_dispatch_id.length > 5 && (
+                    <li>... and {verificationResults.missing_dispatch_id.length - 5} more</li>
                   )}
                 </ul>
               </div>
