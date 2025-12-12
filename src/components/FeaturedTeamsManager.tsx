@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -211,15 +212,11 @@ export function FeaturedTeamsManager() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Featured Teams</CardTitle>
-          <CardDescription>
-            Notifications are sent for matches featuring any of these teams ({teams.length} teams)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Add New Team */}
+      <CollapsibleCard
+        title="Featured Teams"
+        description={`Notifications are sent for matches featuring any of these teams (${teams.length} teams)`}
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <div className="flex gap-2">
               <div className="flex-1">
@@ -318,8 +315,8 @@ export function FeaturedTeamsManager() {
               <p className="text-xs mt-1">Add teams to start scheduling notifications</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </CollapsibleCard>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!teamToDelete} onOpenChange={(open) => !open && setTeamToDelete(null)}>
