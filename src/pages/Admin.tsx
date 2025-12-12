@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Info, FileText, Trash2, LogOut } from 'lucide-react';
+import { Loader2, Info, FileText, Trash2, LogOut, BarChart3 } from 'lucide-react';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 import { SchedulerStats } from '@/components/SchedulerStats';
 import { AlertMonitor } from '@/components/AlertMonitor';
@@ -246,9 +246,13 @@ export default function Admin() {
               View Schedule
             </Button>
             <NotificationPreview />
+            <Button onClick={() => navigate('/admin/analytics')} variant="outline">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
+            </Button>
             <Button onClick={() => navigate('/admin/notification-logs')} variant="outline">
               <FileText className="h-4 w-4 mr-2" />
-              View Notification Logs
+              Logs
             </Button>
             <Button onClick={handleLogout} variant="ghost">
               <LogOut className="h-4 w-4 mr-2" />
