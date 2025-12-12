@@ -8,30 +8,12 @@ interface ExecutiveKPIsProps {
 }
 
 export function ExecutiveKPIs({ data }: ExecutiveKPIsProps) {
-  const { notifications, userStats, deliveryStats } = data;
+  const { userStats, deliveryStats, periodComparison } = data;
 
-  // Calculate week-over-week metrics
-  const now = new Date();
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-
-  const thisWeekNotifications = notifications.filter(n => new Date(n.sent_at) >= oneWeekAgo).length;
-  const lastWeekNotifications = notifications.filter(n => {
-    const date = new Date(n.sent_at);
-    return date >= twoWeeksAgo && date < oneWeekAgo;
-  }).length;
-
-  const weekOverWeekChange = lastWeekNotifications > 0 
-    ? ((thisWeekNotifications - lastWeekNotifications) / lastWeekNotifications * 100)
+  // Calculate period-over-period change
+  const periodChange = periodComparison.previousPeriodNotifications > 0 
+    ? ((periodComparison.currentPeriodNotifications - periodComparison.previousPeriodNotifications) / periodComparison.previousPeriodNotifications * 100)
     : 0;
-
-  // Calculate today's active users
-  const today = new Date().toDateString();
-  const todayUsers = new Set(
-    notifications
-      .filter(n => new Date(n.sent_at).toDateString() === today)
-      .map(n => n.external_user_id)
-  ).size;
 
   // Data quality score (weighted average)
   const dataQualityScore = (
@@ -48,7 +30,7 @@ export function ExecutiveKPIs({ data }: ExecutiveKPIsProps) {
           <Users className="h-4 w-4 text-primary" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold">{todayUsers}</div>
+          <div className="text-3xl font-bold">{userStats.todayUsers.toLocaleString()}</div>
           <p className="text-xs text-muted-foreground mt-1">
             Users reached today
           </p>
@@ -57,8 +39,8 @@ export function ExecutiveKPIs({ data }: ExecutiveKPIsProps) {
 
       <Card className="bg-gradient-to-br from-secondary/10 to-secondary/5 border-secondary/20">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Week-over-Week</CardTitle>
-          {weekOverWeekChange >= 0 ? (
+          <CardTitle className="text-sm font-medium">Period-over-Period</CardTitle>
+          {periodChange >= 0 ? (
             <ArrowUp className="h-4 w-4 text-secondary" />
           ) : (
             <ArrowDown className="h-4 w-4 text-destructive" />
@@ -67,14 +49,14 @@ export function ExecutiveKPIs({ data }: ExecutiveKPIsProps) {
         <CardContent>
           <div className="flex items-center gap-2">
             <span className="text-3xl font-bold">
-              {weekOverWeekChange >= 0 ? '+' : ''}{weekOverWeekChange.toFixed(1)}%
+              {periodChange >= 0 ? '+' : ''}{periodChange.toFixed(1)}%
             </span>
-            <Badge variant={weekOverWeekChange >= 0 ? "default" : "destructive"}>
-              {thisWeekNotifications} this week
+            <Badge variant={periodChange >= 0 ? "default" : "destructive"}>
+              {periodComparison.currentPeriodNotifications.toLocaleString()} this period
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            vs {lastWeekNotifications} last week
+            vs {periodComparison.previousPeriodNotifications.toLocaleString()} previous period
           </p>
         </CardContent>
       </Card>

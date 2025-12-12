@@ -33,7 +33,15 @@ export interface AnalyticsData {
     usersWithMultipleNotifications: number;
     duplicateNotifications: number;
     multiGameDayUsers: number;
+    todayUsers: number;
   };
+  periodComparison: {
+    currentPeriodNotifications: number;
+    previousPeriodNotifications: number;
+    currentPeriodUsers: number;
+    previousPeriodUsers: number;
+  };
+  frequencyDistribution: { range: string; count: number }[];
   contentStats: {
     teamBreakdown: { team: string; count: number }[];
     competitionBreakdown: { competition: string; count: number }[];
@@ -53,7 +61,16 @@ interface ServerAnalyticsSummary {
     usersWithMultiple: number;
     totalNotifications: number;
     avgNotificationsPerUser: number;
+    todayUsers: number;
+    multiGameDayUsers: number;
   };
+  periodComparison: {
+    currentPeriodNotifications: number;
+    previousPeriodNotifications: number;
+    currentPeriodUsers: number;
+    previousPeriodUsers: number;
+  };
+  frequencyDistribution: { range: string; count: number }[] | null;
   deliveryStats: {
     correlationRate: number;
     naRate: number;
@@ -189,8 +206,16 @@ const Analytics = () => {
           totalUsers: summary.userStats.totalUsers || 0,
           usersWithMultipleNotifications: summary.userStats.usersWithMultiple || 0,
           duplicateNotifications: summary.duplicates.count || 0,
-          multiGameDayUsers: 0 // Will be computed if needed
+          multiGameDayUsers: summary.userStats.multiGameDayUsers || 0,
+          todayUsers: summary.userStats.todayUsers || 0
         },
+        periodComparison: {
+          currentPeriodNotifications: summary.periodComparison?.currentPeriodNotifications || 0,
+          previousPeriodNotifications: summary.periodComparison?.previousPeriodNotifications || 0,
+          currentPeriodUsers: summary.periodComparison?.currentPeriodUsers || 0,
+          previousPeriodUsers: summary.periodComparison?.previousPeriodUsers || 0
+        },
+        frequencyDistribution: summary.frequencyDistribution || [],
         contentStats: {
           teamBreakdown,
           competitionBreakdown,
