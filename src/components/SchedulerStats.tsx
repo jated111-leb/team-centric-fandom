@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Play } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -91,34 +92,29 @@ export function SchedulerStats() {
     );
   }
 
+  const runButton = (
+    <Button
+      onClick={runScheduler}
+      disabled={runningScheduler}
+      size="sm"
+      variant="outline"
+    >
+      {runningScheduler ? (
+        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+      ) : (
+        <Play className="h-4 w-4 mr-2" />
+      )}
+      Run Scheduler
+    </Button>
+  );
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Scheduler Statistics & Controls</CardTitle>
-            <CardDescription>
-              Monitor scheduler activity and manually trigger operations
-            </CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={runScheduler}
-              disabled={runningScheduler}
-              size="sm"
-              variant="outline"
-            >
-              {runningScheduler ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              Run Scheduler
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <CollapsibleCard
+      title="Scheduler Statistics & Controls"
+      description="Monitor scheduler activity and manually trigger operations"
+      headerExtra={runButton}
+    >
+      <div className="space-y-6">
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-muted rounded-lg p-4">
@@ -187,7 +183,7 @@ export function SchedulerStats() {
             ))}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -278,72 +279,75 @@ export const ScheduledNotificationsTable = () => {
     );
   }
 
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Scheduled Notifications (Source of Truth)</CardTitle>
-            <CardDescription>
-              Showing {notifications.length} most recent scheduled notifications from the database
-            </CardDescription>
-          </div>
+  const headerButtons = (
+    <div className="flex gap-2">
+      <Button 
+        onClick={verifySchedules} 
+        disabled={verifying || notifications.length === 0}
+        variant="outline"
+        size="sm"
+      >
+        {verifying ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Verifying...
+          </>
+        ) : (
+          <>
+            <CheckCircle2 className="mr-2 h-4 w-4" />
+            Verify with Braze
+          </>
+        )}
+      </Button>
+      
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
           <Button 
-            onClick={verifySchedules} 
-            disabled={verifying || notifications.length === 0}
-            variant="outline"
+            variant="destructive"
+            size="sm"
+            disabled={resetting || notifications.length === 0}
           >
-            {verifying ? (
+            {resetting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Verifying...
+                Resetting...
               </>
             ) : (
               <>
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Verify with Braze
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                Reset
               </>
             )}
           </Button>
-          
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="destructive"
-                disabled={resetting || notifications.length === 0}
-              >
-                {resetting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Resetting...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Reset Schedules
-                  </>
-                )}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reset All Schedules?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will clear all pending schedules from the database and trigger a fresh scheduler run to recreate them in Braze. Use this when schedules are out of sync.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={resetSchedules}>
-                  Reset Schedules
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-        
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset All Schedules?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will clear all pending schedules from the database and trigger a fresh scheduler run to recreate them in Braze. Use this when schedules are out of sync.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={resetSchedules}>
+              Reset Schedules
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+
+  return (
+    <CollapsibleCard
+      title="Scheduled Notifications (Source of Truth)"
+      description={`Showing ${notifications.length} most recent scheduled notifications from the database`}
+      headerExtra={headerButtons}
+      defaultOpen={false}
+    >
+      <div className="space-y-4">
         {verificationResults && (
-          <div className="mt-4 p-4 rounded-lg border bg-muted/50 space-y-2">
+          <div className="p-4 rounded-lg border bg-muted/50 space-y-2">
             <h4 className="font-semibold text-sm">Verification Results</h4>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div className="flex items-center gap-2">
@@ -377,8 +381,6 @@ export const ScheduledNotificationsTable = () => {
             )}
           </div>
         )}
-      </CardHeader>
-      <CardContent>
         {notifications.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No scheduled notifications found
@@ -447,7 +449,7 @@ export const ScheduledNotificationsTable = () => {
             </Table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 };

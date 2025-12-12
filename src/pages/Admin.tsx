@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -225,14 +226,11 @@ export default function Admin() {
           <NotificationPreview />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Braze Push Notifications</CardTitle>
-            <CardDescription>
-              Control whether push notifications are automatically scheduled for featured team matches
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <CollapsibleCard
+          title="Braze Push Notifications"
+          description="Control whether push notifications are automatically scheduled for featured team matches"
+        >
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="braze-toggle" className="text-base">
@@ -274,8 +272,8 @@ export default function Admin() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
 
         <AlertMonitor />
 
@@ -285,42 +283,38 @@ export default function Admin() {
 
         <AdminManagement />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Cleanup Actions</CardTitle>
-            <CardDescription>
-              Remove schedules for matches not featuring any of the configured teams
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="rounded-lg bg-muted p-4">
-                <p className="text-sm text-muted-foreground">
-                  This will delete all scheduled notifications for matches that don't involve any featured teams. 
-                  This includes removing them from both the schedule ledger and Braze.
-                </p>
-              </div>
-              <Button
-                onClick={cleanupNonFeaturedSchedules}
-                disabled={cleaningUp}
-                variant="destructive"
-                className="w-full sm:w-auto"
-              >
-                {cleaningUp ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Cleaning up...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clean Up Non-Featured Team Schedules
-                  </>
-                )}
-              </Button>
+        <CollapsibleCard
+          title="Cleanup Actions"
+          description="Remove schedules for matches not featuring any of the configured teams"
+          defaultOpen={false}
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg bg-muted p-4">
+              <p className="text-sm text-muted-foreground">
+                This will delete all scheduled notifications for matches that don't involve any featured teams. 
+                This includes removing them from both the schedule ledger and Braze.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              onClick={cleanupNonFeaturedSchedules}
+              disabled={cleaningUp}
+              variant="destructive"
+              className="w-full sm:w-auto"
+            >
+              {cleaningUp ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cleaning up...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Clean Up Non-Featured Team Schedules
+                </>
+              )}
+            </Button>
+          </div>
+        </CollapsibleCard>
 
         <FeaturedTeamsManager />
 
