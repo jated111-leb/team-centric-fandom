@@ -2,12 +2,10 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ScheduleFilters } from "@/components/ScheduleFilters";
 import { MatchRow } from "@/components/MatchRow";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar, TrendingUp, RefreshCw, LogOut } from "lucide-react";
-import { toast } from "sonner";
+import { Calendar, TrendingUp, RefreshCw } from "lucide-react";
 import type { Match } from "@/types/match";
 
 const Index = () => {
@@ -15,7 +13,6 @@ const Index = () => {
   const [selectedCompetition, setSelectedCompetition] = useState("all");
   const [selectedPriority, setSelectedPriority] = useState("all");
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch featured teams from database
   const { data: featuredTeamsData = [] } = useQuery({
@@ -101,36 +98,6 @@ const Index = () => {
     };
   }, [refetch]);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      toast.info('Fetching latest match data...');
-      
-      const { data, error } = await supabase.functions.invoke('sync-football-data', {
-        body: { daysAhead: 28 }
-      });
-
-      if (error) throw error;
-
-      toast.success(`Updated ${data.total} matches from football-data.org`);
-      await refetch();
-    } catch (error) {
-      console.error('Refresh error:', error);
-      toast.error('Failed to refresh match data');
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast.success('Logged out successfully');
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Failed to log out');
-    }
-  };
 
   const filteredMatches = useMemo(() => {
     return matches.filter((match) => {
@@ -167,65 +134,35 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">1001 Sports Schedule</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Internal match scheduling & notification management
-              </p>
+    <div className="bg-background">
+      {/* Page Header */}
+      <div className="border-b bg-card/50 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Match Schedule</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Internal match scheduling & notification management
+            </p>
+          </div>
+          <div className="flex gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span className="text-muted-foreground">
+                <span className="font-semibold text-foreground">{stats.total}</span> matches
+              </span>
             </div>
-            <div className="flex items-center gap-6">
-              <div className="flex gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-muted-foreground">
-                    <span className="font-semibold text-foreground">{stats.total}</span> matches
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-priority-high" />
-                  <span className="text-muted-foreground">
-                    <span className="font-semibold text-foreground">{stats.highPriority}</span> high priority
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button 
-                  onClick={() => window.location.href = '/admin'}
-                  variant="outline"
-                  size="sm"
-                >
-                  Admin Panel
-                </Button>
-                <Button 
-                  onClick={handleRefresh} 
-                  disabled={isRefreshing}
-                  variant="outline"
-                  size="sm"
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  {isRefreshing ? 'Syncing...' : 'Refresh Data'}
-                </Button>
-                <Button 
-                  onClick={handleLogout}
-                  variant="ghost"
-                  size="sm"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </Button>
-              </div>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-destructive" />
+              <span className="text-muted-foreground">
+                <span className="font-semibold text-foreground">{stats.highPriority}</span> high priority
+              </span>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="p-6">
         <ScheduleFilters
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Info, FileText, Trash2, LogOut, BarChart3 } from 'lucide-react';
+import { Loader2, Info, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 import { SchedulerStats } from '@/components/SchedulerStats';
 import { AlertMonitor } from '@/components/AlertMonitor';
@@ -19,7 +18,6 @@ import { TeamMappingTester } from '@/components/TeamMappingTester';
 import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
-  const navigate = useNavigate();
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -202,63 +200,29 @@ export default function Admin() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: 'Logged out',
-        description: 'You have been logged out successfully',
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to log out',
-        variant: 'destructive',
-      });
-    }
-  };
-
   if (checkingAuth || loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!isAdmin) {
-    return null; // Will redirect to /auth
+    return null;
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-foreground">Admin Panel</h1>
-            <p className="text-muted-foreground mt-2">
+            <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
+            <p className="text-muted-foreground mt-1">
               Manage Braze notification settings and monitor scheduler activity
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => navigate('/')} variant="outline">
-              View Schedule
-            </Button>
-            <NotificationPreview />
-            <Button onClick={() => navigate('/admin/analytics')} variant="outline">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Analytics
-            </Button>
-            <Button onClick={() => navigate('/admin/notification-logs')} variant="outline">
-              <FileText className="h-4 w-4 mr-2" />
-              Logs
-            </Button>
-            <Button onClick={handleLogout} variant="ghost">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+          <NotificationPreview />
         </div>
 
         <Card>
