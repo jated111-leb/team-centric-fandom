@@ -9,112 +9,109 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 215 25% 15%;
+    /* 1001 Sports Brand Theme - Dark Navy with Green Accents */
+    --background: 210 50% 8%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card: 210 45% 11%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover: 210 45% 11%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 238 48% 9.8039%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 145 100% 50%;
+    --primary-foreground: 210 50% 8%;
 
-    --secondary: 160 60% 45%;
+    --secondary: 210 40% 16%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 210 30% 96%;
-    --muted-foreground: 215 15% 50%;
+    --muted: 210 40% 16%;
+    --muted-foreground: 210 20% 60%;
 
-    --accent: 160 60% 45%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 145 100% 50%;
+    --accent-foreground: 210 50% 8%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 215 20% 90%;
-    --input: 215 20% 90%;
-    --ring: 215 70% 25%;
+    --border: 210 35% 18%;
+    --input: 210 35% 18%;
+    --ring: 145 100% 50%;
 
     --radius: 0.5rem;
 
     /* Sports-specific tokens */
     --priority-high: 0 85% 60%;
     --priority-medium: 35 100% 50%;
-    --priority-low: 215 20% 65%;
+    --priority-low: 210 20% 55%;
 
-    --status-scheduled: 160 60% 45%;
+    --status-scheduled: 145 100% 50%;
     --status-live: 0 85% 60%;
-    --status-finished: 215 15% 50%;
+    --status-finished: 210 20% 55%;
 
-    --gradient-header: linear-gradient(135deg, hsl(215 70% 25%), hsl(215 60% 35%));
-    --shadow-card: 0 2px 8px -2px hsl(215 70% 25% / 0.12);
-    --shadow-elevated: 0 8px 24px -8px hsl(215 70% 25% / 0.18);
+    --gradient-header: linear-gradient(135deg, hsl(210 50% 8%), hsl(210 45% 12%));
+    --shadow-card: 0 2px 8px -2px hsl(0 0% 0% / 0.4);
+    --shadow-elevated: 0 8px 24px -8px hsl(0 0% 0% / 0.6);
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 210 50% 6%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 145 100% 50%;
+    --sidebar-primary-foreground: 210 50% 8%;
+    --sidebar-accent: 210 40% 14%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 210 35% 16%;
+    --sidebar-ring: 145 100% 50%;
 
     --font-sans: Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   }
 
   .dark {
-    --background: 215 30% 8%;
+    /* Same as root - brand is dark-first */
+    --background: 210 50% 8%;
     --foreground: 0 0% 98%;
 
-    --card: 215 25% 12%;
+    --card: 210 45% 11%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 215 25% 12%;
+    --popover: 210 45% 11%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 160 60% 45%;
-    --primary-foreground: 215 30% 8%;
+    --primary: 145 100% 50%;
+    --primary-foreground: 210 50% 8%;
 
-    --secondary: 215 25% 18%;
+    --secondary: 210 40% 16%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 215 25% 18%;
-    --muted-foreground: 215 15% 65%;
+    --muted: 210 40% 16%;
+    --muted-foreground: 210 20% 60%;
 
-    --accent: 160 60% 45%;
-    --accent-foreground: 215 30% 8%;
+    --accent: 145 100% 50%;
+    --accent-foreground: 210 50% 8%;
 
-    --destructive: 0 62.8% 50%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 215 25% 20%;
-    --input: 215 25% 20%;
-    --ring: 160 60% 45%;
+    --border: 210 35% 18%;
+    --input: 210 35% 18%;
+    --ring: 145 100% 50%;
 
     --priority-high: 0 85% 60%;
     --priority-medium: 35 100% 55%;
-    --priority-low: 215 15% 60%;
+    --priority-low: 210 20% 55%;
 
-    --gradient-header: linear-gradient(135deg, hsl(215 30% 12%), hsl(215 25% 18%));
-    --shadow-card: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
-    --shadow-elevated: 0 8px 24px -8px hsl(0 0% 0% / 0.5);
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --gradient-header: linear-gradient(135deg, hsl(210 50% 8%), hsl(210 45% 12%));
+    --shadow-card: 0 2px 8px -2px hsl(0 0% 0% / 0.4);
+    --shadow-elevated: 0 8px 24px -8px hsl(0 0% 0% / 0.6);
+    
+    --sidebar-background: 210 50% 6%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 145 100% 50%;
+    --sidebar-primary-foreground: 210 50% 8%;
+    --sidebar-accent: 210 40% 14%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 210 35% 16%;
+    --sidebar-ring: 145 100% 50%;
+    
     --font-sans: Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   }
 }
