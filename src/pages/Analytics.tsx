@@ -5,12 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Download, LogOut, RefreshCw, Users, TrendingUp, BarChart3, Calendar } from "lucide-react";
+import { Download, RefreshCw, Users, TrendingUp, BarChart3, Calendar } from "lucide-react";
 import { UserInsightsSection } from "@/components/analytics/UserInsightsSection";
 import { ContentPerformanceSection } from "@/components/analytics/ContentPerformanceSection";
 import { DeliveryHealthSection } from "@/components/analytics/DeliveryHealthSection";
 import { ExecutiveKPIs } from "@/components/analytics/ExecutiveKPIs";
-import { subDays, format } from "date-fns";
+import { subDays } from "date-fns";
 
 export interface NotificationAnalytics {
   id: string;
@@ -267,19 +267,7 @@ const Analytics = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: 'Logged out',
-        description: 'You have been logged out successfully',
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  const exportAnalytics = () => {
+  const handleExport = () => {
     if (!analyticsData || !serverStats) return;
     
     const report = {
@@ -320,26 +308,20 @@ const Analytics = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/admin')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Admin
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Growth Marketing Analytics</h1>
-              <p className="text-muted-foreground">
-                User insights, content performance, and delivery health
-                {serverStats && (
-                  <span className="ml-2 text-sm">
-                    • {serverStats.userStats.totalNotifications?.toLocaleString() || 0} notifications
-                  </span>
-                )}
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold">Growth Marketing Analytics</h1>
+            <p className="text-muted-foreground">
+              User insights, content performance, and delivery health
+              {serverStats && (
+                <span className="ml-2 text-sm">
+                  • {serverStats.userStats.totalNotifications?.toLocaleString() || 0} notifications
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex gap-2 items-center">
             <div className="flex items-center gap-2">
@@ -361,13 +343,9 @@ const Analytics = () => {
               <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <Button onClick={exportAnalytics} disabled={!analyticsData}>
+            <Button onClick={handleExport} disabled={!analyticsData}>
               <Download className="h-4 w-4 mr-2" />
               Export
-            </Button>
-            <Button onClick={handleLogout} variant="ghost">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
             </Button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { Layout } from "@/components/Layout";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
@@ -25,7 +26,9 @@ const App = () => (
             path="/"
             element={
               <ProtectedRoute>
-                <Index />
+                <Layout>
+                  <Index />
+                </Layout>
               </ProtectedRoute>
             }
           />
@@ -33,7 +36,9 @@ const App = () => (
             path="/admin"
             element={
               <ProtectedRoute>
-                <Admin />
+                <Layout>
+                  <Admin />
+                </Layout>
               </ProtectedRoute>
             }
           />
@@ -41,7 +46,9 @@ const App = () => (
             path="/admin/notification-logs"
             element={
               <ProtectedRoute>
-                <NotificationLogs />
+                <Layout>
+                  <NotificationLogs />
+                </Layout>
               </ProtectedRoute>
             }
           />
@@ -49,7 +56,9 @@ const App = () => (
             path="/admin/analytics"
             element={
               <ProtectedRoute>
-                <Analytics />
+                <Layout>
+                  <Analytics />
+                </Layout>
               </ProtectedRoute>
             }
           />
@@ -58,7 +67,9 @@ const App = () => (
             path="*"
             element={
               <ProtectedRoute>
-                <NotFound />
+                <Layout>
+                  <NotFound />
+                </Layout>
               </ProtectedRoute>
             }
           />
