@@ -2,14 +2,15 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Download, LogOut, RefreshCw, Users, TrendingUp, AlertTriangle, BarChart3 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Download, LogOut, RefreshCw, Users, TrendingUp, BarChart3, Calendar } from "lucide-react";
 import { UserInsightsSection } from "@/components/analytics/UserInsightsSection";
 import { ContentPerformanceSection } from "@/components/analytics/ContentPerformanceSection";
 import { DeliveryHealthSection } from "@/components/analytics/DeliveryHealthSection";
 import { ExecutiveKPIs } from "@/components/analytics/ExecutiveKPIs";
+import { subDays, format } from "date-fns";
 
 export interface NotificationAnalytics {
   id: string;
@@ -46,16 +47,59 @@ export interface AnalyticsData {
   };
 }
 
+interface ServerAnalyticsSummary {
+  userStats: {
+    totalUsers: number;
+    usersWithMultiple: number;
+    totalNotifications: number;
+    avgNotificationsPerUser: number;
+  };
+  deliveryStats: {
+    correlationRate: number;
+    naRate: number;
+    totalSent: number;
+    hourlyDistribution: { hour: number; count: number }[] | null;
+  };
+  contentStats: {
+    byTeam: { team: string; count: number }[] | null;
+    byCompetition: { competition: string; count: number }[] | null;
+  };
+  duplicates: {
+    count: number;
+    affectedUsers: number;
+  };
+  dateRange: {
+    start: string;
+    end: string;
+  };
+}
+
+const DATE_RANGE_OPTIONS = [
+  { value: '7', label: 'Last 7 days' },
+  { value: '14', label: 'Last 14 days' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '90', label: 'Last 90 days' },
+  { value: 'all', label: 'All time' },
+];
+
 const Analytics = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [dateRange, setDateRange] = useState('30');
+  const [serverStats, setServerStats] = useState<ServerAnalyticsSummary | null>(null);
 
   useEffect(() => {
     checkAdminAndFetchData();
   }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      fetchAnalyticsData();
+    }
+  }, [dateRange]);
 
   const checkAdminAndFetchData = async () => {
     try {
@@ -97,157 +141,55 @@ const Analytics = () => {
     try {
       setRefreshing(true);
       
-      // Fetch all notification sends with pagination (Supabase defaults to 1000 row limit)
-      let allNotifications: NotificationAnalytics[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data: notifications, error } = await supabase
-          .from('notification_sends')
-          .select('*')
-          .order('sent_at', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (error) throw error;
-
-        if (notifications && notifications.length > 0) {
-          allNotifications = [...allNotifications, ...notifications];
-          page++;
-          // If we got less than pageSize, we've reached the end
-          hasMore = notifications.length === pageSize;
-        } else {
-          hasMore = false;
-        }
+      // Calculate date range
+      const endDate = new Date();
+      let startDate: Date | null = null;
+      
+      if (dateRange !== 'all') {
+        startDate = subDays(endDate, parseInt(dateRange));
       }
 
-      const data = allNotifications;
-      
-      // Calculate user stats
-      const userNotificationCounts = new Map<string, number>();
-      const userDailyMatches = new Map<string, Set<string>>();
-      const matchUserCombos = new Set<string>();
-      let duplicateCount = 0;
+      // Call server-side aggregation function (handles all heavy computation in DB)
+      const { data: summaryData, error: summaryError } = await supabase
+        .rpc('compute_analytics_summary', {
+          p_start_date: startDate?.toISOString() || null,
+          p_end_date: endDate.toISOString()
+        });
 
-      data.forEach(n => {
-        const userId = n.external_user_id || 'unknown';
-        userNotificationCounts.set(userId, (userNotificationCounts.get(userId) || 0) + 1);
-        
-        // Check for multi-game day
-        const sentDate = new Date(n.sent_at).toDateString();
-        const dayKey = `${userId}_${sentDate}`;
-        if (!userDailyMatches.has(dayKey)) {
-          userDailyMatches.set(dayKey, new Set());
-        }
-        if (n.match_id) {
-          userDailyMatches.get(dayKey)!.add(n.match_id.toString());
-        }
-        
-        // Check for duplicates
-        const combo = `${userId}_${n.match_id}`;
-        if (matchUserCombos.has(combo)) {
-          duplicateCount++;
-        }
-        matchUserCombos.add(combo);
+      if (summaryError) {
+        console.error('Server aggregation error:', summaryError);
+        throw summaryError;
+      }
+
+      const summary = summaryData as unknown as ServerAnalyticsSummary;
+      setServerStats(summary);
+
+      // Convert server stats to AnalyticsData format (for compatibility with existing components)
+      const hourlyDistribution = Array.from({ length: 24 }, (_, hour) => {
+        const found = summary.deliveryStats.hourlyDistribution?.find(h => h.hour === hour);
+        return { hour, count: found?.count || 0 };
       });
 
-      const usersWithMultiple = Array.from(userNotificationCounts.values()).filter(c => c > 1).length;
-      const multiGameDayUsers = Array.from(userDailyMatches.values()).filter(matches => matches.size > 1).length;
-
-      // Calculate content stats
-      const teamCounts = new Map<string, number>();
-      const competitionCounts = new Map<string, number>();
-      const matchPerformanceMap = new Map<number, { homeTeam: string; awayTeam: string; reach: number; correlated: number }>();
-
-      data.forEach(n => {
-        // Team counts
-        if (n.home_team) {
-          teamCounts.set(n.home_team, (teamCounts.get(n.home_team) || 0) + 1);
-        }
-        if (n.away_team) {
-          teamCounts.set(n.away_team, (teamCounts.get(n.away_team) || 0) + 1);
-        }
-        
-        // Competition counts
-        const comp = n.competition || 'Unknown';
-        competitionCounts.set(comp, (competitionCounts.get(comp) || 0) + 1);
-        
-        // Match performance
-        if (n.match_id) {
-          const existing = matchPerformanceMap.get(n.match_id) || {
-            homeTeam: n.home_team || 'N/A',
-            awayTeam: n.away_team || 'N/A',
-            reach: 0,
-            correlated: 0
-          };
-          existing.reach++;
-          if (n.home_team && n.away_team) {
-            existing.correlated++;
-          }
-          matchPerformanceMap.set(n.match_id, existing);
-        }
-      });
-
-      const teamBreakdown = Array.from(teamCounts.entries())
-        .map(([team, count]) => ({ team, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-
-      const competitionBreakdown = Array.from(competitionCounts.entries())
-        .map(([competition, count]) => ({ competition, count }))
-        .sort((a, b) => b.count - a.count);
-
-      const matchPerformance = Array.from(matchPerformanceMap.entries())
-        .map(([matchId, data]) => ({
-          matchId,
-          homeTeam: data.homeTeam,
-          awayTeam: data.awayTeam,
-          reach: data.reach,
-          correlationRate: data.reach > 0 ? (data.correlated / data.reach) * 100 : 0
-        }))
-        .sort((a, b) => b.reach - a.reach)
-        .slice(0, 20);
-
-      // Calculate delivery stats
-      const hourCounts = new Map<number, number>();
-      let correlatedCount = 0;
-      let totalLatency = 0;
-      let latencyCount = 0;
-
-      data.forEach(n => {
-        const hour = new Date(n.sent_at).getUTCHours();
-        hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
-        
-        if (n.home_team && n.away_team && n.match_id) {
-          correlatedCount++;
-        }
-        
-        if (n.event_received_at && n.sent_at) {
-          const latency = new Date(n.event_received_at).getTime() - new Date(n.sent_at).getTime();
-          if (latency > 0 && latency < 3600000) { // Within 1 hour
-            totalLatency += latency;
-            latencyCount++;
-          }
-        }
-      });
-
-      const hourlyDistribution = Array.from({ length: 24 }, (_, hour) => ({
-        hour,
-        count: hourCounts.get(hour) || 0
+      const teamBreakdown = (summary.contentStats.byTeam || []).map(t => ({
+        team: t.team,
+        count: t.count
       }));
 
-      const correlationRate = data.length > 0 ? (correlatedCount / data.length) * 100 : 0;
-      const naRate = 100 - correlationRate;
-      const avgWebhookLatency = latencyCount > 0 ? totalLatency / latencyCount / 1000 : 0; // in seconds
+      const competitionBreakdown = (summary.contentStats.byCompetition || []).map(c => ({
+        competition: c.competition,
+        count: c.count
+      }));
+
+      // Fetch match performance data (paginated, only top 20 matches)
+      const matchPerformance = await fetchTopMatchPerformance(startDate, endDate);
 
       setAnalyticsData({
-        notifications: data,
+        notifications: [], // We don't need raw notifications anymore for summary views
         userStats: {
-          totalUsers: userNotificationCounts.size,
-          usersWithMultipleNotifications: usersWithMultiple,
-          duplicateNotifications: duplicateCount,
-          multiGameDayUsers
+          totalUsers: summary.userStats.totalUsers || 0,
+          usersWithMultipleNotifications: summary.userStats.usersWithMultiple || 0,
+          duplicateNotifications: summary.duplicates.count || 0,
+          multiGameDayUsers: 0 // Will be computed if needed
         },
         contentStats: {
           teamBreakdown,
@@ -256,9 +198,9 @@ const Analytics = () => {
         },
         deliveryStats: {
           hourlyDistribution,
-          correlationRate,
-          naRate,
-          avgWebhookLatency
+          correlationRate: summary.deliveryStats.correlationRate || 0,
+          naRate: summary.deliveryStats.naRate || 0,
+          avgWebhookLatency: 0 // Computed separately if needed
         }
       });
 
@@ -275,6 +217,56 @@ const Analytics = () => {
     }
   };
 
+  const fetchTopMatchPerformance = async (startDate: Date | null, endDate: Date): Promise<AnalyticsData['contentStats']['matchPerformance']> => {
+    try {
+      let query = supabase
+        .from('notification_sends')
+        .select('match_id, home_team, away_team')
+        .not('match_id', 'is', null);
+      
+      if (startDate) {
+        query = query.gte('sent_at', startDate.toISOString());
+      }
+      query = query.lte('sent_at', endDate.toISOString());
+
+      const { data, error } = await query.limit(1000);
+      
+      if (error) throw error;
+
+      // Aggregate match performance client-side (limited data)
+      const matchMap = new Map<number, { homeTeam: string; awayTeam: string; reach: number; correlated: number }>();
+      
+      (data || []).forEach(n => {
+        if (!n.match_id) return;
+        const existing = matchMap.get(n.match_id) || {
+          homeTeam: n.home_team || 'N/A',
+          awayTeam: n.away_team || 'N/A',
+          reach: 0,
+          correlated: 0
+        };
+        existing.reach++;
+        if (n.home_team && n.away_team) {
+          existing.correlated++;
+        }
+        matchMap.set(n.match_id, existing);
+      });
+
+      return Array.from(matchMap.entries())
+        .map(([matchId, data]) => ({
+          matchId,
+          homeTeam: data.homeTeam,
+          awayTeam: data.awayTeam,
+          reach: data.reach,
+          correlationRate: data.reach > 0 ? (data.correlated / data.reach) * 100 : 0
+        }))
+        .sort((a, b) => b.reach - a.reach)
+        .slice(0, 20);
+    } catch (error) {
+      console.error('Error fetching match performance:', error);
+      return [];
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -288,15 +280,21 @@ const Analytics = () => {
   };
 
   const exportAnalytics = () => {
-    if (!analyticsData) return;
+    if (!analyticsData || !serverStats) return;
     
     const report = {
       generatedAt: new Date().toISOString(),
+      dateRange: {
+        start: serverStats.dateRange.start,
+        end: serverStats.dateRange.end
+      },
       summary: {
-        totalNotifications: analyticsData.notifications.length,
-        ...analyticsData.userStats,
+        totalNotifications: serverStats.userStats.totalNotifications,
+        totalUsers: serverStats.userStats.totalUsers,
+        usersWithMultipleNotifications: serverStats.userStats.usersWithMultiple,
+        duplicateNotifications: serverStats.duplicates.count,
         correlationRate: analyticsData.deliveryStats.correlationRate.toFixed(2) + '%',
-        avgWebhookLatency: analyticsData.deliveryStats.avgWebhookLatency.toFixed(2) + 's'
+        naRate: analyticsData.deliveryStats.naRate.toFixed(2) + '%'
       },
       teamBreakdown: analyticsData.contentStats.teamBreakdown,
       competitionBreakdown: analyticsData.contentStats.competitionBreakdown
@@ -333,17 +331,39 @@ const Analytics = () => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold">Growth Marketing Analytics</h1>
-              <p className="text-muted-foreground">User insights, content performance, and delivery health</p>
+              <p className="text-muted-foreground">
+                User insights, content performance, and delivery health
+                {serverStats && (
+                  <span className="ml-2 text-sm">
+                    • {serverStats.userStats.totalNotifications?.toLocaleString() || 0} notifications
+                  </span>
+                )}
+              </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Select range" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DATE_RANGE_OPTIONS.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button variant="outline" onClick={fetchAnalyticsData} disabled={refreshing}>
               <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
             <Button onClick={exportAnalytics} disabled={!analyticsData}>
               <Download className="h-4 w-4 mr-2" />
-              Export Report
+              Export
             </Button>
             <Button onClick={handleLogout} variant="ghost">
               <LogOut className="h-4 w-4 mr-2" />

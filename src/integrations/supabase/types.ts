@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_cache: {
+        Row: {
+          computed_at: string
+          created_at: string
+          date_range_end: string | null
+          date_range_start: string | null
+          id: string
+          stat_type: string
+          stat_value: Json
+        }
+        Insert: {
+          computed_at?: string
+          created_at?: string
+          date_range_end?: string | null
+          date_range_start?: string | null
+          id?: string
+          stat_type: string
+          stat_value: Json
+        }
+        Update: {
+          computed_at?: string
+          created_at?: string
+          date_range_end?: string | null
+          date_range_start?: string | null
+          id?: string
+          stat_type?: string
+          stat_value?: Json
+        }
+        Relationships: []
+      }
       competition_translations: {
         Row: {
           arabic_name: string
@@ -404,6 +434,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      compute_analytics_summary: {
+        Args: { p_end_date?: string; p_start_date?: string }
+        Returns: Json
+      }
+      get_notification_details: {
+        Args: {
+          p_end_date?: string
+          p_filter_type?: string
+          p_filter_value?: string
+          p_page?: number
+          p_page_size?: number
+          p_start_date?: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
