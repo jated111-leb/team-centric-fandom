@@ -115,13 +115,13 @@ serve(async (req) => {
             }
           }
 
-          // Strategy 2: Time-based correlation - find schedules sent within 2 minutes of this event
+          // Strategy 2: Time-based correlation - find schedules sent within 10 minutes of this event
           if (!matchId) {
             const sentAtTime = new Date(sentAt);
-            const windowStart = new Date(sentAtTime.getTime() - 2 * 60 * 1000).toISOString(); // 2 min before
-            const windowEnd = new Date(sentAtTime.getTime() + 2 * 60 * 1000).toISOString(); // 2 min after
+            const windowStart = new Date(sentAtTime.getTime() - 10 * 60 * 1000).toISOString(); // 10 min before
+            const windowEnd = new Date(sentAtTime.getTime() + 10 * 60 * 1000).toISOString(); // 10 min after
             
-            console.log(`🕐 Time-based correlation: looking for schedules between ${windowStart} and ${windowEnd}`);
+            console.log(`🕐 Time-based correlation: looking for schedules within 10-minute window (${windowStart} to ${windowEnd})`);
             
             const { data: timeMatchedEntries } = await supabase
               .from('schedule_ledger')
