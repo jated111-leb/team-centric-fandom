@@ -106,7 +106,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="gap-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
@@ -115,6 +115,14 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        
+        <div className="px-2 py-3 border-t border-sidebar-border">
+          <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-start'}`}>
+            <span className="text-2xl font-bold text-primary tracking-tight">
+              {collapsed ? '10' : '1001'}
+            </span>
+          </div>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
