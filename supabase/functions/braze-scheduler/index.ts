@@ -113,8 +113,16 @@ Deno.serve(async (req) => {
     const now = new Date();
     const thirtyDaysOut = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
+    // Competitions we don't have streaming rights for - exclude from notifications
+    const EXCLUDED_COMPETITIONS = [
+      'FL1',  // Ligue 1 (France)
+      'DED',  // Eredivisie (Dutch League)
+      'EL',   // UEFA Europa League
+      'ECL',  // UEFA Europa Conference League
+    ];
+
     // Fetch upcoming matches with featured teams
-    const { data: matches, error: matchError } = await supabase
+    const { data: allMatches, error: matchError } = await supabase
       .from('matches')
       .select('*')
       .gte('utc_date', now.toISOString())
@@ -124,7 +132,10 @@ Deno.serve(async (req) => {
 
     if (matchError) throw matchError;
 
-    console.log(`Fetched ${matches?.length || 0} matches with SCHEDULED or TIMED status`);
+    // Filter out excluded competitions
+    const matches = (allMatches || []).filter(match => !EXCLUDED_COMPETITIONS.includes(match.competition));
+    
+    console.log(`Fetched ${allMatches?.length || 0} matches, ${matches.length} after excluding non-licensed competitions (${EXCLUDED_COMPETITIONS.join(', ')})`)
 
     // Fetch featured teams from database with Braze attribute values
     const { data: featuredTeamsData } = await supabase
