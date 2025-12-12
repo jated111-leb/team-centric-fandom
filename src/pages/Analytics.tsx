@@ -97,16 +97,32 @@ const Analytics = () => {
     try {
       setRefreshing(true);
       
-      // Fetch all notification sends
-      const { data: notifications, error } = await supabase
-        .from('notification_sends')
-        .select('*')
-        .order('sent_at', { ascending: false })
-        .limit(5000);
+      // Fetch all notification sends with pagination (Supabase defaults to 1000 row limit)
+      let allNotifications: NotificationAnalytics[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data: notifications, error } = await supabase
+          .from('notification_sends')
+          .select('*')
+          .order('sent_at', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      const data = notifications || [];
+        if (error) throw error;
+
+        if (notifications && notifications.length > 0) {
+          allNotifications = [...allNotifications, ...notifications];
+          page++;
+          // If we got less than pageSize, we've reached the end
+          hasMore = notifications.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const data = allNotifications;
       
       // Calculate user stats
       const userNotificationCounts = new Map<string, number>();
