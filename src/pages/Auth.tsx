@@ -6,13 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 
 const emailSchema = z.string().trim().email({ message: 'Invalid email address' });
 const passwordSchema = z.string().min(8, { message: 'Password must be at least 8 characters' });
 
+type AuthMode = 'login' | 'forgot-password';
+
 export default function Auth() {
+  const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -136,6 +139,111 @@ export default function Auth() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateEmail(email)) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: 'Reset Email Sent',
+        description: 'Check your email for a password reset link',
+      });
+
+      setMode('login');
+      setEmail('');
+    } catch (error) {
+      console.error('Password reset error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send reset email. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mode === 'forgot-password') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+            <CardDescription>
+              Enter your email to receive a password reset link
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="admin@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (e.target.value.trim()) {
+                      validateEmail(e.target.value);
+                    } else {
+                      setEmailError('');
+                    }
+                  }}
+                  disabled={loading}
+                  className={emailError ? 'border-destructive' : ''}
+                />
+                {emailError && (
+                  <p className="text-xs text-destructive">{emailError}</p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !email || !!emailError}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Reset Link'
+                )}
+              </Button>
+            </form>
+
+            <Button
+              variant="ghost"
+              className="w-full mt-4"
+              onClick={() => {
+                setMode('login');
+                setEmailError('');
+              }}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -209,7 +317,18 @@ export default function Auth() {
             </Button>
           </form>
 
-          <div className="mt-4 text-center">
+          <div className="mt-4 text-center space-y-2">
+            <Button
+              variant="link"
+              className="text-sm text-muted-foreground"
+              onClick={() => {
+                setMode('forgot-password');
+                setPassword('');
+                setPasswordError('');
+              }}
+            >
+              Forgot your password?
+            </Button>
             <p className="text-xs text-muted-foreground">
               For security, please change your password after first login
             </p>
