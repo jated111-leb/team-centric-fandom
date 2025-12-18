@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, CheckCircle, AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Search, CheckCircle, AlertTriangle, XCircle, RefreshCw, Settings } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface TeamMapping {
@@ -154,14 +154,17 @@ export function TeamMappingTester() {
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Team Configuration Validator</CardTitle>
-        <CardDescription>
-          Test team name mappings and verify Braze attribute configuration
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <CollapsibleCard
+      title={
+        <div className="flex items-center gap-2">
+          <Settings className="h-5 w-5" />
+          <span>Team Configuration Validator</span>
+        </div>
+      }
+      description="Test team name mappings and verify Braze attribute configuration"
+      defaultOpen={false}
+    >
+      <div className="space-y-6">
         {/* Team Name Tester */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold">Test Team Name Resolution</h3>
@@ -310,7 +313,7 @@ export function TeamMappingTester() {
             </Table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
