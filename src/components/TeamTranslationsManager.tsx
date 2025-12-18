@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -365,17 +366,17 @@ export function TeamTranslationsManager() {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <CollapsibleCard
+      title={
         <div className="flex items-center gap-2">
           <Languages className="h-5 w-5" />
-          <CardTitle>Team Translations</CardTitle>
+          <span>Team Translations</span>
         </div>
-        <CardDescription>
-          Manage Arabic translations for team names. New teams are automatically translated using AI, but you can review and edit them here.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      }
+      description="Manage Arabic translations for team names. New teams are automatically translated using AI, but you can review and edit them here."
+      defaultOpen={false}
+    >
+      <div className="space-y-6">
         {/* Add new translation */}
         <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
           <h3 className="font-semibold text-sm">Add New Translation</h3>
@@ -594,7 +595,7 @@ export function TeamTranslationsManager() {
             <li>Changes take effect immediately for new notifications</li>
           </ul>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
