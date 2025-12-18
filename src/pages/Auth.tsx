@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -27,33 +27,35 @@ export default function Auth() {
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Use ref to track password recovery state synchronously (avoids race condition)
+  const isPasswordRecoveryRef = useRef(false);
 
   useEffect(() => {
-    // Check if already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        // Don't redirect if we're in password recovery mode
-        if (mode !== 'reset-password') {
-          checkRoleAndRedirect(session.user.id);
-        }
-      }
-    });
-
-    // Listen for auth changes
+    // Listen for auth changes FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // User clicked the password reset link - show the reset form
+        // User clicked the password reset link - set ref immediately (synchronous)
+        isPasswordRecoveryRef.current = true;
         setMode('reset-password');
         return;
       }
       
-      if (session && mode !== 'reset-password') {
+      // Don't redirect if we're in password recovery mode (check ref, not state)
+      if (session && !isPasswordRecoveryRef.current) {
+        checkRoleAndRedirect(session.user.id);
+      }
+    });
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && !isPasswordRecoveryRef.current) {
         checkRoleAndRedirect(session.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, mode]);
+  }, [navigate]);
 
   const checkRoleAndRedirect = (userId: string) => {
     // Defer Supabase call to avoid auth callback deadlock
@@ -239,6 +241,7 @@ export default function Auth() {
 
       // Sign out and redirect to login
       await supabase.auth.signOut();
+      isPasswordRecoveryRef.current = false;
       setMode('login');
       setNewPassword('');
       setConfirmPassword('');
@@ -342,6 +345,7 @@ export default function Auth() {
               variant="ghost"
               className="w-full mt-4"
               onClick={() => {
+                isPasswordRecoveryRef.current = false;
                 setMode('login');
                 setNewPassword('');
                 setConfirmPassword('');
