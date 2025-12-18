@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -246,46 +246,45 @@ export function AlertMonitor() {
   const hasCritical = stalePending.length > 0 || missingSchedules.length > 0;
 
   return (
-    <Card className={hasCritical ? 'border-destructive border-2' : hasIssues ? 'border-destructive' : 'border-border'}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {hasCritical ? (
-              <ShieldAlert className="h-5 w-5 text-destructive animate-pulse" />
-            ) : hasIssues ? (
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            ) : (
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            )}
-            <div>
-              <CardTitle>System Alerts</CardTitle>
-              <CardDescription>
-                Monitoring scheduler errors, timing issues, and missed notifications (Last checked: {lastCheck.toLocaleTimeString()})
-              </CardDescription>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={runVerification}
-              disabled={loading || verifying}
-              size="sm"
-              variant="outline"
-            >
-              <ShieldAlert className={`h-4 w-4 mr-2 ${verifying ? 'animate-spin' : ''}`} />
-              Verify
-            </Button>
-            <Button
-              onClick={checkForIssues}
-              disabled={loading || verifying}
-              size="sm"
-              variant="outline"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
+    <CollapsibleCard
+      className={hasCritical ? 'border-destructive border-2' : hasIssues ? 'border-destructive' : 'border-border'}
+      title={
+        <div className="flex items-center gap-2">
+          {hasCritical ? (
+            <ShieldAlert className="h-5 w-5 text-destructive animate-pulse" />
+          ) : hasIssues ? (
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          ) : (
+            <CheckCircle className="h-5 w-5 text-green-500" />
+          )}
+          <span>System Alerts</span>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      }
+      description={`Monitoring scheduler errors, timing issues, and missed notifications (Last checked: ${lastCheck.toLocaleTimeString()})`}
+      headerExtra={
+        <div className="flex gap-2">
+          <Button
+            onClick={runVerification}
+            disabled={loading || verifying}
+            size="sm"
+            variant="outline"
+          >
+            <ShieldAlert className={`h-4 w-4 mr-2 ${verifying ? 'animate-spin' : ''}`} />
+            Verify
+          </Button>
+          <Button
+            onClick={checkForIssues}
+            disabled={loading || verifying}
+            size="sm"
+            variant="outline"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+      }
+      defaultOpen={true}
+    >
+      <div className="space-y-4">
         {!hasIssues && !loading && (
           <Alert className="border-green-500/20 bg-green-500/10">
             <CheckCircle className="h-4 w-4 text-green-500" />
@@ -482,7 +481,7 @@ export function AlertMonitor() {
             <div className="text-xs text-muted-foreground">Timing Issues</div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
