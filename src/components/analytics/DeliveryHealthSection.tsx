@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Clock, AlertTriangle, CheckCircle, Timer, Activity } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from "recharts";
 import type { AnalyticsData } from "@/pages/Analytics";
 
 interface DeliveryHealthSectionProps {
@@ -11,7 +11,7 @@ interface DeliveryHealthSectionProps {
 }
 
 export function DeliveryHealthSection({ data }: DeliveryHealthSectionProps) {
-  const { deliveryStats, notifications } = data;
+  const { deliveryStats } = data;
 
   // Calculate hourly trends
   const hourlyData = deliveryStats.hourlyDistribution.map(h => ({
@@ -19,33 +19,14 @@ export function DeliveryHealthSection({ data }: DeliveryHealthSectionProps) {
     label: `${h.hour.toString().padStart(2, '0')}:00`,
   }));
 
-  // Calculate N/A rate trend by day
-  const dailyNARate = new Map<string, { total: number; na: number }>();
-  notifications.forEach(n => {
-    const date = new Date(n.sent_at).toLocaleDateString();
-    const existing = dailyNARate.get(date) || { total: 0, na: 0 };
-    existing.total++;
-    if (!n.home_team || !n.away_team || !n.match_id) {
-      existing.na++;
-    }
-    dailyNARate.set(date, existing);
-  });
-
-  const naRateTrend = Array.from(dailyNARate.entries())
-    .map(([date, data]) => ({
-      date,
-      rate: data.total > 0 ? (data.na / data.total) * 100 : 0,
-      total: data.total,
-      na: data.na
-    }))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(-14); // Last 14 days
-
   // Find peak hours
   const sortedHours = [...deliveryStats.hourlyDistribution].sort((a, b) => b.count - a.count);
-  const peakHour = sortedHours[0];
-  const peakPercentage = notifications.length > 0 
-    ? (peakHour.count / notifications.length) * 100 
+  const peakHour = sortedHours[0] || { hour: 0, count: 0 };
+  
+  // Calculate peak percentage from total sent
+  const totalFromHourly = deliveryStats.hourlyDistribution.reduce((sum, h) => sum + h.count, 0);
+  const peakPercentage = totalFromHourly > 0 
+    ? (peakHour.count / totalFromHourly) * 100 
     : 0;
 
   const getHealthStatus = () => {
@@ -187,53 +168,32 @@ export function DeliveryHealthSection({ data }: DeliveryHealthSectionProps) {
         </CardContent>
       </Card>
 
-      {/* N/A Rate Trend */}
+      {/* N/A Rate Info */}
       <Card>
         <CardHeader>
-          <CardTitle>N/A Rate Trend (Last 14 Days)</CardTitle>
-          <CardDescription>Track correlation success over time</CardDescription>
+          <CardTitle>Data Quality Summary</CardTitle>
+          <CardDescription>Correlation status for match notifications</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={naRateTrend}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="date" 
-                  className="text-xs" 
-                  tickFormatter={(value) => {
-                    const date = new Date(value);
-                    return `${date.getMonth() + 1}/${date.getDate()}`;
-                  }}
-                />
-                <YAxis className="text-xs" domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number, name: string) => {
-                    if (name === 'rate') return [`${value.toFixed(1)}%`, 'N/A Rate'];
-                    return [value, name];
-                  }}
-                  labelFormatter={(label) => `Date: ${label}`}
-                />
-                <defs>
-                  <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <Area 
-                  type="monotone" 
-                  dataKey="rate" 
-                  stroke="hsl(var(--destructive))" 
-                  fill="url(#colorRate)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg bg-muted p-4">
+              <p className="text-sm font-medium">Correlated Notifications</p>
+              <p className="text-2xl font-bold mt-1 text-secondary">
+                {deliveryStats.correlationRate.toFixed(1)}%
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Notifications with complete match data
+              </p>
+            </div>
+            <div className="rounded-lg bg-muted p-4">
+              <p className="text-sm font-medium">Missing Data (N/A)</p>
+              <p className="text-2xl font-bold mt-1 text-destructive">
+                {deliveryStats.naRate.toFixed(1)}%
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Notifications missing team or match info
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
