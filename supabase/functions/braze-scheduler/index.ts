@@ -104,9 +104,9 @@ Deno.serve(async (req) => {
 
     const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
     const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID');
+    const brazeCanvasId = Deno.env.get('BRAZE_CANVAS_ID');
 
-    if (!brazeApiKey || !brazeEndpoint || !brazeCampaignId) {
+    if (!brazeApiKey || !brazeEndpoint || !brazeCanvasId) {
       throw new Error('Missing Braze configuration');
     }
 
@@ -497,18 +497,18 @@ Deno.serve(async (req) => {
 
         // Update existing schedule
         try {
-          const updateRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/update`, {
+          const updateRes = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/update`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${brazeApiKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              campaign_id: brazeCampaignId,
+              canvas_id: brazeCanvasId,
               schedule_id: existingSchedule.braze_schedule_id,
               schedule: { time: sendAtDate.toISOString() },
               audience,
-              trigger_properties: triggerProps,
+              canvas_entry_properties: triggerProps,
             }),
           });
 
@@ -592,18 +592,18 @@ Deno.serve(async (req) => {
 
         // STEP 2: Call Braze API to create schedule
         try {
-          const createRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/create`, {
+          const createRes = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/create`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${brazeApiKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              campaign_id: brazeCampaignId,
+              canvas_id: brazeCanvasId,
               broadcast: true,
               schedule: { time: sendAtDate.toISOString() },
               audience,
-              trigger_properties: triggerProps,
+              canvas_entry_properties: triggerProps,
             }),
           });
 
