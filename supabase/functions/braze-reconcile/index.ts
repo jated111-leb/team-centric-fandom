@@ -104,9 +104,9 @@ Deno.serve(async (req) => {
 
     const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
     const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID');
+    const brazeCanvasId = Deno.env.get('BRAZE_CANVAS_ID');
 
-    if (!brazeApiKey || !brazeEndpoint || !brazeCampaignId) {
+    if (!brazeApiKey || !brazeEndpoint || !brazeCanvasId) {
       throw new Error('Missing Braze configuration');
     }
 
@@ -131,11 +131,11 @@ Deno.serve(async (req) => {
     const brazeData = await brazeRes.json();
     const allBroadcasts = brazeData.scheduled_broadcasts || [];
 
-    // Filter to our campaign
+    // Filter to our canvas
     const ourBroadcasts = allBroadcasts.filter((broadcast: any) => {
-      return broadcast.campaign_id === brazeCampaignId ||
-             broadcast.campaign_api_id === brazeCampaignId ||
-             broadcast.campaign_api_identifier === brazeCampaignId;
+      return broadcast.canvas_id === brazeCanvasId ||
+             broadcast.canvas_api_id === brazeCanvasId ||
+             broadcast.canvas_api_identifier === brazeCanvasId;
     });
 
     // Fetch our ledger
@@ -174,14 +174,14 @@ Deno.serve(async (req) => {
       const sig = broadcast.trigger_properties?.sig;
       if (sig && !desiredSignatures.has(sig) && knownScheduleIds.has(broadcast.schedule_id)) {
         try {
-          const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
+          const cancelRes = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/delete`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${brazeApiKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              campaign_id: brazeCampaignId,
+              canvas_id: brazeCanvasId,
               schedule_id: broadcast.schedule_id,
             }),
           });
@@ -206,14 +206,14 @@ Deno.serve(async (req) => {
       // Phase 1: Cancel orphaned schedules (in Braze but not in ledger)
       if (!knownScheduleIds.has(broadcast.schedule_id)) {
         try {
-          const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
+          const cancelRes = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/delete`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${brazeApiKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              campaign_id: brazeCampaignId,
+              canvas_id: brazeCanvasId,
               schedule_id: broadcast.schedule_id,
             }),
           });
@@ -256,14 +256,14 @@ Deno.serve(async (req) => {
           }
           
           try {
-            const cancelRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
+            const cancelRes = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/delete`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${brazeApiKey}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                campaign_id: brazeCampaignId,
+                canvas_id: brazeCanvasId,
                 schedule_id: schedule.schedule_id,
               }),
             });

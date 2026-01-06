@@ -15,9 +15,9 @@ serve(async (req) => {
   try {
     const BRAZE_API_KEY = Deno.env.get('BRAZE_API_KEY');
     const BRAZE_REST_ENDPOINT = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const BRAZE_CAMPAIGN_ID = Deno.env.get('BRAZE_CAMPAIGN_ID');
+    const BRAZE_CANVAS_ID = Deno.env.get('BRAZE_CANVAS_ID');
 
-    if (!BRAZE_API_KEY || !BRAZE_REST_ENDPOINT || !BRAZE_CAMPAIGN_ID) {
+    if (!BRAZE_API_KEY || !BRAZE_REST_ENDPOINT || !BRAZE_CANVAS_ID) {
       throw new Error('Missing required Braze configuration');
     }
 
@@ -29,9 +29,9 @@ serve(async (req) => {
 
     console.log('Deleting scheduled message from Braze:', schedule_id);
 
-    // Delete the scheduled message from Braze
+    // Delete the scheduled message from Braze (Canvas API requires both canvas_id and schedule_id)
     const brazeResponse = await fetch(
-      `${BRAZE_REST_ENDPOINT}/messages/schedule/delete`,
+      `${BRAZE_REST_ENDPOINT}/canvas/trigger/schedule/delete`,
       {
         method: 'POST',
         headers: {
@@ -39,6 +39,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          canvas_id: BRAZE_CANVAS_ID,
           schedule_id: schedule_id,
         }),
       }

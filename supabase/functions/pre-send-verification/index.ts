@@ -17,11 +17,11 @@ Deno.serve(async (req) => {
   try {
     const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
     const brazeRestEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID');
+    const brazeCanvasId = Deno.env.get('BRAZE_CANVAS_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!brazeApiKey || !brazeRestEndpoint || !brazeCampaignId) {
+    if (!brazeApiKey || !brazeRestEndpoint || !brazeCanvasId) {
       throw new Error('Missing required Braze configuration');
     }
 
@@ -71,9 +71,9 @@ Deno.serve(async (req) => {
     if (brazeRes.ok) {
       const brazeData = await brazeRes.json();
       const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-        b.campaign_id === brazeCampaignId ||
-        b.campaign_api_id === brazeCampaignId ||
-        b.campaign_api_identifier === brazeCampaignId
+        b.canvas_id === brazeCanvasId ||
+        b.canvas_api_id === brazeCanvasId ||
+        b.canvas_api_identifier === brazeCanvasId
       );
       
       for (const broadcast of ourBroadcasts) {
@@ -187,18 +187,18 @@ Deno.serve(async (req) => {
       };
 
       try {
-        const createRes = await fetch(`${brazeRestEndpoint}/campaigns/trigger/schedule/create`, {
+        const createRes = await fetch(`${brazeRestEndpoint}/canvas/trigger/schedule/create`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${brazeApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            campaign_id: brazeCampaignId,
+            canvas_id: brazeCanvasId,
             broadcast: true,
             schedule: { time: schedule.send_at_utc },
             audience,
-            trigger_properties: triggerProps,
+            canvas_entry_properties: triggerProps,
           }),
         });
 

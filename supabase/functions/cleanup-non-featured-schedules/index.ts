@@ -16,10 +16,10 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const brazeApiKey = Deno.env.get('BRAZE_API_KEY')!;
     const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT')!;
-    const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID')!;
+    const brazeCanvasId = Deno.env.get('BRAZE_CANVAS_ID')!;
 
-    if (!brazeCampaignId) {
-      throw new Error('Missing BRAZE_CAMPAIGN_ID environment variable');
+    if (!brazeCanvasId) {
+      throw new Error('Missing BRAZE_CANVAS_ID environment variable');
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
     }
 
     // Delete from Braze first, then from schedule_ledger (safeguard to prevent orphans)
-    const brazeDeleteUrl = `${brazeEndpoint}/campaigns/trigger/schedule/delete`;
+    const brazeDeleteUrl = `${brazeEndpoint}/canvas/trigger/schedule/delete`;
     const successfullyDeletedSchedules: Array<{ id: string; braze_schedule_id: string }> = [];
     const failedBrazeDeletes: Array<{ schedule_id: string; match_id: number; error: string }> = [];
 
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
             'Authorization': `Bearer ${brazeApiKey}`,
           },
           body: JSON.stringify({
-            campaign_id: brazeCampaignId,  // FIX: Added campaign_id
+            canvas_id: brazeCanvasId,
             schedule_id: schedule.braze_schedule_id,
           }),
         });
