@@ -95,8 +95,25 @@ Deno.serve(async (req) => {
     console.log('Match:', match.id, match.home_team, 'vs', match.away_team);
     console.log('Canvas entry properties:', canvasEntryProperties);
 
-    // Send immediate Canvas trigger to single user
-    const brazeResponse = await fetch(`${brazeEndpoint}/canvas/trigger/send`, {
+    // Use schedule/create exactly like the scheduler - with audience filter for single user
+    const sendAt = new Date(Date.now() + 60 * 1000); // 1 minute from now
+    
+    // Target only the test user via audience filter (same pattern as scheduler)
+    const audience = {
+      AND: [
+        { external_user_id: testUserId }
+      ]
+    };
+    
+    console.log('Request body:', JSON.stringify({
+      canvas_id: brazeCanvasId,
+      broadcast: true,
+      schedule: { time: sendAt.toISOString() },
+      audience,
+      canvas_entry_properties: canvasEntryProperties,
+    }, null, 2));
+    
+    const brazeResponse = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/create`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${brazeApiKey}`,
@@ -104,9 +121,9 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         canvas_id: brazeCanvasId,
-        recipients: [
-          { external_user_id: testUserId }
-        ],
+        broadcast: true,
+        schedule: { time: sendAt.toISOString() },
+        audience,
         canvas_entry_properties: canvasEntryProperties,
       }),
     });
