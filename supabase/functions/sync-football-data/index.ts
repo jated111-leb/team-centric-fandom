@@ -133,29 +133,18 @@ Deno.serve(async (req) => {
       body = {};
     }
 
-    // Check for cron secret first (for automated runs)
+    // Check for cron secret in body (for automated cron runs)
     const cronSecret = Deno.env.get('CRON_SECRET');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const isCronCall = body.cron_secret && cronSecret && body.cron_secret === cronSecret;
     
-    // Also allow service role key in Authorization header (for cron jobs)
+    // Check authorization header
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.replace('Bearer ', '') || '';
-    const isServiceRoleCall = token === serviceRoleKey;
 
     if (isCronCall) {
       console.log('✅ Authenticated via cron secret');
-    } else if (isServiceRoleCall) {
-      console.log('✅ Authenticated via service role key');
-    } else {
-      // Verify admin role for manual calls
-      if (!authHeader) {
-        return new Response(
-          JSON.stringify({ error: 'Missing authorization header' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+    } else if (authHeader) {
+      // Verify admin role for manual calls with JWT
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
       if (userError || !user) {
@@ -179,6 +168,12 @@ Deno.serve(async (req) => {
       }
       
       console.log('✅ Authenticated via admin JWT');
+    } else {
+      // No auth header and no cron secret = unauthorized
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const { daysAhead = 30, competitions = Object.keys(COMPETITION_CODES) } = body;
