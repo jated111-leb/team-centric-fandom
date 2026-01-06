@@ -135,13 +135,20 @@ Deno.serve(async (req) => {
 
     // Check for cron secret first (for automated runs)
     const cronSecret = Deno.env.get('CRON_SECRET');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const isCronCall = body.cron_secret && cronSecret && body.cron_secret === cronSecret;
+    
+    // Also allow service role key in Authorization header (for cron jobs)
+    const authHeader = req.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '') || '';
+    const isServiceRoleCall = token === serviceRoleKey;
 
     if (isCronCall) {
       console.log('✅ Authenticated via cron secret');
+    } else if (isServiceRoleCall) {
+      console.log('✅ Authenticated via service role key');
     } else {
       // Verify admin role for manual calls
-      const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
         return new Response(
           JSON.stringify({ error: 'Missing authorization header' }),
@@ -149,7 +156,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
       if (userError || !user) {
