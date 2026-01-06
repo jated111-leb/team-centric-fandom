@@ -34,7 +34,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.sync-football-data]
-verify_jwt = true
+verify_jwt = false
 
 [functions.cleanup-non-featured-schedules]
 verify_jwt = true
