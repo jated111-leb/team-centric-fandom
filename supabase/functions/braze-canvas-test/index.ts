@@ -95,40 +95,33 @@ Deno.serve(async (req) => {
     console.log('Match:', match.id, match.home_team, 'vs', match.away_team);
     console.log('Canvas entry properties:', canvasEntryProperties);
 
-    // Use schedule/create exactly like the scheduler - with audience filter for single user
-    const sendAt = new Date(Date.now() + 60 * 1000); // 1 minute from now
-    
-    // Target only the test user via audience filter (same pattern as scheduler)
-    const audience = {
-      AND: [
+    // Use immediate send with recipients array for single user test
+    const requestBody = {
+      canvas_id: brazeCanvasId,
+      recipients: [
         { external_user_id: testUserId }
-      ]
+      ],
+      canvas_entry_properties: canvasEntryProperties,
     };
     
-    console.log('Request body:', JSON.stringify({
-      canvas_id: brazeCanvasId,
-      broadcast: true,
-      schedule: { time: sendAt.toISOString() },
-      audience,
-      canvas_entry_properties: canvasEntryProperties,
-    }, null, 2));
+    const fullUrl = `${brazeEndpoint}/canvas/trigger/send`;
+    console.log('Braze endpoint:', brazeEndpoint);
+    console.log('Full URL:', fullUrl);
+    console.log('Canvas ID:', brazeCanvasId);
+    console.log('API Key (first 10 chars):', brazeApiKey?.substring(0, 10) + '...');
+    console.log('Request body:', JSON.stringify(requestBody, null, 2));
     
-    const brazeResponse = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/create`, {
+    const brazeResponse = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${brazeApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        canvas_id: brazeCanvasId,
-        broadcast: true,
-        schedule: { time: sendAt.toISOString() },
-        audience,
-        canvas_entry_properties: canvasEntryProperties,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const brazeResult = await brazeResponse.json();
+    console.log('Braze HTTP status:', brazeResponse.status);
     console.log('Braze response:', JSON.stringify(brazeResult));
 
     // Log the test send
