@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { formatInTimeZone, toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,16 +78,52 @@ Deno.serve(async (req) => {
 
     const competitionAr = compTranslation?.arabic_name || match.competition_name;
 
-    // Prepare canvas entry properties (same as scheduler)
+    // Prepare canvas entry properties (match scheduler keys + backwards-compatible aliases)
+    const kickoffDate = new Date(match.utc_date);
+    const BAGHDAD_TIMEZONE = 'Asia/Baghdad';
+    const baghdadTime = toZonedTime(kickoffDate, BAGHDAD_TIMEZONE);
+
+    // Helper to convert digits to Arabic numerals
+    const toArabicDigits = (str: string) => {
+      const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+      return str.replace(/\d/g, (d) => arabicDigits[parseInt(d)]);
+    };
+
+    // kickoff_ar: "الساعة ٨:٠٠ م ٢٥-١١-٢٠٢٥ (توقيت بغداد)"
+    const hours24 = baghdadTime.getHours();
+    const minutes = baghdadTime.getMinutes();
+    const hours12 = hours24 % 12 || 12;
+    const ampm = hours24 < 12 ? 'ص' : 'م';
+    const day = baghdadTime.getDate();
+    const month = baghdadTime.getMonth() + 1;
+    const year = baghdadTime.getFullYear();
+    const timeStr = `${hours12}:${minutes.toString().padStart(2, '0')}`;
+    const dateStr = `${day.toString().padStart(2, '0')}-${month.toString().padStart(2, '0')}-${year}`;
+    const kickoff_ar = toArabicDigits(`الساعة ${timeStr} ${ampm} ${dateStr} (توقيت بغداد)`);
+
+    const kickoff_baghdad = formatInTimeZone(kickoffDate, BAGHDAD_TIMEZONE, 'yyyy-MM-dd HH:mm');
+
     const canvasEntryProperties = {
-      match_id: match.id,
+      // Scheduler keys
+      match_id: match.id.toString(),
+      competition_key: match.competition,
+      competition_en: match.competition_name,
+      competition_ar: competitionAr,
+      home_en: match.home_team,
+      away_en: match.away_team,
+      home_ar: homeTeamAr,
+      away_ar: awayTeamAr,
+      kickoff_utc: match.utc_date,
+      kickoff_baghdad,
+      kickoff_ar,
+      sig: `test-${match.id}-${Date.now()}`,
+
+      // Backwards-compatible aliases (in case the Canvas uses these names)
       home_team: match.home_team,
       away_team: match.away_team,
       home_team_ar: homeTeamAr,
       away_team_ar: awayTeamAr,
       competition: match.competition_name,
-      competition_ar: competitionAr,
-      kickoff_utc: match.utc_date,
       match_date: match.match_date,
       match_time: match.match_time,
     };
