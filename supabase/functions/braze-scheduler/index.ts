@@ -458,7 +458,38 @@ Deno.serve(async (req) => {
         sig: signature,
       };
 
-      if (existingSchedule) {
+      // CRITICAL FIX: Detect Campaign-format schedule IDs that need migration to Canvas
+      // Campaign IDs are UUIDs, Canvas IDs are shorter alphanumeric
+      const isOldCampaignFormat = existingSchedule?.braze_schedule_id && 
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(existingSchedule.braze_schedule_id);
+      
+      // Track if we need to create a new schedule (either fresh or migration)
+      let needsNewSchedule = !existingSchedule;
+      
+      if (existingSchedule && isOldCampaignFormat) {
+        console.warn(`⚠️ Match ${match.id}: Found old Campaign-format schedule ID - forcing re-creation with Canvas API`);
+        
+        // Delete the old ledger entry to allow fresh Canvas schedule
+        await supabase
+          .from('schedule_ledger')
+          .delete()
+          .eq('id', existingSchedule.id);
+        
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-scheduler',
+          match_id: match.id,
+          action: 'campaign_migration',
+          reason: 'Migrating from Campaign to Canvas format',
+          details: { 
+            old_schedule_id: existingSchedule.braze_schedule_id,
+            old_signature: existingSchedule.signature
+          },
+        });
+        
+        // Flag for fresh Canvas schedule creation
+        needsNewSchedule = true;
+      } else if (existingSchedule) {
+        // Normal existing Canvas schedule - check if needs update
         // Check if signature changed
         if (existingSchedule.signature === signature) {
           console.log(`Match ${match.id}: unchanged`);
@@ -565,8 +596,11 @@ Deno.serve(async (req) => {
             details: { error: error instanceof Error ? error.message : 'Unknown error' },
           });
         }
-      } else {
-        // Create new schedule
+        continue; // Skip to next match after update attempt
+      }
+      
+      // Create new schedule (fresh or migrated from Campaign)
+      if (needsNewSchedule) {
         // STEP 1: Reserve slot in ledger FIRST (protected by unique index)
         const reservationId = crypto.randomUUID();
         const { error: insertError } = await supabase
