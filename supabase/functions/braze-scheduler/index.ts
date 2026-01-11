@@ -467,7 +467,52 @@ Deno.serve(async (req) => {
       let needsNewSchedule = !existingSchedule;
       
       if (existingSchedule && isOldCampaignFormat) {
-        console.warn(`⚠️ Match ${match.id}: Found old Campaign-format schedule ID - forcing re-creation with Canvas API`);
+        console.warn(`⚠️ Match ${match.id}: Found old Campaign-format schedule ID - cancelling in Braze first, then re-creating with Canvas API`);
+        
+        // CRITICAL: Cancel the old schedule in Braze BEFORE deleting from ledger
+        // This prevents duplicate notifications from orphaned Braze schedules
+        try {
+          // Try to cancel as Campaign first (since it was created as Campaign)
+          const cancelCampaignRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${brazeApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              campaign_id: Deno.env.get('BRAZE_CAMPAIGN_ID'), // Old Campaign ID
+              schedule_id: existingSchedule.braze_schedule_id,
+            }),
+          });
+          
+          if (cancelCampaignRes.ok) {
+            console.log(`✅ Match ${match.id}: Cancelled old Campaign schedule ${existingSchedule.braze_schedule_id}`);
+          } else if (cancelCampaignRes.status !== 404) {
+            // 404 is OK - schedule already gone. Other errors should be logged
+            const errorText = await cancelCampaignRes.text();
+            console.warn(`⚠️ Match ${match.id}: Failed to cancel Campaign schedule: ${errorText}`);
+          }
+          
+          // Also try Canvas delete in case it was already migrated but stuck
+          const cancelCanvasRes = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/delete`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${brazeApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              canvas_id: brazeCanvasId,
+              schedule_id: existingSchedule.braze_schedule_id,
+            }),
+          });
+          
+          if (cancelCanvasRes.ok) {
+            console.log(`✅ Match ${match.id}: Also cancelled Canvas schedule ${existingSchedule.braze_schedule_id}`);
+          }
+        } catch (cancelError) {
+          console.error(`❌ Match ${match.id}: Error cancelling old schedule:`, cancelError);
+          // Continue anyway - we'll create a new schedule and the old one may have already fired
+        }
         
         // Delete the old ledger entry to allow fresh Canvas schedule
         await supabase
@@ -479,10 +524,11 @@ Deno.serve(async (req) => {
           function_name: 'braze-scheduler',
           match_id: match.id,
           action: 'campaign_migration',
-          reason: 'Migrating from Campaign to Canvas format',
+          reason: 'Migrating from Campaign to Canvas format - old schedule cancelled in Braze',
           details: { 
             old_schedule_id: existingSchedule.braze_schedule_id,
-            old_signature: existingSchedule.signature
+            old_signature: existingSchedule.signature,
+            cancelled_in_braze: true
           },
         });
         
