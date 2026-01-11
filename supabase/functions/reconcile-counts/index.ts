@@ -5,8 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// This function compares counts between the schedule_ledger and Braze
-// to detect any discrepancies that might indicate missed or duplicate schedules
+// This function performs ledger-based health checks for schedule tracking.
+// NOTE: Braze's /messages/scheduled_broadcasts API does NOT list API-triggered Canvas schedules,
+// so we rely on the schedule_ledger as the source of truth.
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,97 +20,120 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
-    const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCanvasId = Deno.env.get('BRAZE_CANVAS_ID');
-
-    if (!brazeApiKey || !brazeEndpoint || !brazeCanvasId) {
-      throw new Error('Missing Braze configuration');
-    }
-
     const now = new Date();
-    console.log('🔢 Reconciling counts between ledger and Braze...');
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+    const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    // Count pending schedules in ledger (future only)
-    const { count: ledgerPendingCount, error: ledgerError } = await supabase
+    console.log('🔢 Performing ledger health check...');
+
+    // 1. Count pending schedules (future only)
+    const { count: pendingFutureCount, error: pendingError } = await supabase
       .from('schedule_ledger')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
       .gt('send_at_utc', now.toISOString());
 
-    if (ledgerError) {
-      throw new Error(`Failed to count ledger entries: ${ledgerError.message}`);
+    if (pendingError) {
+      throw new Error(`Failed to count pending entries: ${pendingError.message}`);
     }
 
-    // Fetch Braze schedules
-    const daysAhead = 90;
-    const endIso = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString();
-    
-    const brazeRes = await fetch(
-      `${brazeEndpoint}/messages/scheduled_broadcasts?end_time=${encodeURIComponent(endIso)}`,
-      { method: 'GET', headers: { 'Authorization': `Bearer ${brazeApiKey}` } }
-    );
-
-    if (!brazeRes.ok) {
-      throw new Error(`Failed to fetch Braze schedules: ${await brazeRes.text()}`);
-    }
-
-    const brazeData = await brazeRes.json();
-    const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-      b.canvas_id === brazeCanvasId ||
-      b.canvas_api_id === brazeCanvasId
-    );
-
-    const brazeCount = ourBroadcasts.length;
-
-    // Compare counts
-    const discrepancy = (ledgerPendingCount || 0) - brazeCount;
-    const hasDiscrepancy = discrepancy !== 0;
-
-    console.log(`Ledger pending: ${ledgerPendingCount}, Braze schedules: ${brazeCount}, Discrepancy: ${discrepancy}`);
-
-    // Get detailed breakdown
-    const { data: ledgerSchedules } = await supabase
+    // 2. Count stale pending (past send_at_utc but still pending - these should have been sent)
+    const { count: stalePendingCount, data: stalePendingData, error: staleError } = await supabase
       .from('schedule_ledger')
-      .select('match_id, braze_schedule_id')
+      .select('match_id, braze_schedule_id, send_at_utc, dispatch_id', { count: 'exact' })
       .eq('status', 'pending')
-      .gt('send_at_utc', now.toISOString());
+      .lt('send_at_utc', now.toISOString());
 
-    const ledgerScheduleIds = new Set(ledgerSchedules?.map(s => s.braze_schedule_id) || []);
-    const brazeScheduleIds = new Set(ourBroadcasts.map((b: any) => b.schedule_id));
-
-    // Find orphaned schedules (in Braze but not in ledger)
-    const orphanedInBraze = ourBroadcasts.filter((b: any) => !ledgerScheduleIds.has(b.schedule_id));
-    
-    // Find missing from Braze (in ledger but not in Braze)
-    const missingFromBraze = ledgerSchedules?.filter(s => !brazeScheduleIds.has(s.braze_schedule_id)) || [];
-
-    // Find match_ids with multiple schedules in Braze
-    const matchIdCounts = new Map<string, number>();
-    for (const broadcast of ourBroadcasts) {
-      // Canvas uses canvas_entry_properties instead of trigger_properties
-      const matchId = broadcast.canvas_entry_properties?.match_id || broadcast.trigger_properties?.match_id;
-      if (matchId) {
-        matchIdCounts.set(matchId, (matchIdCounts.get(matchId) || 0) + 1);
-      }
+    if (staleError) {
+      throw new Error(`Failed to count stale pending: ${staleError.message}`);
     }
-    const duplicateMatches = Array.from(matchIdCounts.entries())
-      .filter(([_, count]) => count > 1)
-      .map(([matchId, count]) => ({ match_id: matchId, count }));
 
-    // Log if discrepancy found
-    if (hasDiscrepancy || orphanedInBraze.length > 0 || missingFromBraze.length > 0 || duplicateMatches.length > 0) {
+    // 3. Count confirmed sent (with webhook confirmation in last 24h)
+    const { count: confirmedSentCount, error: sentError } = await supabase
+      .from('schedule_ledger')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'sent')
+      .gt('updated_at', twentyFourHoursAgo.toISOString());
+
+    if (sentError) {
+      throw new Error(`Failed to count sent entries: ${sentError.message}`);
+    }
+
+    // 4. Count cancelled/failed in last 24h
+    const { count: cancelledCount, error: cancelledError } = await supabase
+      .from('schedule_ledger')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'cancelled')
+      .gt('updated_at', twentyFourHoursAgo.toISOString());
+
+    if (cancelledError) {
+      throw new Error(`Failed to count cancelled entries: ${cancelledError.message}`);
+    }
+
+    // 5. Find upcoming high-priority matches without schedules (gaps)
+    const { data: upcomingMatches, error: matchesError } = await supabase
+      .from('matches')
+      .select('id, home_team, away_team, utc_date, priority')
+      .gte('utc_date', oneHourFromNow.toISOString())
+      .lte('utc_date', twentyFourHoursFromNow.toISOString())
+      .in('priority', ['critical', 'high'])
+      .order('utc_date', { ascending: true });
+
+    if (matchesError) {
+      throw new Error(`Failed to fetch upcoming matches: ${matchesError.message}`);
+    }
+
+    // Check which upcoming matches have schedules
+    const upcomingMatchIds = upcomingMatches?.map(m => m.id) || [];
+    let upcomingGaps: Array<{ match_id: number; home_team: string; away_team: string; kickoff: string; priority: string }> = [];
+
+    if (upcomingMatchIds.length > 0) {
+      const { data: scheduledMatches, error: scheduledError } = await supabase
+        .from('schedule_ledger')
+        .select('match_id')
+        .in('match_id', upcomingMatchIds)
+        .in('status', ['pending', 'sent']);
+
+      if (scheduledError) {
+        throw new Error(`Failed to check scheduled matches: ${scheduledError.message}`);
+      }
+
+      const scheduledMatchIds = new Set(scheduledMatches?.map(s => s.match_id) || []);
+      upcomingGaps = (upcomingMatches || [])
+        .filter(m => !scheduledMatchIds.has(m.id))
+        .map(m => ({
+          match_id: m.id,
+          home_team: m.home_team,
+          away_team: m.away_team,
+          kickoff: m.utc_date,
+          priority: m.priority,
+        }));
+    }
+
+    // 6. Get count of schedules with confirmed dispatch_id (webhook verified)
+    const { count: webhookVerifiedCount, error: verifiedError } = await supabase
+      .from('schedule_ledger')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'sent')
+      .not('dispatch_id', 'is', null);
+
+    if (verifiedError) {
+      throw new Error(`Failed to count webhook verified: ${verifiedError.message}`);
+    }
+
+    // Determine overall health status
+    const hasIssues = (stalePendingCount || 0) > 0 || upcomingGaps.length > 0;
+
+    // Log if issues found
+    if (hasIssues) {
       await supabase.from('scheduler_logs').insert({
         function_name: 'reconcile-counts',
-        action: 'count_discrepancy',
-        reason: `Ledger: ${ledgerPendingCount}, Braze: ${brazeCount}, Diff: ${discrepancy}`,
+        action: 'health_check_issues',
+        reason: `Stale: ${stalePendingCount || 0}, Gaps: ${upcomingGaps.length}`,
         details: {
-          ledger_pending_count: ledgerPendingCount,
-          braze_count: brazeCount,
-          discrepancy,
-          orphaned_in_braze: orphanedInBraze.length,
-          missing_from_braze: missingFromBraze.length,
-          duplicate_matches: duplicateMatches.length,
+          stale_pending_count: stalePendingCount || 0,
+          upcoming_gaps: upcomingGaps.length,
           checked_at: now.toISOString(),
         },
       });
@@ -117,27 +141,26 @@ Deno.serve(async (req) => {
 
     const result = {
       success: true,
-      counts: {
-        ledger_pending: ledgerPendingCount || 0,
-        braze_scheduled: brazeCount,
-        discrepancy,
+      checked_at: now.toISOString(),
+      ledger_health: {
+        pending_future: pendingFutureCount || 0,
+        stale_past_pending: stalePendingCount || 0,
+        confirmed_sent_24h: confirmedSentCount || 0,
+        webhook_verified_total: webhookVerifiedCount || 0,
+        cancelled_24h: cancelledCount || 0,
       },
-      issues: {
-        orphaned_in_braze: orphanedInBraze.map((b: any) => ({
-          schedule_id: b.schedule_id,
-          match_id: b.canvas_entry_properties?.match_id || b.trigger_properties?.match_id,
-          send_time: b.send_time || b.next_send_time,
-        })),
-        missing_from_braze: missingFromBraze.map(s => ({
-          schedule_id: s.braze_schedule_id,
-          match_id: s.match_id,
-        })),
-        duplicate_matches: duplicateMatches,
-      },
-      has_issues: hasDiscrepancy || orphanedInBraze.length > 0 || missingFromBraze.length > 0 || duplicateMatches.length > 0,
+      stale_pending_details: (stalePendingData || []).slice(0, 10).map(s => ({
+        match_id: s.match_id,
+        schedule_id: s.braze_schedule_id,
+        send_at_utc: s.send_at_utc,
+        has_dispatch_id: !!s.dispatch_id,
+      })),
+      upcoming_gaps: upcomingGaps,
+      has_issues: hasIssues,
+      note: 'Braze API cannot list API-triggered Canvas schedules. The schedule_ledger is the source of truth. Webhook callbacks confirm actual delivery.',
     };
 
-    console.log('Count reconciliation complete:', result);
+    console.log('Ledger health check complete:', JSON.stringify(result, null, 2));
 
     return new Response(
       JSON.stringify(result),

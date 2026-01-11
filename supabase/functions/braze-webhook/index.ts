@@ -270,35 +270,63 @@ serve(async (req) => {
 
     console.log(`✅ Bulk inserted ${notificationRecords.length} notification records`);
 
-    // ==================== PHASE 6: Update schedule_ledger status ====================
+    // ==================== PHASE 6: Update schedule_ledger status with dispatch_id ====================
     if (matchIdsWithWebhooks.size > 0) {
       const matchIdsArray = Array.from(matchIdsWithWebhooks);
       console.log(`📊 Updating status to 'sent' for ${matchIdsArray.length} matches`);
 
-      const { error: updateError, data: updatedRecords } = await supabase
-        .from('schedule_ledger')
-        .update({ status: 'sent' })
-        .in('match_id', matchIdsArray)
-        .eq('status', 'pending')
-        .select('match_id, braze_schedule_id');
+      // Collect dispatch_ids for each match_id from processed events
+      const matchDispatchMap = new Map<number, string>();
+      for (let i = 0; i < processedEvents.length; i++) {
+        const matchId = eventMatchIds[i];
+        const dispatchId = processedEvents[i].dispatchId;
+        if (matchId && dispatchId && !matchDispatchMap.has(matchId)) {
+          matchDispatchMap.set(matchId, dispatchId);
+        }
+      }
 
-      if (updateError) {
-        console.error('❌ Error updating schedule_ledger status:', updateError);
-      } else {
-        console.log(`✅ Updated ${updatedRecords?.length || 0} schedule_ledger entries to 'sent'`);
+      // Update each match's ledger entry with its dispatch_id
+      const updatePromises = matchIdsArray.map(async (matchId) => {
+        const dispatchId = matchDispatchMap.get(matchId) || null;
+        const { error, data } = await supabase
+          .from('schedule_ledger')
+          .update({ 
+            status: 'sent',
+            dispatch_id: dispatchId,
+          })
+          .eq('match_id', matchId)
+          .eq('status', 'pending')
+          .select('match_id, braze_schedule_id');
+        
+        return { matchId, dispatchId, error, data };
+      });
 
-        // Bulk insert scheduler logs
-        if (updatedRecords && updatedRecords.length > 0) {
-          const logRecords = updatedRecords.map(record => ({
+      const updateResults = await Promise.all(updatePromises);
+      const successfulUpdates = updateResults.filter(r => !r.error && r.data && r.data.length > 0);
+      const failedUpdates = updateResults.filter(r => r.error);
+
+      if (failedUpdates.length > 0) {
+        console.error('❌ Error updating some schedule_ledger entries:', failedUpdates.map(f => f.error));
+      }
+
+      console.log(`✅ Updated ${successfulUpdates.length} schedule_ledger entries to 'sent' with dispatch_id`);
+
+      // Bulk insert scheduler logs for all successful updates
+      if (successfulUpdates.length > 0) {
+        const logRecords = successfulUpdates.flatMap(result => 
+          (result.data || []).map(record => ({
             function_name: 'braze-webhook',
             match_id: record.match_id,
-            action: 'webhook_received',
-            reason: 'Webhook confirmed notification sent',
-            details: { schedule_id: record.braze_schedule_id },
-          }));
+            action: 'webhook_confirmed',
+            reason: 'Webhook confirmed notification delivery',
+            details: { 
+              schedule_id: record.braze_schedule_id,
+              dispatch_id: result.dispatchId,
+            },
+          }))
+        );
 
-          await supabase.from('scheduler_logs').insert(logRecords);
-        }
+        await supabase.from('scheduler_logs').insert(logRecords);
       }
     }
 
