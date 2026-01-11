@@ -24,14 +24,22 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Parse optional parameters
+    // Parse parameters
     let testUserId = '874810';
     let matchId: number | null = null;
+    let mode: 'immediate' | 'scheduled' = 'immediate';
+    let waitForWebhook = false;
+    let webhookTimeoutSeconds = 30;
+    let scheduleDelayMinutes = 2; // For scheduled mode, how far in the future
 
     if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       if (body.user_id) testUserId = String(body.user_id);
       if (body.match_id) matchId = Number(body.match_id);
+      if (body.mode === 'scheduled') mode = 'scheduled';
+      if (body.wait_for_webhook === true) waitForWebhook = true;
+      if (body.webhook_timeout_seconds) webhookTimeoutSeconds = Math.min(60, Math.max(5, Number(body.webhook_timeout_seconds)));
+      if (body.schedule_delay_minutes) scheduleDelayMinutes = Math.min(30, Math.max(1, Number(body.schedule_delay_minutes)));
     }
 
     // Get a real upcoming match if no match_id specified
@@ -78,7 +86,7 @@ Deno.serve(async (req) => {
 
     const competitionAr = compTranslation?.arabic_name || match.competition_name;
 
-    // Prepare canvas entry properties (match scheduler keys + backwards-compatible aliases)
+    // Prepare canvas entry properties
     const kickoffDate = new Date(match.utc_date);
     const BAGHDAD_TIMEZONE = 'Asia/Baghdad';
     const baghdadTime = toZonedTime(kickoffDate, BAGHDAD_TIMEZONE);
@@ -103,6 +111,7 @@ Deno.serve(async (req) => {
 
     const kickoff_baghdad = formatInTimeZone(kickoffDate, BAGHDAD_TIMEZONE, 'yyyy-MM-dd HH:mm');
 
+    const testSignature = `test-${match.id}-${Date.now()}`;
     const canvasEntryProperties = {
       // Scheduler keys
       match_id: match.id.toString(),
@@ -116,9 +125,9 @@ Deno.serve(async (req) => {
       kickoff_utc: match.utc_date,
       kickoff_baghdad,
       kickoff_ar,
-      sig: `test-${match.id}-${Date.now()}`,
+      sig: testSignature,
 
-      // Backwards-compatible aliases (in case the Canvas uses these names)
+      // Backwards-compatible aliases
       home_team: match.home_team,
       away_team: match.away_team,
       home_team_ar: homeTeamAr,
@@ -128,64 +137,157 @@ Deno.serve(async (req) => {
       match_time: match.match_time,
     };
 
+    console.log(`🧪 Test mode: ${mode}`);
     console.log('Sending test Canvas to user:', testUserId);
     console.log('Match:', match.id, match.home_team, 'vs', match.away_team);
-    console.log('Canvas entry properties:', canvasEntryProperties);
 
-    // Use immediate send with recipients array for single user test
-    const requestBody = {
-      canvas_id: brazeCanvasId,
-      recipients: [
-        { external_user_id: testUserId }
-      ],
-      canvas_entry_properties: canvasEntryProperties,
-    };
-    
-    const fullUrl = `${brazeEndpoint}/canvas/trigger/send`;
-    console.log('Braze endpoint:', brazeEndpoint);
-    console.log('Full URL:', fullUrl);
-    console.log('Canvas ID:', brazeCanvasId);
-    console.log('API Key (first 10 chars):', brazeApiKey?.substring(0, 10) + '...');
-    console.log('Request body:', JSON.stringify(requestBody, null, 2));
-    
-    const brazeResponse = await fetch(fullUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${brazeApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
+    let brazeResult: any;
+    let scheduleId: string | null = null;
+    let scheduledSendTime: string | null = null;
 
-    const brazeResult = await brazeResponse.json();
-    console.log('Braze HTTP status:', brazeResponse.status);
-    console.log('Braze response:', JSON.stringify(brazeResult));
+    if (mode === 'immediate') {
+      // Immediate send with recipients array for single user test
+      const requestBody = {
+        canvas_id: brazeCanvasId,
+        recipients: [
+          { external_user_id: testUserId }
+        ],
+        canvas_entry_properties: canvasEntryProperties,
+      };
+      
+      const fullUrl = `${brazeEndpoint}/canvas/trigger/send`;
+      console.log('Sending immediate test to:', fullUrl);
+      
+      const brazeResponse = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${brazeApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      brazeResult = await brazeResponse.json();
+      console.log('Braze response:', JSON.stringify(brazeResult));
+
+    } else {
+      // Scheduled send - create a schedule for X minutes in the future
+      scheduledSendTime = new Date(Date.now() + scheduleDelayMinutes * 60 * 1000).toISOString();
+      
+      const requestBody = {
+        canvas_id: brazeCanvasId,
+        recipients: [
+          { external_user_id: testUserId }
+        ],
+        canvas_entry_properties: canvasEntryProperties,
+        schedule: {
+          time: scheduledSendTime,
+        },
+      };
+      
+      const fullUrl = `${brazeEndpoint}/canvas/trigger/schedule/create`;
+      console.log('Creating scheduled test for:', scheduledSendTime);
+      console.log('Sending to:', fullUrl);
+      
+      const brazeResponse = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${brazeApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      brazeResult = await brazeResponse.json();
+      scheduleId = brazeResult.schedule_id || null;
+      console.log('Braze response:', JSON.stringify(brazeResult));
+    }
+
+    const brazeSendSuccess = brazeResult.message === 'success';
 
     // Log the test send
     await supabase.from('scheduler_logs').insert({
       function_name: 'braze-canvas-test',
-      action: 'test_send',
+      action: mode === 'immediate' ? 'test_send_immediate' : 'test_send_scheduled',
       match_id: match.id,
       details: {
         user_id: testUserId,
         canvas_id: brazeCanvasId,
+        mode,
+        schedule_id: scheduleId,
+        scheduled_send_time: scheduledSendTime,
         braze_response: brazeResult,
-        canvas_entry_properties: canvasEntryProperties,
+        test_signature: testSignature,
       },
     });
 
+    // Wait for webhook verification if requested (only for immediate sends)
+    let webhookVerified = false;
+    let webhookDetails: any = null;
+
+    if (waitForWebhook && brazeSendSuccess && mode === 'immediate') {
+      console.log(`⏳ Waiting up to ${webhookTimeoutSeconds}s for webhook confirmation...`);
+      
+      const startTime = Date.now();
+      const pollInterval = 2000; // Check every 2 seconds
+      
+      while (Date.now() - startTime < webhookTimeoutSeconds * 1000) {
+        // Check notification_sends for a record matching our test
+        const { data: webhookRecord, error: webhookError } = await supabase
+          .from('notification_sends')
+          .select('*')
+          .eq('match_id', match.id)
+          .eq('external_user_id', testUserId)
+          .gte('sent_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+          .order('sent_at', { ascending: false })
+          .limit(1);
+
+        if (!webhookError && webhookRecord && webhookRecord.length > 0) {
+          webhookVerified = true;
+          webhookDetails = {
+            notification_id: webhookRecord[0].id,
+            event_type: webhookRecord[0].braze_event_type,
+            received_at: webhookRecord[0].created_at,
+            latency_ms: Date.now() - startTime,
+          };
+          console.log(`✅ Webhook confirmed after ${webhookDetails.latency_ms}ms`);
+          break;
+        }
+
+        // Wait before next poll
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+
+      if (!webhookVerified) {
+        console.log(`⚠️ No webhook received within ${webhookTimeoutSeconds}s timeout`);
+      }
+    }
+
+    const response: any = {
+      success: brazeSendSuccess,
+      mode,
+      user_id: testUserId,
+      match: {
+        id: match.id,
+        home_team: match.home_team,
+        away_team: match.away_team,
+        kickoff: match.utc_date,
+      },
+      braze_response: brazeResult,
+    };
+
+    if (mode === 'scheduled') {
+      response.schedule_id = scheduleId;
+      response.scheduled_send_time = scheduledSendTime;
+    }
+
+    if (waitForWebhook && mode === 'immediate') {
+      response.webhook_verified = webhookVerified;
+      response.webhook_details = webhookDetails;
+    }
+
     return new Response(
-      JSON.stringify({
-        success: brazeResult.message === 'success',
-        user_id: testUserId,
-        match: {
-          id: match.id,
-          home_team: match.home_team,
-          away_team: match.away_team,
-          kickoff: match.utc_date,
-        },
-        braze_response: brazeResult,
-      }),
+      JSON.stringify(response),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
