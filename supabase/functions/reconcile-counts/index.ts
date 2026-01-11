@@ -21,9 +21,9 @@ Deno.serve(async (req) => {
 
     const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
     const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCampaignId = Deno.env.get('BRAZE_CAMPAIGN_ID');
+    const brazeCanvasId = Deno.env.get('BRAZE_CANVAS_ID');
 
-    if (!brazeApiKey || !brazeEndpoint || !brazeCampaignId) {
+    if (!brazeApiKey || !brazeEndpoint || !brazeCanvasId) {
       throw new Error('Missing Braze configuration');
     }
 
@@ -56,9 +56,8 @@ Deno.serve(async (req) => {
 
     const brazeData = await brazeRes.json();
     const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
-      b.campaign_id === brazeCampaignId ||
-      b.campaign_api_id === brazeCampaignId ||
-      b.campaign_api_identifier === brazeCampaignId
+      b.canvas_id === brazeCanvasId ||
+      b.canvas_api_id === brazeCanvasId
     );
 
     const brazeCount = ourBroadcasts.length;
@@ -88,7 +87,8 @@ Deno.serve(async (req) => {
     // Find match_ids with multiple schedules in Braze
     const matchIdCounts = new Map<string, number>();
     for (const broadcast of ourBroadcasts) {
-      const matchId = broadcast.trigger_properties?.match_id;
+      // Canvas uses canvas_entry_properties instead of trigger_properties
+      const matchId = broadcast.canvas_entry_properties?.match_id || broadcast.trigger_properties?.match_id;
       if (matchId) {
         matchIdCounts.set(matchId, (matchIdCounts.get(matchId) || 0) + 1);
       }
@@ -125,8 +125,8 @@ Deno.serve(async (req) => {
       issues: {
         orphaned_in_braze: orphanedInBraze.map((b: any) => ({
           schedule_id: b.schedule_id,
-          match_id: b.trigger_properties?.match_id,
-          send_time: b.send_time,
+          match_id: b.canvas_entry_properties?.match_id || b.trigger_properties?.match_id,
+          send_time: b.send_time || b.next_send_time,
         })),
         missing_from_braze: missingFromBraze.map(s => ({
           schedule_id: s.braze_schedule_id,
