@@ -433,7 +433,34 @@ Deno.serve(async (req) => {
       // If Arabic names change, signature changes, triggering an update to Braze
       const signature = `${sendAtDate.toISOString()}|${targetTeams.sort().join('+')}|${home_ar}|${away_ar}`;
 
-      // PRE-FLIGHT CHECK: Check if schedule already exists in ledger
+      // PRE-FLIGHT CHECK 1: Check if notification was already delivered (webhook confirmation exists)
+      // This prevents re-scheduling for matches that already received notifications
+      const { data: existingDelivery } = await supabase
+        .from('notification_sends')
+        .select('id, sent_at')
+        .eq('match_id', match.id)
+        .eq('braze_event_type', 'canvas.sent')
+        .limit(1)
+        .maybeSingle();
+
+      if (existingDelivery) {
+        console.log(`Match ${match.id}: already delivered at ${existingDelivery.sent_at} - skipping`);
+        skipped++;
+        
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-scheduler',
+          match_id: match.id,
+          action: 'skipped_already_delivered',
+          reason: 'Notification already delivered (webhook confirmed)',
+          details: { 
+            delivery_id: existingDelivery.id,
+            sent_at: existingDelivery.sent_at
+          },
+        });
+        continue;
+      }
+
+      // PRE-FLIGHT CHECK 2: Check if schedule already exists in ledger
       // This is now protected by a unique index on (match_id) WHERE status IN ('pending', 'sent')
       const { data: existingSchedule } = await supabase
         .from('schedule_ledger')
