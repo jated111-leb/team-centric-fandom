@@ -244,65 +244,27 @@ const Analytics = () => {
 
   const fetchTopMatchPerformance = async (startDate: Date | null, endDate: Date): Promise<AnalyticsData['contentStats']['matchPerformance']> => {
     try {
-      let query = supabase
-        .from('notification_sends')
-        .select('match_id, home_team, away_team, competition, external_user_id, sent_at')
-        .not('match_id', 'is', null);
-      
-      if (startDate) {
-        query = query.gte('sent_at', startDate.toISOString());
-      }
-      query = query.lte('sent_at', endDate.toISOString());
-
-      const { data, error } = await query.limit(1000);
+      // Use server-side aggregation for accurate counts
+      const { data, error } = await supabase
+        .rpc('get_match_performance', {
+          p_start_date: startDate?.toISOString() || null,
+          p_end_date: endDate.toISOString()
+        });
       
       if (error) throw error;
 
-      // Aggregate match performance client-side (limited data)
-      const matchMap = new Map<number, { 
-        homeTeam: string; 
-        awayTeam: string; 
-        competition: string;
-        sentDate: string;
-        reach: number; 
-        correlated: number;
-        users: Set<string>;
-      }>();
-      
-      (data || []).forEach(n => {
-        if (!n.match_id) return;
-        const existing = matchMap.get(n.match_id) || {
-          homeTeam: n.home_team || 'N/A',
-          awayTeam: n.away_team || 'N/A',
-          competition: n.competition || 'N/A',
-          sentDate: n.sent_at?.split('T')[0] || 'N/A',
-          reach: 0,
-          correlated: 0,
-          users: new Set<string>()
-        };
-        existing.reach++;
-        if (n.home_team && n.away_team) {
-          existing.correlated++;
-        }
-        if (n.external_user_id) {
-          existing.users.add(n.external_user_id);
-        }
-        matchMap.set(n.match_id, existing);
-      });
-
-      return Array.from(matchMap.entries())
-        .map(([matchId, data]) => ({
-          matchId,
-          homeTeam: data.homeTeam,
-          awayTeam: data.awayTeam,
-          competition: data.competition,
-          sentDate: data.sentDate,
-          reach: data.reach,
-          uniqueUsers: data.users.size,
-          correlationRate: data.reach > 0 ? (data.correlated / data.reach) * 100 : 0
-        }))
-        .sort((a, b) => b.reach - a.reach)
-        .slice(0, 20);
+      // The RPC returns the data already aggregated and sorted
+      const results = Array.isArray(data) ? data : [];
+      return results.map((match: any) => ({
+        matchId: match.matchId,
+        homeTeam: match.homeTeam || 'N/A',
+        awayTeam: match.awayTeam || 'N/A',
+        competition: match.competition || 'N/A',
+        sentDate: match.sentDate || 'N/A',
+        reach: Number(match.reach) || 0,
+        uniqueUsers: Number(match.uniqueUsers) || 0,
+        correlationRate: Number(match.correlationRate) || 0
+      }));
     } catch (error) {
       console.error('Error fetching match performance:', error);
       return [];
