@@ -456,6 +456,10 @@ export type Database = {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
       }
+      get_match_performance: {
+        Args: { p_end_date?: string; p_start_date?: string }
+        Returns: Json
+      }
       get_notification_details: {
         Args: {
           p_end_date?: string
