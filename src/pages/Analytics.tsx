@@ -45,7 +45,7 @@ export interface AnalyticsData {
   contentStats: {
     teamBreakdown: { team: string; count: number }[];
     competitionBreakdown: { competition: string; count: number }[];
-    matchPerformance: { matchId: number; homeTeam: string; awayTeam: string; reach: number; correlationRate: number }[];
+    matchPerformance: { matchId: number; homeTeam: string; awayTeam: string; reach: number; uniqueUsers: number; competition: string; sentDate: string; correlationRate: number }[];
   };
   deliveryStats: {
     hourlyDistribution: { hour: number; count: number }[];
@@ -246,7 +246,7 @@ const Analytics = () => {
     try {
       let query = supabase
         .from('notification_sends')
-        .select('match_id, home_team, away_team')
+        .select('match_id, home_team, away_team, competition, external_user_id, sent_at')
         .not('match_id', 'is', null);
       
       if (startDate) {
@@ -259,19 +259,33 @@ const Analytics = () => {
       if (error) throw error;
 
       // Aggregate match performance client-side (limited data)
-      const matchMap = new Map<number, { homeTeam: string; awayTeam: string; reach: number; correlated: number }>();
+      const matchMap = new Map<number, { 
+        homeTeam: string; 
+        awayTeam: string; 
+        competition: string;
+        sentDate: string;
+        reach: number; 
+        correlated: number;
+        users: Set<string>;
+      }>();
       
       (data || []).forEach(n => {
         if (!n.match_id) return;
         const existing = matchMap.get(n.match_id) || {
           homeTeam: n.home_team || 'N/A',
           awayTeam: n.away_team || 'N/A',
+          competition: n.competition || 'N/A',
+          sentDate: n.sent_at?.split('T')[0] || 'N/A',
           reach: 0,
-          correlated: 0
+          correlated: 0,
+          users: new Set<string>()
         };
         existing.reach++;
         if (n.home_team && n.away_team) {
           existing.correlated++;
+        }
+        if (n.external_user_id) {
+          existing.users.add(n.external_user_id);
         }
         matchMap.set(n.match_id, existing);
       });
@@ -281,7 +295,10 @@ const Analytics = () => {
           matchId,
           homeTeam: data.homeTeam,
           awayTeam: data.awayTeam,
+          competition: data.competition,
+          sentDate: data.sentDate,
           reach: data.reach,
+          uniqueUsers: data.users.size,
           correlationRate: data.reach > 0 ? (data.correlated / data.reach) * 100 : 0
         }))
         .sort((a, b) => b.reach - a.reach)
