@@ -187,14 +187,16 @@ const Analytics = () => {
         return { hour, count: found?.count || 0 };
       });
 
-      const teamBreakdown = (summary.contentStats.byTeam || []).map(t => ({
+      // Use uniqueUsers (reach) instead of count (impressions) for team breakdown
+      const teamBreakdown = (summary.contentStats.byTeam || []).map((t: any) => ({
         team: t.team,
-        count: t.count
+        count: t.uniqueUsers || t.count || 0  // Prefer uniqueUsers (reach)
       }));
 
-      const competitionBreakdown = (summary.contentStats.byCompetition || []).map(c => ({
+      // Use uniqueUsers (reach) for competition breakdown too
+      const competitionBreakdown = (summary.contentStats.byCompetition || []).map((c: any) => ({
         competition: c.competition,
-        count: c.count
+        count: c.uniqueUsers || c.count || 0  // Prefer uniqueUsers (reach)
       }));
 
       // Fetch match performance data (paginated, only top 20 matches)
