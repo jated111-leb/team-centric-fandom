@@ -10,7 +10,7 @@ import { UserInsightsSection } from "@/components/analytics/UserInsightsSection"
 import { ContentPerformanceSection } from "@/components/analytics/ContentPerformanceSection";
 import { DeliveryHealthSection } from "@/components/analytics/DeliveryHealthSection";
 import { ExecutiveKPIs } from "@/components/analytics/ExecutiveKPIs";
-import { subDays } from "date-fns";
+import { subDays, startOfDay, endOfDay, startOfYesterday, endOfYesterday } from "date-fns";
 
 export interface NotificationAnalytics {
   id: string;
@@ -92,6 +92,8 @@ interface ServerAnalyticsSummary {
 }
 
 const DATE_RANGE_OPTIONS = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
   { value: '7', label: 'Last 7 days' },
   { value: '14', label: 'Last 14 days' },
   { value: '30', label: 'Last 30 days' },
@@ -159,10 +161,16 @@ const Analytics = () => {
       setRefreshing(true);
       
       // Calculate date range
-      const endDate = new Date();
+      let endDate = new Date();
       let startDate: Date | null = null;
       
-      if (dateRange !== 'all') {
+      if (dateRange === 'today') {
+        startDate = startOfDay(new Date());
+        endDate = new Date();
+      } else if (dateRange === 'yesterday') {
+        startDate = startOfYesterday();
+        endDate = endOfYesterday();
+      } else if (dateRange !== 'all') {
         startDate = subDays(endDate, parseInt(dateRange));
       }
 
