@@ -12,14 +12,18 @@ interface ContentPerformanceSectionProps {
 export function ContentPerformanceSection({ data }: ContentPerformanceSectionProps) {
   const { contentStats } = data;
 
+  // Different shades of green for competition breakdown
   const pieColors = [
-    'hsl(var(--primary))',
-    'hsl(var(--secondary))',
-    'hsl(var(--accent))',
-    'hsl(160, 60%, 35%)',
-    'hsl(200, 60%, 45%)',
-    'hsl(280, 60%, 45%)',
-    'hsl(320, 60%, 45%)',
+    'hsl(142, 70%, 45%)',  // Bright green
+    'hsl(142, 60%, 35%)',  // Medium green
+    'hsl(142, 50%, 55%)',  // Light green
+    'hsl(142, 70%, 25%)',  // Dark green
+    'hsl(160, 60%, 40%)',  // Teal green
+    'hsl(120, 50%, 40%)',  // Yellow-green
+    'hsl(155, 65%, 50%)',  // Mint green
+    'hsl(130, 55%, 30%)',  // Forest green
+    'hsl(145, 45%, 60%)',  // Sage green
+    'hsl(150, 70%, 35%)',  // Emerald
   ];
 
   const barColors = 'hsl(var(--primary))';
