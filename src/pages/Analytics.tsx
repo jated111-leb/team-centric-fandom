@@ -193,10 +193,10 @@ const Analytics = () => {
         count: t.uniqueUsers || t.count || 0  // Prefer uniqueUsers (reach)
       }));
 
-      // Use uniqueUsers (reach) for competition breakdown too
+      // Competition breakdown uses notifications count (not reach)
       const competitionBreakdown = (summary.contentStats.byCompetition || []).map((c: any) => ({
-        competition: c.competition,
-        count: c.uniqueUsers || c.count || 0  // Prefer uniqueUsers (reach)
+        competition: c.competition,  // Now uses friendly names from competition_translations
+        count: c.count || 0  // Total notifications per competition
       }));
 
       // Fetch match performance data (paginated, only top 20 matches)
