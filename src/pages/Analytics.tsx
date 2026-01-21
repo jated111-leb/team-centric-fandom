@@ -30,9 +30,9 @@ export interface AnalyticsData {
   notifications: NotificationAnalytics[];
   userStats: {
     totalUsers: number;
-    usersWithMultipleNotifications: number;
-    duplicateNotifications: number;
-    multiGameDayUsers: number;
+    multiMatchUsers: number; // Users who received 2+ different matches (healthy engagement)
+    usersWithDuplicates: number; // Users who received same match 2+ times (bug indicator)
+    duplicateNotifications: number; // Total extra notifications (same user + same match)
     todayUsers: number;
   };
   periodComparison: {
@@ -214,9 +214,9 @@ const Analytics = () => {
         notifications: [], // We don't need raw notifications anymore for summary views
         userStats: {
           totalUsers: summary.userStats.totalUsers || 0,
-          usersWithMultipleNotifications: summary.userStats.usersWithMultiple || 0,
-          duplicateNotifications: summary.duplicates.count || 0,
-          multiGameDayUsers: summary.userStats.multiGameDayUsers || 0,
+          multiMatchUsers: summary.userStats.multiGameDayUsers || 0, // Users with 2+ different matches
+          usersWithDuplicates: summary.duplicates.affectedUsers || 0, // Users who got duplicates
+          duplicateNotifications: summary.duplicates.count || 0, // Total extra notifications
           todayUsers: summary.userStats.todayUsers || 0
         },
         periodComparison: {

@@ -33,8 +33,8 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Duplicate Notifications Detected</AlertTitle>
           <AlertDescription>
-            {userStats.duplicateNotifications} duplicate notifications found (same user + same match).
-            This could indicate a scheduler issue.
+            {userStats.duplicateNotifications.toLocaleString()} extra notifications sent to {userStats.usersWithDuplicates.toLocaleString()} users 
+            (same user received same match multiple times). This indicates a webhook or scheduler issue.
           </AlertDescription>
         </Alert>
       )}
@@ -60,6 +60,7 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{userStats.totalUsers.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total reach</p>
           </CardContent>
         </Card>
 
@@ -67,44 +68,52 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <UserCheck className="h-4 w-4" />
-              Multi-Notification Users
+              Multi-Match Users
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{userStats.usersWithMultipleNotifications.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{userStats.multiMatchUsers.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {userStats.totalUsers > 0 
-                ? ((userStats.usersWithMultipleNotifications / userStats.totalUsers) * 100).toFixed(1) 
-                : 0}% of users
+              Received 2+ different matches
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Multi-Game Day Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{userStats.multiGameDayUsers.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              Received 2+ games in one day
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Duplicates</CardTitle>
+            <CardTitle className="text-sm font-medium">Users with Duplicates</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{userStats.duplicateNotifications}</span>
+              <span className="text-2xl font-bold">{userStats.usersWithDuplicates.toLocaleString()}</span>
+              {userStats.usersWithDuplicates === 0 ? (
+                <Badge variant="default" className="bg-secondary">Clean</Badge>
+              ) : (
+                <Badge variant="destructive">Bug</Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Same match 2+ times
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Extra Notifications</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold">{userStats.duplicateNotifications.toLocaleString()}</span>
               {userStats.duplicateNotifications === 0 ? (
                 <Badge variant="default" className="bg-secondary">Clean</Badge>
               ) : (
                 <Badge variant="destructive">Alert</Badge>
               )}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Duplicate sends total
+            </p>
           </CardContent>
         </Card>
       </div>
