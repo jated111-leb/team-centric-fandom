@@ -33,7 +33,7 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Duplicate Notifications Detected</AlertTitle>
           <AlertDescription>
-            {userStats.duplicateNotifications.toLocaleString()} extra notifications sent to {userStats.usersWithDuplicates.toLocaleString()} users 
+            {(userStats.duplicateNotifications ?? 0).toLocaleString()} extra notifications sent to {(userStats.usersWithDuplicates ?? 0).toLocaleString()} users 
             (same user received same match multiple times). This indicates a webhook or scheduler issue.
           </AlertDescription>
         </Alert>
@@ -72,7 +72,7 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{userStats.multiMatchUsers.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{(userStats.multiMatchUsers ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               Received 2+ different matches
             </p>
@@ -85,8 +85,8 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{userStats.usersWithDuplicates.toLocaleString()}</span>
-              {userStats.usersWithDuplicates === 0 ? (
+              <span className="text-2xl font-bold">{(userStats.usersWithDuplicates ?? 0).toLocaleString()}</span>
+              {(userStats.usersWithDuplicates ?? 0) === 0 ? (
                 <Badge variant="default" className="bg-secondary">Clean</Badge>
               ) : (
                 <Badge variant="destructive">Bug</Badge>
