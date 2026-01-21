@@ -5,11 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, RefreshCw, Users, TrendingUp, BarChart3, Calendar } from "lucide-react";
+import { Download, RefreshCw, Users, TrendingUp, BarChart3, Calendar, Server } from "lucide-react";
 import { UserInsightsSection } from "@/components/analytics/UserInsightsSection";
 import { ContentPerformanceSection } from "@/components/analytics/ContentPerformanceSection";
 import { DeliveryHealthSection } from "@/components/analytics/DeliveryHealthSection";
 import { ExecutiveKPIs } from "@/components/analytics/ExecutiveKPIs";
+import { SchedulerHealthSection } from "@/components/analytics/SchedulerHealthSection";
 import { subDays, startOfDay, endOfDay, startOfYesterday, endOfYesterday } from "date-fns";
 
 export interface NotificationAnalytics {
@@ -53,6 +54,19 @@ export interface AnalyticsData {
     naRate: number;
     avgWebhookLatency: number;
   };
+  schedulerHealth: {
+    matchesWithMultipleDispatchIds: number;
+    avgDispatchIdsPerMatch: number;
+    scheduleLedgerDuplicates: number;
+    webhookDuplicatesSkipped: number;
+    topAnomalies: {
+      matchId: number;
+      homeTeam: string;
+      awayTeam: string;
+      dispatchIdCount: number;
+      scheduleCount: number;
+    }[];
+  };
 }
 
 interface ServerAnalyticsSummary {
@@ -84,6 +98,19 @@ interface ServerAnalyticsSummary {
   duplicates: {
     count: number;
     affectedUsers: number;
+  };
+  schedulerHealth: {
+    matchesWithMultipleDispatchIds: number;
+    avgDispatchIdsPerMatch: number;
+    scheduleLedgerDuplicates: number;
+    webhookDuplicatesSkipped: number;
+    topAnomalies: {
+      matchId: number;
+      homeTeam: string;
+      awayTeam: string;
+      dispatchIdCount: number;
+      scheduleCount: number;
+    }[] | null;
   };
   dateRange: {
     start: string;
@@ -236,6 +263,13 @@ const Analytics = () => {
           correlationRate: summary.deliveryStats.correlationRate || 0,
           naRate: summary.deliveryStats.naRate || 0,
           avgWebhookLatency: 0 // Computed separately if needed
+        },
+        schedulerHealth: {
+          matchesWithMultipleDispatchIds: summary.schedulerHealth?.matchesWithMultipleDispatchIds || 0,
+          avgDispatchIdsPerMatch: summary.schedulerHealth?.avgDispatchIdsPerMatch || 0,
+          scheduleLedgerDuplicates: summary.schedulerHealth?.scheduleLedgerDuplicates || 0,
+          webhookDuplicatesSkipped: summary.schedulerHealth?.webhookDuplicatesSkipped || 0,
+          topAnomalies: summary.schedulerHealth?.topAnomalies || []
         }
       });
 
@@ -369,7 +403,7 @@ const Analytics = () => {
 
         {/* Tabbed Sections */}
         <Tabs defaultValue="users" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               User Insights
@@ -381,6 +415,10 @@ const Analytics = () => {
             <TabsTrigger value="delivery" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Delivery Health
+            </TabsTrigger>
+            <TabsTrigger value="scheduler" className="flex items-center gap-2">
+              <Server className="h-4 w-4" />
+              Scheduler Health
             </TabsTrigger>
           </TabsList>
 
@@ -394,6 +432,10 @@ const Analytics = () => {
 
           <TabsContent value="delivery">
             {analyticsData && <DeliveryHealthSection data={analyticsData} />}
+          </TabsContent>
+
+          <TabsContent value="scheduler">
+            {analyticsData && <SchedulerHealthSection data={analyticsData.schedulerHealth} />}
           </TabsContent>
         </Tabs>
       </div>
