@@ -200,8 +200,25 @@ serve(async (req) => {
       }
     }
 
-    // ==================== PHASE 5: Build and insert all notification records ====================
+    // ==================== PHASE 5: Deduplicate and build notification records ====================
     const matchIdsWithWebhooks = new Set<number>();
+    
+    // Fetch existing user+match+event combinations to deduplicate
+    const existingCombos = new Set<string>();
+    if (matchIdsToFetch.size > 0) {
+      const { data: existing } = await supabase
+        .from('notification_sends')
+        .select('external_user_id, match_id, braze_event_type')
+        .in('match_id', Array.from(matchIdsToFetch));
+      
+      existing?.forEach(r => {
+        if (r.match_id) {
+          existingCombos.add(`${r.external_user_id}|${r.match_id}|${r.braze_event_type}`);
+        }
+      });
+      console.log(`📊 Found ${existingCombos.size} existing user+match+event combinations`);
+    }
+
     const notificationRecords: Array<{
       external_user_id: string;
       braze_event_type: string;
@@ -219,10 +236,24 @@ serve(async (req) => {
       sent_at: string;
       raw_payload: any;
     }> = [];
+    
+    let skippedDuplicates = 0;
 
     for (let i = 0; i < processedEvents.length; i++) {
       const pe = processedEvents[i];
       const matchId = eventMatchIds[i];
+      
+      // Skip duplicates: same user + same match + same event type
+      if (matchId) {
+        const dedupeKey = `${pe.externalUserId}|${matchId}|${pe.eventType}`;
+        if (existingCombos.has(dedupeKey)) {
+          skippedDuplicates++;
+          matchIdsWithWebhooks.add(matchId); // Still mark as having webhook
+          continue;
+        }
+        // Add to set to prevent duplicates within this batch
+        existingCombos.add(dedupeKey);
+      }
       
       let homeTeam = pe.properties.home_team || null;
       let awayTeam = pe.properties.away_team || null;
@@ -258,17 +289,35 @@ serve(async (req) => {
       });
     }
 
-    // Single bulk insert for all notification records
-    const { error: insertError } = await supabase
-      .from('notification_sends')
-      .insert(notificationRecords);
-
-    if (insertError) {
-      console.error('❌ Error bulk inserting notification sends:', insertError);
-      throw insertError;
+    // Log duplicate activity
+    if (skippedDuplicates > 0) {
+      console.log(`⚠️ Skipped ${skippedDuplicates} duplicate webhook events`);
+      await supabase.from('scheduler_logs').insert({
+        function_name: 'braze-webhook',
+        action: 'duplicates_skipped',
+        reason: `Braze sent ${skippedDuplicates} duplicate webhook events`,
+        details: { 
+          total_received: eventCount,
+          duplicates_skipped: skippedDuplicates,
+          inserted: notificationRecords.length
+        }
+      });
     }
 
-    console.log(`✅ Bulk inserted ${notificationRecords.length} notification records`);
+    // Only insert if we have new records
+    if (notificationRecords.length > 0) {
+      const { error: insertError } = await supabase
+        .from('notification_sends')
+        .insert(notificationRecords);
+
+      if (insertError) {
+        console.error('❌ Error bulk inserting notification sends:', insertError);
+        throw insertError;
+      }
+      console.log(`✅ Inserted ${notificationRecords.length} new notification records`);
+    } else {
+      console.log(`ℹ️ No new records to insert (all ${eventCount} events were duplicates)`);
+    }
 
     // ==================== PHASE 6: Update schedule_ledger status with dispatch_id ====================
     if (matchIdsWithWebhooks.size > 0) {
