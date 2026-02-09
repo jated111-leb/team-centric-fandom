@@ -118,13 +118,13 @@ export function ContentPerformanceSection({ data }: ContentPerformanceSectionPro
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis type="number" className="text-xs" />
                 <YAxis dataKey="team" type="category" width={120} className="text-xs" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '8px'
                   }}
-                  formatter={(value: number) => [value.toLocaleString(), 'Notifications']}
+                  formatter={(value: number) => [value.toLocaleString(), 'Unique Users']}
                 />
                 <Bar dataKey="count" fill={barColors} radius={[0, 4, 4, 0]} />
               </BarChart>

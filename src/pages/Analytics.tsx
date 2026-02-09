@@ -76,7 +76,7 @@ interface ServerAnalyticsSummary {
     totalNotifications: number;
     avgNotificationsPerUser: number;
     todayUsers: number;
-    multiGameDayUsers: number;
+    multiMatchUsers: number;
   };
   periodComparison: {
     currentPeriodNotifications: number;
@@ -89,6 +89,7 @@ interface ServerAnalyticsSummary {
     correlationRate: number;
     naRate: number;
     totalSent: number;
+    avgWebhookLatency: number;
     hourlyDistribution: { hour: number; count: number }[] | null;
   };
   contentStats: {
@@ -241,7 +242,7 @@ const Analytics = () => {
         notifications: [], // We don't need raw notifications anymore for summary views
         userStats: {
           totalUsers: summary.userStats.totalUsers || 0,
-          multiMatchUsers: summary.userStats.multiGameDayUsers || 0, // Users with 2+ different matches
+          multiMatchUsers: summary.userStats.multiMatchUsers || 0, // Users with 2+ different matches
           usersWithDuplicates: summary.duplicates.affectedUsers || 0, // Users who got duplicates
           duplicateNotifications: summary.duplicates.count || 0, // Total extra notifications
           todayUsers: summary.userStats.todayUsers || 0
@@ -262,7 +263,7 @@ const Analytics = () => {
           hourlyDistribution,
           correlationRate: summary.deliveryStats.correlationRate || 0,
           naRate: summary.deliveryStats.naRate || 0,
-          avgWebhookLatency: 0 // Computed separately if needed
+          avgWebhookLatency: summary.deliveryStats.avgWebhookLatency || 0
         },
         schedulerHealth: {
           matchesWithMultipleDispatchIds: summary.schedulerHealth?.matchesWithMultipleDispatchIds || 0,
