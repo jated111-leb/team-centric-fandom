@@ -307,24 +307,10 @@ Deno.serve(async (req) => {
       
       if (homeInHardcodedList && !homeCanonical) {
         console.warn(`⚠️ UNMATCHED FEATURED TEAM: "${match.home_team}" appears to be a featured team but has no mapping!`);
-        await supabase.from('scheduler_logs').insert({
-          function_name: 'braze-scheduler',
-          match_id: match.id,
-          action: 'unmatched_featured_team',
-          reason: `Team "${match.home_team}" appears to be featured but has no team_mapping`,
-          details: { team: match.home_team, position: 'home', match_date: match.match_date },
-        });
       }
       
       if (awayInHardcodedList && !awayCanonical) {
         console.warn(`⚠️ UNMATCHED FEATURED TEAM: "${match.away_team}" appears to be a featured team but has no mapping!`);
-        await supabase.from('scheduler_logs').insert({
-          function_name: 'braze-scheduler',
-          match_id: match.id,
-          action: 'unmatched_featured_team',
-          reason: `Team "${match.away_team}" appears to be featured but has no team_mapping`,
-          details: { team: match.away_team, position: 'away', match_date: match.match_date },
-        });
       }
       
       if (!homeFeatured && !awayFeatured) {
