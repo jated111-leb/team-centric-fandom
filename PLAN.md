@@ -1,148 +1,234 @@
-# Plan: Post-Match Congrats Notification
+# Plan: Post-Match Congrats Push Notification (Braze Campaign)
 
 ## Context
 
-The system currently sends **pre-match** notifications (60 min before kickoff) to users whose favorite teams are playing. This plan adds a **post-match "congrats"** notification sent to users whose team just won.
+The system currently sends **pre-match** notifications via Braze **Canvas** (scheduled 60 min before kickoff). This plan adds a **post-match "congrats" push** via a Braze **Campaign** — 1 notification per game per user, sent 10-30 minutes after the match finishes, only to fans of the winning team.
 
 ### Current Architecture (relevant)
-- **Match data**: `football-data.org` API → `sync-football-data` edge function → `matches` table (has `status`, `score_home`, `score_away`)
+- **Match data**: `football-data.org` API → `sync-football-data` (every 15 min) → `matches` table (has `status`, `score_home`, `score_away`)
 - **User targeting**: Braze custom attributes (`Team 1`, `Team 2`, `Team 3`) — no local user preferences DB
-- **Notification pipeline**: `braze-scheduler` → Braze Canvas API → `braze-webhook` → `notification_sends`
+- **Pre-match pipeline**: `braze-scheduler` → Braze Canvas API (scheduled send) → `braze-webhook` → `notification_sends`
 - **Dedup**: `schedule_ledger` (UNIQUE on `match_id`) + signature-based change detection
-- **Cron**: `sync-football-data` and `braze-scheduler` run every 15 minutes
+- **Team mapping**: `team_mappings` (regex patterns → canonical names), `featured_teams` (with `braze_attribute_value`)
+- **Translations**: Auto-generated Arabic via Lovable AI/Gemini, stored in `team_translations`
 
 ---
 
 ## Requirements
 
-### 1. Data Layer: Detect Match Results
+### 1. Detect Finished Matches with a Winner
 
-**What's needed:**
-- `sync-football-data` already fetches match status and scores from football-data.org
-- The `matches` table already has `status` (SCHEDULED → TIMED → IN_PLAY → FINISHED), `score_home`, `score_away`
-- **Gap**: Nothing currently reacts to a match transitioning to `FINISHED`
+**Already available:**
+- `matches.status` transitions to `FINISHED` when football-data.org reports final result
+- `matches.score_home` and `matches.score_away` are populated with final scores
+- `sync-football-data` already upserts these fields every 15 minutes
 
-**Changes:**
-- Add a `result_notification_status` column to `matches` (e.g., `pending`, `sent`, `skipped`) to track whether a congrats notification was processed for each match
-- In `sync-football-data`, after upserting matches, detect newly-finished matches (status changed to `FINISHED`) and trigger the congrats flow
+**New: Track congrats notification processing per match:**
+- Add `congrats_status` column to `matches` table: `NULL` (not applicable), `'pending'` (finished, needs processing), `'sent'`, `'skipped'`
+- On each sync, when a match transitions to `FINISHED` with scores, set `congrats_status = 'pending'`
 
-### 2. Winner Determination Logic
+### 2. Winner Determination
 
-**Rules:**
+Simple comparison — only trigger on a clear winner:
 - `score_home > score_away` → home team wins
 - `score_away > score_home` → away team wins
-- `score_home = score_away` → draw (no congrats notification, or a "tough draw" variant — **decision needed**)
-- Only send for **featured teams** (the 10 teams in `featured_teams` table)
-- If both teams are featured and one wins, only target fans of the winning team
+- `score_home = score_away` → draw → **skip** (set `congrats_status = 'skipped'`)
+- Only process matches where the winning team is in `featured_teams`
+- If both teams are featured, only target fans of the **winning** team
 
-### 3. New Edge Function: `braze-congrats-scheduler`
+### 3. New Edge Function: `braze-congrats`
 
-**Separate from existing `braze-scheduler`** to keep concerns isolated (pre-match vs post-match).
+**Uses Braze Campaign API** (not Canvas). Immediate send via `/campaigns/trigger/send`.
 
 **Flow:**
-1. Query `matches` where `status = 'FINISHED'` AND `result_notification_status = 'pending'` AND at least one team is in `featured_teams`
-2. Determine winner
-3. Build Braze audience filter targeting users with winning team in `Team 1`, `Team 2`, or `Team 3`
-4. Call Braze Canvas API (`/canvas/trigger/send` — immediate send, not scheduled) with a **separate Canvas ID** for congrats
-5. Insert into a `congrats_ledger` table (similar to `schedule_ledger` but for post-match)
-6. Update `matches.result_notification_status = 'sent'`
-7. Log to `scheduler_logs`
+1. Check feature flag `congrats_notifications_enabled`
+2. Acquire advisory lock (`scheduler_locks`, key: `braze-congrats`)
+3. Query matches: `status = 'FINISHED' AND congrats_status = 'pending' AND score_home IS NOT NULL`
+4. For each match:
+   a. Determine winner (score comparison)
+   b. If draw → set `congrats_status = 'skipped'`, log, continue
+   c. Resolve winning team to canonical name via `team_mappings`
+   d. Check if winning team is in `featured_teams`; if not → skip
+   e. Get Braze attribute value for winning team from `featured_teams.braze_attribute_value`
+   f. Get Arabic translations for both teams (reuse `ensureTeamTranslation` pattern)
+   g. Reserve slot in `congrats_ledger` (UNIQUE on `match_id` prevents double-sends)
+   h. Call Braze Campaign API: `POST /campaigns/trigger/send`
+   i. Update `congrats_ledger` with `dispatch_id` from response
+   j. Set `matches.congrats_status = 'sent'`
+   k. Log to `scheduler_logs`
+5. Release lock
 
-**Trigger options:**
-- Option A: Called by `sync-football-data` after detecting FINISHED matches (event-driven)
-- Option B: Separate cron job every 15 minutes checking for unprocessed FINISHED matches (poll-based, more resilient)
-- **Recommendation**: Option B (poll-based) — more resilient to failures; if one run fails, next run catches it
+**Braze Campaign API call:**
+```json
+POST {BRAZE_REST_ENDPOINT}/campaigns/trigger/send
+{
+  "campaign_id": "{BRAZE_CONGRATS_CAMPAIGN_ID}",
+  "broadcast": true,
+  "audience": {
+    "OR": [
+      { "custom_attribute": { "custom_attribute_name": "Team 1", "comparison": "equals", "value": "{winning_team_braze_value}" } },
+      { "custom_attribute": { "custom_attribute_name": "Team 2", "comparison": "equals", "value": "{winning_team_braze_value}" } },
+      { "custom_attribute": { "custom_attribute_name": "Team 3", "comparison": "equals", "value": "{winning_team_braze_value}" } }
+    ]
+  },
+  "trigger_properties": {
+    "match_id": "12345",
+    "winning_team_en": "Real Madrid CF",
+    "winning_team_ar": "ريال مدريد",
+    "losing_team_en": "FC Barcelona",
+    "losing_team_ar": "برشلونة",
+    "score_home": 2,
+    "score_away": 1,
+    "home_en": "Real Madrid CF",
+    "away_en": "FC Barcelona",
+    "home_ar": "ريال مدريد",
+    "away_ar": "برشلونة",
+    "competition_en": "LaLiga",
+    "competition_ar": "الدوري الإسباني",
+    "result_summary": "2-1"
+  }
+}
+```
 
-### 4. New Braze Canvas
+### 4. Braze Campaign Setup (manual, in Braze dashboard)
 
-**Requires Braze-side setup (not code):**
-- Create a new Canvas in Braze for congrats notifications
-- Canvas entry properties needed:
-  - `match_id`, `winning_team_en`, `winning_team_ar`, `losing_team_en`, `losing_team_ar`
-  - `score_home`, `score_away`, `competition_en`, `competition_ar`
-  - `home_en`, `away_en`, `home_ar`, `away_ar`
-- Store the new Canvas ID as env var: `BRAZE_CONGRATS_CANVAS_ID`
+- Create an API-triggered Campaign in Braze (not Canvas)
+- Campaign type: Push Notification
+- Message content uses Liquid templating with `trigger_properties`:
+  - Title: `Congrats! {{trigger_properties.${winning_team_en}}} wins!`
+  - Arabic: `مبروك! {{trigger_properties.${winning_team_ar}}} فاز!`
+  - Body can include score: `{{trigger_properties.${result_summary}}}`
+- Store the Campaign ID as env var: `BRAZE_CONGRATS_CAMPAIGN_ID`
 
 ### 5. Deduplication: `congrats_ledger` Table
 
-**New table** (mirrors `schedule_ledger` pattern):
-```
-congrats_ledger:
-  id UUID PK
-  match_id BIGINT FK → matches(id), UNIQUE
-  winning_team TEXT
-  braze_dispatch_id TEXT
-  status: 'sent' | 'skipped'
-  created_at, updated_at
+```sql
+CREATE TABLE congrats_ledger (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  winning_team TEXT NOT NULL,
+  losing_team TEXT NOT NULL,
+  score_home INT NOT NULL,
+  score_away INT NOT NULL,
+  braze_dispatch_id TEXT,
+  status TEXT NOT NULL DEFAULT 'sent',  -- 'sent' or 'error'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(match_id)
+);
 ```
 
-- UNIQUE on `match_id` prevents double-sending
-- `result_notification_status` on `matches` is the primary guard, ledger is the secondary
+Two layers of protection:
+1. `matches.congrats_status` — primary guard (query filter)
+2. `congrats_ledger UNIQUE(match_id)` — secondary guard (DB constraint)
 
 ### 6. Feature Flag
 
-- Add new flag: `congrats_notifications_enabled` (default: `false`)
-- Check this flag before processing any congrats notifications
+```sql
+INSERT INTO feature_flags (flag_name, enabled, description)
+VALUES ('congrats_notifications_enabled', false, 'Enable post-match congrats push notifications for winning team fans');
+```
 
-### 7. Webhook Handling
+### 7. Timing: 10-30 Minutes After Match
 
-- The existing `braze-webhook` handler already stores events by `match_id` and `braze_event_type`
-- Congrats events will come from a different Canvas but same webhook endpoint
-- **Need to differentiate**: Add `notification_type` column to `notification_sends` (`pre_match` vs `congrats`) — or use the `canvas_id` to distinguish
+- `sync-football-data` runs every **15 minutes** via `pg_cron`
+- football-data.org typically updates within 5-15 min of final whistle
+- `braze-congrats` polls for `congrats_status = 'pending'` every 15 min
+- **Expected delivery window:** 10-30 min after final whistle (aligns with requirement)
+- The Braze Campaign `/campaigns/trigger/send` fires immediately — no additional scheduling delay
 
-### 8. Analytics Updates
+**Cron schedule:**
+```sql
+-- Run every 15 minutes, offset by 5 min from sync-football-data to ensure fresh data
+SELECT cron.schedule('braze-congrats', '5,20,35,50 * * * *', ...);
+```
 
-- Update `compute_analytics_summary` to include congrats metrics:
-  - Total congrats sent, unique users reached
-  - Win rate breakdown by team
-  - Congrats engagement (open rate, click rate)
-- Add a new tab or section to the Analytics page
+### 8. Webhook Handling
 
-### 9. Timing Considerations
+The existing `braze-webhook` handler already works for campaign events:
+- Braze sends webhook events for campaigns too (send, delivery, open)
+- `match_id` is included in `trigger_properties` and stored in `notification_sends`
+- **Add `notification_type` column** to `notification_sends` to distinguish:
+  - `'pre_match'` — existing pre-match Canvas notifications
+  - `'congrats'` — new post-match campaign notifications
+- The webhook handler can infer the type from `campaign_id` vs `canvas_id` in the payload
 
-- football-data.org updates scores shortly after a match ends (typically within 5-15 minutes)
-- `sync-football-data` runs every 15 minutes
-- Worst case: congrats notification arrives ~30 min after final whistle
-- If faster delivery is needed, increase sync frequency for in-play matches or use a live scores API
+### 9. Analytics (future, not in v1)
 
-### 10. Draw Handling (Decision Needed)
-
-Options:
-- **Option A**: No notification on draws (simplest)
-- **Option B**: Send a "tough draw" notification to both teams' fans
-- **Option C**: Only send on draws in knockout stages (where it goes to penalties)
+- Track congrats notifications separately in analytics via `notification_type` column
+- Metrics: congrats sent per team, open rates, engagement
+- Not required for v1 launch
 
 ---
 
-## Database Migrations Needed
+## Database Migration
 
-1. `ALTER TABLE matches ADD COLUMN result_notification_status text DEFAULT 'pending'`
-2. `CREATE TABLE congrats_ledger (...)` with UNIQUE on match_id
-3. `INSERT INTO feature_flags (flag_name, enabled, description) VALUES ('congrats_notifications_enabled', false, ...)`
-4. (Optional) `ALTER TABLE notification_sends ADD COLUMN notification_type text DEFAULT 'pre_match'`
+```sql
+-- 1. Track congrats processing status on matches
+ALTER TABLE matches ADD COLUMN congrats_status TEXT DEFAULT NULL;
+CREATE INDEX idx_matches_congrats_status ON matches(congrats_status) WHERE congrats_status = 'pending';
+
+-- 2. Congrats dedup ledger
+CREATE TABLE congrats_ledger (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  winning_team TEXT NOT NULL,
+  losing_team TEXT NOT NULL,
+  score_home INT NOT NULL,
+  score_away INT NOT NULL,
+  braze_dispatch_id TEXT,
+  status TEXT NOT NULL DEFAULT 'sent',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(match_id)
+);
+ALTER TABLE congrats_ledger ENABLE ROW LEVEL SECURITY;
+
+-- 3. Feature flag
+INSERT INTO feature_flags (flag_name, enabled, description)
+VALUES ('congrats_notifications_enabled', false, 'Enable post-match congrats push notifications')
+ON CONFLICT (flag_name) DO NOTHING;
+
+-- 4. Lock entry
+INSERT INTO scheduler_locks (lock_name) VALUES ('braze-congrats')
+ON CONFLICT (lock_name) DO NOTHING;
+
+-- 5. Notification type on notification_sends
+ALTER TABLE notification_sends ADD COLUMN notification_type TEXT DEFAULT 'pre_match';
+```
 
 ## New Files
 
-1. `supabase/functions/braze-congrats-scheduler/index.ts` — main congrats logic
-2. SQL migration for schema changes
+1. `supabase/functions/braze-congrats/index.ts` — post-match congrats scheduler
 
 ## Modified Files
 
-1. `sync-football-data/index.ts` — set `result_notification_status = 'pending'` for newly-finished matches (or handled by DEFAULT)
-2. `braze-webhook/index.ts` — distinguish congrats vs pre-match events (if adding `notification_type`)
-3. `Analytics.tsx` + new analytics component — congrats metrics section
-4. `compute_analytics_summary` SQL — add congrats stats
+1. `supabase/functions/sync-football-data/index.ts` — set `congrats_status = 'pending'` when match transitions to FINISHED with scores
+2. `supabase/functions/braze-webhook/index.ts` — populate `notification_type` from campaign_id vs canvas_id
 
-## Environment Variables Needed
+## Environment Variables
 
-1. `BRAZE_CONGRATS_CANVAS_ID` — the Braze Canvas for congrats notifications
+1. `BRAZE_CONGRATS_CAMPAIGN_ID` — the Braze Campaign ID for congrats push notifications
 
 ## Cron Setup
 
 ```sql
 SELECT cron.schedule(
-  'braze-congrats-scheduler',
-  '*/15 * * * *',
-  $$ SELECT ... invoke edge function ... $$
+  'braze-congrats',
+  '5,20,35,50 * * * *',
+  $$
+  SELECT net.http_post(
+    url := current_setting('supabase.url') || '/functions/v1/braze-congrats',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer ' || current_setting('supabase.service_role_key'),
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'
+  );
+  $$
 );
 ```
+
+## Open Decisions
+
+1. **Draws**: Plan assumes skip. Revisit if you want a "tough match" variant later.
+2. **Both teams featured, winner is featured**: Only fans of winning team get the notification. Losing team fans get nothing. Confirm this is desired.
+3. **Excluded competitions**: Same exclusion list as pre-match (FL1, DED, EL, ECL)? Or different for congrats?
