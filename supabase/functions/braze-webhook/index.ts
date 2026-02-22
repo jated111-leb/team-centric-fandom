@@ -203,20 +203,23 @@ serve(async (req) => {
     // ==================== PHASE 5: Deduplicate and build notification records ====================
     const matchIdsWithWebhooks = new Set<number>();
     
-    // Fetch existing user+match+event combinations to deduplicate
+    // Fetch existing user+match+event+dispatch combinations to deduplicate
+    // Includes dispatch_id so we can track multi-dispatch sends (e.g. scheduler ran twice)
+    // while still preventing exact duplicate webhook events
     const existingCombos = new Set<string>();
     if (matchIdsToFetch.size > 0) {
       const { data: existing } = await supabase
         .from('notification_sends')
-        .select('external_user_id, match_id, braze_event_type')
+        .select('external_user_id, match_id, braze_event_type, raw_payload')
         .in('match_id', Array.from(matchIdsToFetch));
-      
+
       existing?.forEach(r => {
         if (r.match_id) {
-          existingCombos.add(`${r.external_user_id}|${r.match_id}|${r.braze_event_type}`);
+          const existingDispatchId = r.raw_payload?.dispatch_id || 'none';
+          existingCombos.add(`${r.external_user_id}|${r.match_id}|${r.braze_event_type}|${existingDispatchId}`);
         }
       });
-      console.log(`📊 Found ${existingCombos.size} existing user+match+event combinations`);
+      console.log(`📊 Found ${existingCombos.size} existing user+match+event+dispatch combinations`);
     }
 
     const notificationRecords: Array<{
@@ -243,9 +246,11 @@ serve(async (req) => {
       const pe = processedEvents[i];
       const matchId = eventMatchIds[i];
       
-      // Skip duplicates: same user + same match + same event type
+      // Skip duplicates: same user + same match + same event type + same dispatch
+      // Different dispatch_ids are allowed through so we can detect multi-dispatch sends
       if (matchId) {
-        const dedupeKey = `${pe.externalUserId}|${matchId}|${pe.eventType}`;
+        const eventDispatchId = pe.dispatchId || 'none';
+        const dedupeKey = `${pe.externalUserId}|${matchId}|${pe.eventType}|${eventDispatchId}`;
         if (existingCombos.has(dedupeKey)) {
           skippedDuplicates++;
           matchIdsWithWebhooks.add(matchId); // Still mark as having webhook
