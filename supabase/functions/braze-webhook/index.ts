@@ -222,6 +222,9 @@ serve(async (req) => {
       console.log(`📊 Found ${existingCombos.size} existing user+match+event+dispatch combinations`);
     }
 
+    // Determine congrats campaign ID for notification_type tagging
+    const congratsCampaignId = Deno.env.get('BRAZE_CONGRATS_CAMPAIGN_ID') || null;
+
     const notificationRecords: Array<{
       external_user_id: string;
       braze_event_type: string;
@@ -232,6 +235,7 @@ serve(async (req) => {
       canvas_name: string | null;
       canvas_step_name: string | null;
       source_type: string;
+      notification_type: string;
       home_team: string | null;
       away_team: string | null;
       competition: string | null;
@@ -275,6 +279,11 @@ serve(async (req) => {
         matchIdsWithWebhooks.add(matchId);
       }
 
+      // Tag notification type based on campaign_id
+      const notificationType = (congratsCampaignId && pe.campaignId === congratsCampaignId)
+        ? 'congrats'
+        : 'pre_match';
+
       notificationRecords.push({
         external_user_id: pe.externalUserId,
         braze_event_type: pe.eventType,
@@ -285,6 +294,7 @@ serve(async (req) => {
         canvas_name: pe.canvasName,
         canvas_step_name: pe.canvasStepName,
         source_type: pe.sourceType,
+        notification_type: notificationType,
         home_team: homeTeam,
         away_team: awayTeam,
         competition: competition,

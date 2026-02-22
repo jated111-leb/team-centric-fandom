@@ -248,9 +248,15 @@ Deno.serve(async (req) => {
             });
           }
 
+          // Set congrats_status to 'pending' for newly finished matches with scores
+          const isFinished = matchData.status === 'FINISHED' && matchData.score_home != null && matchData.score_away != null;
+          const upsertData = isFinished
+            ? { ...matchData, congrats_status: 'pending' }
+            : matchData;
+
           const { error } = await supabase
             .from('matches')
-            .upsert(matchData, {
+            .upsert(upsertData, {
               onConflict: 'id',
               ignoreDuplicates: false
             });

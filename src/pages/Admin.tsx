@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Info, Trash2 } from 'lucide-react';
+import { Loader2, Info, Trash2, Bell, Trophy, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScheduledNotificationsTable } from '@/components/ScheduledNotificationsTable';
 import { SchedulerStats } from '@/components/SchedulerStats';
@@ -16,6 +17,7 @@ import { TeamTranslationsManager } from '@/components/TeamTranslationsManager';
 import { GapDetectionAlert } from '@/components/GapDetectionAlert';
 import { AdminManagement } from '@/components/AdminManagement';
 import { TeamMappingTester } from '@/components/TeamMappingTester';
+import { CongratsSettings } from '@/components/CongratsSettings';
 import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
@@ -226,103 +228,128 @@ export default function Admin() {
           <NotificationPreview />
         </div>
 
-        <CollapsibleCard
-          title="Braze Push Notifications"
-          description="Control whether push notifications are automatically scheduled for featured team matches"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="braze-toggle" className="text-base">
-                  Enable Notifications
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  {enabled
-                    ? 'Notifications are being sent 60 minutes before featured matches'
-                    : 'Notifications are currently disabled'}
-                </p>
-              </div>
-              <Switch
-                id="braze-toggle"
-                checked={enabled}
-                onCheckedChange={toggleFeature}
-                disabled={updating}
-              />
-            </div>
+        <Tabs defaultValue="pre-match" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="pre-match" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Pre-Match
+            </TabsTrigger>
+            <TabsTrigger value="congrats" className="flex items-center gap-2">
+              <Trophy className="h-4 w-4" />
+              Congrats
+            </TabsTrigger>
+            <TabsTrigger value="admin" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Admin
+            </TabsTrigger>
+          </TabsList>
 
-            {enabled && (
-              <div className="rounded-lg bg-muted p-4 space-y-3">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  How it works
-                </h3>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>Runs automatically every 15 minutes via cron job</li>
-                  <li>Sends notifications 60 minutes before kickoff</li>
-                  <li>Only for matches featuring the configured teams below</li>
-                  <li>Uses Braze Connected Attributes (Team 1/2/3)</li>
-                  <li>Automatically updates if match times change (with 20min buffer)</li>
-                  <li>Reconciles daily to clean up orphaned schedules</li>
-                  <li>Deduplicates by signature and match ID</li>
-                </ul>
-                <div className="border-t border-border pt-3 mt-3">
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-semibold">Campaign ID:</span> {campaignId}
+          <TabsContent value="pre-match" className="space-y-6">
+            <CollapsibleCard
+              title="Braze Push Notifications"
+              description="Control whether push notifications are automatically scheduled for featured team matches"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="braze-toggle" className="text-base">
+                      Enable Notifications
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {enabled
+                        ? 'Notifications are being sent 60 minutes before featured matches'
+                        : 'Notifications are currently disabled'}
+                    </p>
+                  </div>
+                  <Switch
+                    id="braze-toggle"
+                    checked={enabled}
+                    onCheckedChange={toggleFeature}
+                    disabled={updating}
+                  />
+                </div>
+
+                {enabled && (
+                  <div className="rounded-lg bg-muted p-4 space-y-3">
+                    <h3 className="font-semibold text-sm flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      How it works
+                    </h3>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Runs automatically every 15 minutes via cron job</li>
+                      <li>Sends notifications 60 minutes before kickoff</li>
+                      <li>Only for matches featuring the configured teams below</li>
+                      <li>Uses Braze Connected Attributes (Team 1/2/3)</li>
+                      <li>Automatically updates if match times change (with 20min buffer)</li>
+                      <li>Reconciles daily to clean up orphaned schedules</li>
+                      <li>Deduplicates by signature and match ID</li>
+                    </ul>
+                    <div className="border-t border-border pt-3 mt-3">
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-semibold">Campaign ID:</span> {campaignId}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CollapsibleCard>
+
+            <AlertMonitor />
+
+            <GapDetectionAlert />
+
+            <SchedulerStats />
+
+            <CollapsibleCard
+              title="Cleanup Actions"
+              description="Remove schedules for matches not featuring any of the configured teams"
+              defaultOpen={false}
+            >
+              <div className="space-y-4">
+                <div className="rounded-lg bg-muted p-4">
+                  <p className="text-sm text-muted-foreground">
+                    This will delete all scheduled notifications for matches that don't involve any featured teams.
+                    This includes removing them from both the schedule ledger and Braze.
                   </p>
                 </div>
+                <Button
+                  onClick={cleanupNonFeaturedSchedules}
+                  disabled={cleaningUp}
+                  variant="destructive"
+                  className="w-full sm:w-auto"
+                >
+                  {cleaningUp ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Cleaning up...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Clean Up Non-Featured Team Schedules
+                    </>
+                  )}
+                </Button>
               </div>
-            )}
-          </div>
-        </CollapsibleCard>
+            </CollapsibleCard>
 
-        <AlertMonitor />
+            <FeaturedTeamsManager />
 
-        <GapDetectionAlert />
+            <TeamMappingTester />
 
-        <SchedulerStats />
+            <TeamTranslationsManager />
 
-        <AdminManagement />
+            <ScheduledNotificationsTable />
+          </TabsContent>
 
-        <CollapsibleCard
-          title="Cleanup Actions"
-          description="Remove schedules for matches not featuring any of the configured teams"
-          defaultOpen={false}
-        >
-          <div className="space-y-4">
-            <div className="rounded-lg bg-muted p-4">
-              <p className="text-sm text-muted-foreground">
-                This will delete all scheduled notifications for matches that don't involve any featured teams. 
-                This includes removing them from both the schedule ledger and Braze.
-              </p>
-            </div>
-            <Button
-              onClick={cleanupNonFeaturedSchedules}
-              disabled={cleaningUp}
-              variant="destructive"
-              className="w-full sm:w-auto"
-            >
-              {cleaningUp ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Cleaning up...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Clean Up Non-Featured Team Schedules
-                </>
-              )}
-            </Button>
-          </div>
-        </CollapsibleCard>
+          <TabsContent value="congrats" className="space-y-6">
+            <CongratsSettings />
+          </TabsContent>
 
-        <FeaturedTeamsManager />
-
-        <TeamMappingTester />
-
-        <TeamTranslationsManager />
-
-        <ScheduledNotificationsTable />
+          <TabsContent value="admin" className="space-y-6">
+            <AdminManagement />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
