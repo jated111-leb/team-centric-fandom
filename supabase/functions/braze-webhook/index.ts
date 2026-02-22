@@ -206,12 +206,17 @@ serve(async (req) => {
     // Fetch existing user+match+event+dispatch combinations to deduplicate
     // Includes dispatch_id so we can track multi-dispatch sends (e.g. scheduler ran twice)
     // while still preventing exact duplicate webhook events
+    // Scoped to 48h window for scale safety — matches don't repeat so older dupes are irrelevant
     const existingCombos = new Set<string>();
     if (matchIdsToFetch.size > 0) {
+      const earliestEventTime = Math.min(...processedEvents.map(pe => pe.sentAtTime.getTime()));
+      const dedupCutoff = new Date(earliestEventTime - 48 * 60 * 60 * 1000).toISOString();
+      
       const { data: existing } = await supabase
         .from('notification_sends')
         .select('external_user_id, match_id, braze_event_type, raw_payload')
-        .in('match_id', Array.from(matchIdsToFetch));
+        .in('match_id', Array.from(matchIdsToFetch))
+        .gte('sent_at', dedupCutoff);
 
       existing?.forEach(r => {
         if (r.match_id) {
