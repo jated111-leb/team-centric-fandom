@@ -20,8 +20,10 @@ import { FEATURED_TEAMS } from '@/lib/teamConfig';
 
 export default function Admin() {
   const [enabled, setEnabled] = useState(false);
+  const [congratsEnabled, setCongratsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [updatingCongrats, setUpdatingCongrats] = useState(false);
   const [campaignId, setCampaignId] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -112,14 +114,16 @@ export default function Admin() {
     try {
       const { data, error } = await supabase
         .from('feature_flags')
-        .select('enabled')
-        .eq('flag_name', 'braze_notifications_enabled')
-        .single();
+        .select('flag_name, enabled')
+        .in('flag_name', ['braze_notifications_enabled', 'congrats_notifications_enabled']);
 
       if (error) throw error;
-      setEnabled(data?.enabled || false);
+      data?.forEach(flag => {
+        if (flag.flag_name === 'braze_notifications_enabled') setEnabled(flag.enabled);
+        if (flag.flag_name === 'congrats_notifications_enabled') setCongratsEnabled(flag.enabled);
+      });
     } catch (error) {
-      console.error('Error fetching feature flag:', error);
+      console.error('Error fetching feature flags:', error);
       toast({
         title: 'Error',
         description: 'Failed to load feature flag status',
@@ -156,6 +160,35 @@ export default function Admin() {
       });
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const toggleCongrats = async (checked: boolean) => {
+    setUpdatingCongrats(true);
+    try {
+      const { error } = await supabase
+        .from('feature_flags')
+        .update({ enabled: checked })
+        .eq('flag_name', 'congrats_notifications_enabled');
+
+      if (error) throw error;
+
+      setCongratsEnabled(checked);
+      toast({
+        title: checked ? 'Congrats Notifications Enabled' : 'Congrats Notifications Disabled',
+        description: checked
+          ? 'Post-match congratulations will be sent to winning team fans'
+          : 'Post-match congratulations have been disabled',
+      });
+    } catch (error) {
+      console.error('Error updating congrats flag:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update congrats notifications',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingCongrats(false);
     }
   };
 
@@ -273,6 +306,49 @@ export default function Admin() {
               </div>
             )}
           </div>
+        </CollapsibleCard>
+
+        <CollapsibleCard
+          title="Post-Match Congrats Notifications"
+          description="Send congratulations push notifications to fans of winning teams after matches finish"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="congrats-toggle" className="text-base">
+                  Enable Congrats Notifications
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {congratsEnabled
+                    ? 'Congrats notifications are active for finished matches'
+                    : 'Congrats notifications are currently disabled'}
+                </p>
+              </div>
+              <Switch
+                id="congrats-toggle"
+                checked={congratsEnabled}
+                onCheckedChange={toggleCongrats}
+                disabled={updatingCongrats}
+              />
+            </div>
+
+            {congratsEnabled && (
+              <div className="rounded-lg bg-muted p-4 space-y-3">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  How it works
+                </h3>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Runs every 15 minutes (at :05, :20, :35, :50)</li>
+                  <li>Detects finished matches with a clear winner</li>
+                  <li>Sends congratulations to fans of the winning team</li>
+                  <li>Uses Braze Campaign API with audience targeting</li>
+                  <li>Includes Arabic team name translations</li>
+                  <li>Deduplicates via congrats ledger (one per match)</li>
+                </ul>
+              </div>
+            )}
+           </div>
         </CollapsibleCard>
 
         <AlertMonitor />
