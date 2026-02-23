@@ -248,6 +248,14 @@ Deno.serve(async (req) => {
             });
           }
 
+          // Check if match just transitioned to FINISHED with scores → set congrats_status = 'pending'
+          // First, get current status before upsert
+          const { data: existingMatch } = await supabase
+            .from('matches')
+            .select('status, congrats_status')
+            .eq('id', match.id)
+            .maybeSingle();
+
           const { error } = await supabase
             .from('matches')
             .upsert(matchData, {
@@ -257,6 +265,21 @@ Deno.serve(async (req) => {
 
           if (error) {
             console.error(`Error upserting match ${match.id}:`, error);
+          }
+
+          // If match just became FINISHED with scores and hasn't been processed for congrats yet
+          if (
+            !error &&
+            match.status === 'FINISHED' &&
+            match.score?.fullTime?.home != null &&
+            match.score?.fullTime?.away != null &&
+            (!existingMatch || existingMatch.status !== 'FINISHED' || existingMatch.congrats_status === null)
+          ) {
+            // Only set to pending if not already processed
+            if (!existingMatch?.congrats_status || existingMatch.congrats_status === null) {
+              await supabase.from('matches').update({ congrats_status: 'pending' }).eq('id', match.id);
+              console.log(`🎉 Match ${match.id} finished (${match.score.fullTime.home}-${match.score.fullTime.away}) → congrats_status = 'pending'`);
+            }
           }
         }
 

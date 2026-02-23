@@ -237,6 +237,7 @@ serve(async (req) => {
       canvas_name: string | null;
       canvas_step_name: string | null;
       source_type: string;
+      notification_type: string;
       home_team: string | null;
       away_team: string | null;
       competition: string | null;
@@ -280,6 +281,9 @@ serve(async (req) => {
         matchIdsWithWebhooks.add(matchId);
       }
 
+      // Determine notification_type from campaign_id vs canvas_id
+      const notificationType = pe.campaignId && !pe.canvasId ? 'congrats' : 'pre_match';
+
       notificationRecords.push({
         external_user_id: pe.externalUserId,
         braze_event_type: pe.eventType,
@@ -290,6 +294,7 @@ serve(async (req) => {
         canvas_name: pe.canvasName,
         canvas_step_name: pe.canvasStepName,
         source_type: pe.sourceType,
+        notification_type: notificationType,
         home_team: homeTeam,
         away_team: awayTeam,
         competition: competition,
