@@ -68,6 +68,50 @@ export type Database = {
         }
         Relationships: []
       }
+      congrats_ledger: {
+        Row: {
+          braze_dispatch_id: string | null
+          created_at: string | null
+          id: string
+          losing_team: string
+          match_id: number
+          score_away: number
+          score_home: number
+          status: string
+          winning_team: string
+        }
+        Insert: {
+          braze_dispatch_id?: string | null
+          created_at?: string | null
+          id?: string
+          losing_team: string
+          match_id: number
+          score_away: number
+          score_home: number
+          status?: string
+          winning_team: string
+        }
+        Update: {
+          braze_dispatch_id?: string | null
+          created_at?: string | null
+          id?: string
+          losing_team?: string
+          match_id?: number
+          score_away?: number
+          score_home?: number
+          status?: string
+          winning_team?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "congrats_ledger_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feature_flags: {
         Row: {
           created_at: string | null
@@ -126,6 +170,7 @@ export type Database = {
           channel: string | null
           competition: string
           competition_name: string
+          congrats_status: string | null
           created_at: string
           home_team: string
           home_team_id: number | null
@@ -150,6 +195,7 @@ export type Database = {
           channel?: string | null
           competition: string
           competition_name: string
+          congrats_status?: string | null
           created_at?: string
           home_team: string
           home_team_id?: number | null
@@ -174,6 +220,7 @@ export type Database = {
           channel?: string | null
           competition?: string
           competition_name?: string
+          congrats_status?: string | null
           created_at?: string
           home_team?: string
           home_team_id?: number | null
@@ -211,6 +258,7 @@ export type Database = {
           id: string
           kickoff_utc: string | null
           match_id: number | null
+          notification_type: string | null
           raw_payload: Json | null
           sent_at: string
           source_type: string | null
@@ -231,6 +279,7 @@ export type Database = {
           id?: string
           kickoff_utc?: string | null
           match_id?: number | null
+          notification_type?: string | null
           raw_payload?: Json | null
           sent_at: string
           source_type?: string | null
@@ -251,6 +300,7 @@ export type Database = {
           id?: string
           kickoff_utc?: string | null
           match_id?: number | null
+          notification_type?: string | null
           raw_payload?: Json | null
           sent_at?: string
           source_type?: string | null
