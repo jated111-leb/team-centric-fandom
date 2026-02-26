@@ -16,7 +16,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-const SYSTEM_PROMPT = `You are a Growth Operations Copilot for 1001 Sports. You help create and send Braze push notification campaigns.
+const SYSTEM_PROMPT = `You are a Growth Operations Copilot for 1001 Sports. You help create and send Braze push notification and in-app message (IAM) campaigns.
 
 Your capabilities:
 1. List featured teams from the database
@@ -27,11 +27,25 @@ Your capabilities:
 6. List available Braze segments (call list_braze_segments to find segment IDs)
 7. Get segment details including estimated audience size (call get_segment_details)
 
-HOW THIS COPILOT SENDS PUSH NOTIFICATIONS:
-- This copilot sends push notifications via Braze /messages/send with explicit apple_push and android_push objects.
-- The title and body you compose are sent DIRECTLY in the push payload — no campaign template dependency, no Liquid tags needed.
+HOW THIS COPILOT SENDS NOTIFICATIONS:
+- This copilot sends via Braze /messages/send with explicit messaging objects.
+- Push: uses apple_push and android_push objects. Title and body are sent directly — no campaign template or Liquid tags needed.
+- In-App Messages (IAM): uses the in_app_message object. Supports slideup, modal, and full types.
+- You can send push only, IAM only, or both together in a single campaign.
 - This guarantees the exact content you specify reaches the user.
 - send_to_existing_only defaults to true: if the external_user_id doesn't exist in Braze, nothing sends.
+
+IN-APP MESSAGE (IAM) GUIDELINES:
+- Use channels: ["push", "iam"] or channels: ["iam"] to include in-app messages.
+- Default channel is ["push"] if not specified.
+- IAM types:
+  - "slideup" — non-intrusive bar that slides from top or bottom. Great for tips, alerts, quick announcements.
+  - "modal" — centered overlay with optional header, body, image, and buttons. Good for promotions, confirmations.
+  - "full" — full-screen takeover with image, header, body, buttons. Use for major announcements.
+- When the user says "tooltip", "toast", "toast bar", or "slide-up", use type "slideup".
+- When the user says "popup", "dialog", or "overlay", use type "modal".
+- When the user says "takeover" or "full screen", use type "full".
+- IAM messages are displayed when the user next opens the app (session start trigger by default).
 
 SEGMENT LOOKUP:
 - When a user mentions targeting a segment by name (e.g. "weekly active users"), call list_braze_segments first to find the matching segment_id.
@@ -119,6 +133,35 @@ const commonTargetingParams = {
   },
 };
 
+const channelParams = {
+  channels: {
+    type: "array" as const,
+    items: { type: "string" as const, enum: ["push", "iam"] },
+    description: "Channels to send on. Default: ['push']. Options: 'push', 'iam' (in-app message). Can include both.",
+  },
+  iam_type: {
+    type: "string" as const,
+    enum: ["slideup", "modal", "full"],
+    description: "In-app message type: 'slideup' (tooltip/toast bar), 'modal' (centered popup), 'full' (fullscreen takeover). Default: 'slideup'. Only used when channels includes 'iam'.",
+  },
+  iam_header: {
+    type: "string" as const,
+    description: "Optional header text for modal/full IAM types. Not used for slideup.",
+  },
+  iam_body: {
+    type: "string" as const,
+    description: "IAM body text. If omitted, falls back to the push body.",
+  },
+  iam_image_url: {
+    type: "string" as const,
+    description: "Optional image URL for modal/full IAM types.",
+  },
+  iam_click_action: {
+    type: "string" as const,
+    description: "Optional deep link or URL to open when the IAM is tapped.",
+  },
+};
+
 const tools = [
   {
     type: "function",
@@ -167,6 +210,7 @@ const tools = [
           title: { type: "string", description: "Push notification title" },
           body: { type: "string", description: "Push notification body text" },
           ...commonTargetingParams,
+          ...channelParams,
           schedule_time: {
             type: "string",
             description:
@@ -190,6 +234,7 @@ const tools = [
           title: { type: "string", description: "Push notification title" },
           body: { type: "string", description: "Push notification body text" },
           ...commonTargetingParams,
+          ...channelParams,
           schedule_time: {
             type: "string",
             description: "ISO 8601 datetime or 'now'",
@@ -259,6 +304,62 @@ const tools = [
     },
   },
 ];
+
+// Build messaging objects based on channels
+function buildMessagesObject(args: Record<string, unknown>, name: string) {
+  const channels = (args.channels as string[]) || ["push"];
+  const title = args.title as string;
+  const body = args.body as string;
+  const iamType = (args.iam_type as string) || "slideup";
+  const iamHeader = args.iam_header as string | undefined;
+  const iamBody = (args.iam_body as string) || body;
+  const iamImageUrl = args.iam_image_url as string | undefined;
+  const iamClickAction = args.iam_click_action as string | undefined;
+
+  const messages: Record<string, unknown> = {};
+
+  if (channels.includes("push")) {
+    messages.apple_push = {
+      alert: { title, body },
+      extra: { campaign_name: name, sent_by: "copilot" },
+    };
+    messages.android_push = {
+      title,
+      alert: body,
+      extra: { campaign_name: name, sent_by: "copilot" },
+    };
+  }
+
+  if (channels.includes("iam")) {
+    const iam: Record<string, unknown> = {
+      type: iamType,
+      message: iamBody,
+      message_close: iamType === "slideup" ? "auto_dismiss" : "button",
+      extras: { campaign_name: name, sent_by: "copilot" },
+    };
+
+    if (iamType === "slideup") {
+      iam.slide_from = "bottom";
+    }
+
+    if ((iamType === "modal" || iamType === "full") && iamHeader) {
+      iam.header = iamHeader;
+    }
+
+    if ((iamType === "modal" || iamType === "full") && iamImageUrl) {
+      iam.image_url = iamImageUrl;
+    }
+
+    if (iamClickAction) {
+      iam.click_action = "URI";
+      iam.uri = iamClickAction;
+    }
+
+    messages.in_app_message = iam;
+  }
+
+  return { messages, channels };
+}
 
 // Build audience object from the various targeting params
 async function buildAudienceAndRecipients(args: Record<string, unknown>) {
@@ -402,6 +503,7 @@ async function executeTool(
         };
 
         const targeting = await buildAudienceAndRecipients(args);
+        const { messages, channels } = buildMessagesObject(args, name);
 
         const validationErrors = [
           ...targeting.errors,
@@ -414,14 +516,12 @@ async function executeTool(
             name,
             title,
             body,
+            channels,
             targeting: targeting.details,
             audience: targeting.audience,
             recipients: targeting.recipients,
             schedule: schedule_time || "immediate",
-            messages: {
-              apple_push: { alert: { title, body }, extra: { campaign_name: name, sent_by: "copilot" } },
-              android_push: { title, alert: body, extra: { campaign_name: name, sent_by: "copilot" } },
-            },
+            messages,
           },
           validation: {
             valid: validationErrors.length === 0,
@@ -461,9 +561,14 @@ async function executeTool(
         }
 
         // Store for audit trail in DB (not sent to Braze)
+        const channels = (args.channels as string[]) || ["push"];
         const triggerProperties = {
           title,
           body,
+          channels,
+          iam_type: args.iam_type || null,
+          iam_header: args.iam_header || null,
+          iam_body: args.iam_body || null,
           campaign_name: name,
           sent_by: "copilot",
         };
@@ -471,20 +576,11 @@ async function executeTool(
         // Generate unique send_id for traceability
         const sendId = `copilot-${name.replace(/\s+/g, '-').toLowerCase().slice(0, 40)}-${Date.now()}`;
 
-        // Build Braze /messages/send payload with explicit push objects
+        // Build Braze /messages/send payload with messaging objects
+        const { messages } = buildMessagesObject(args, name);
         const brazePayload: Record<string, unknown> = {
           send_id: sendId,
-          messages: {
-            apple_push: {
-              alert: { title, body },
-              extra: { campaign_name: name, sent_by: "copilot" },
-            },
-            android_push: {
-              title,
-              alert: body,
-              extra: { campaign_name: name, sent_by: "copilot" },
-            },
-          },
+          messages,
         };
 
         // Test mode: override all targeting to send only to test user
@@ -535,7 +631,7 @@ async function executeTool(
             success: true,
             type: "dry_run",
             send_id: sendId,
-            message: "DRY RUN — no notifications were sent. The payload below shows the exact apple_push and android_push objects that would be delivered. Title and body are sent directly — no template dependency.",
+            message: `DRY RUN — no notifications were sent. Channels: ${channels.join(", ")}. The payload below shows the exact messaging objects that would be delivered.`,
             braze_payload: brazePayload,
             schedule: schedule_time || "immediate",
             targeting_details: targeting.details,
