@@ -31,14 +31,60 @@ CRITICAL SAFETY RULES:
 - Show the preview card and ask "Should I send this?" before proceeding.
 - If the user says "send" without a preview, call preview_campaign first.
 
+AUDIENCE TARGETING:
+You can target campaigns using multiple methods, alone or combined:
+
+1. **target_teams** (shorthand): Array of team names. Auto-expands to favourite_team custom attribute filters. 
+   Example: target_teams: ["Al Hilal", "Al Ahli"]
+
+2. **audience** (full Braze Connected Audience object): Arbitrary AND/OR filter combinations.
+   Supports:
+   - Custom attributes: { "custom_attribute": { "custom_attribute_name": "favourite_team", "value": "Al Hilal" } }
+     Comparisons: equals, not_equal, matches_regex, exists, does_not_exist, includes_value, does_not_include_value
+   - Push subscription: { "push_subscription_status": { "comparison": "is", "value": "opted_in" } }
+   - Email subscription: { "email_subscription_status": { "comparison": "is", "value": "subscribed" } }
+   - Combine with AND/OR:
+     { "AND": [ { "custom_attribute": {...} }, { "push_subscription_status": {...} } ] }
+     { "OR": [ { "custom_attribute": {...} }, { "custom_attribute": {...} } ] }
+
+3. **segment_id**: Target an existing Braze segment by ID.
+   Example: segment_id: "segment_abc123"
+
+4. **external_user_ids**: Array of specific user IDs for individual targeting.
+   Example: external_user_ids: ["user_123", "user_456"]
+
+All methods can be combined. For example, you can target a segment with additional audience filters and specific user IDs.
+
 When a user wants to send a campaign:
-1. Gather: campaign name, target audience (team-based segment), message title & body
+1. Gather: campaign name, target audience, message title & body
 2. Call preview_campaign to validate and show preview
 3. Ask for confirmation
-4. Only then call confirm_and_send
+4. Only then call confirm_and_send`;
 
-For audience targeting, use Braze custom attributes. Each featured team has a braze_attribute_value.
-The campaign uses trigger properties to customize the push notification content.`;
+const audienceParamSchema = {
+  type: "object" as const,
+  description:
+    "Braze Connected Audience object with AND/OR filter combinations. Supports custom_attribute, push_subscription_status, email_subscription_status filters.",
+};
+
+const commonTargetingParams = {
+  target_teams: {
+    type: "array" as const,
+    items: { type: "string" as const },
+    description:
+      "Optional shorthand: array of team names (auto-expands to favourite_team custom attribute filters)",
+  },
+  audience: audienceParamSchema,
+  segment_id: {
+    type: "string" as const,
+    description: "Optional Braze segment ID to target directly",
+  },
+  external_user_ids: {
+    type: "array" as const,
+    items: { type: "string" as const },
+    description: "Optional array of external user IDs for individual targeting",
+  },
+};
 
 const tools = [
   {
@@ -87,19 +133,14 @@ const tools = [
           name: { type: "string", description: "Campaign name" },
           title: { type: "string", description: "Push notification title" },
           body: { type: "string", description: "Push notification body text" },
-          target_teams: {
-            type: "array",
-            items: { type: "string" },
-            description:
-              "Array of team names to target (uses their braze_attribute_value)",
-          },
+          ...commonTargetingParams,
           schedule_time: {
             type: "string",
             description:
               "ISO 8601 datetime for scheduled send, or 'now' for immediate",
           },
         },
-        required: ["name", "title", "body", "target_teams"],
+        required: ["name", "title", "body"],
       },
     },
   },
@@ -115,17 +156,13 @@ const tools = [
           name: { type: "string", description: "Campaign name" },
           title: { type: "string", description: "Push notification title" },
           body: { type: "string", description: "Push notification body text" },
-          target_teams: {
-            type: "array",
-            items: { type: "string" },
-            description: "Array of team names to target",
-          },
+          ...commonTargetingParams,
           schedule_time: {
             type: "string",
             description: "ISO 8601 datetime or 'now'",
           },
         },
-        required: ["name", "title", "body", "target_teams"],
+        required: ["name", "title", "body"],
       },
     },
   },
@@ -146,6 +183,92 @@ const tools = [
     },
   },
 ];
+
+// Build audience object from the various targeting params
+async function buildAudienceAndRecipients(args: Record<string, unknown>) {
+  const {
+    target_teams,
+    audience,
+    segment_id,
+    external_user_ids,
+  } = args as {
+    target_teams?: string[];
+    audience?: Record<string, unknown>;
+    segment_id?: string;
+    external_user_ids?: string[];
+  };
+
+  let resolvedAudience: Record<string, unknown> | undefined = undefined;
+  const recipients: { external_user_id: string }[] = [];
+  const errors: string[] = [];
+  const details: Record<string, unknown> = {};
+
+  // 1. If target_teams shorthand, expand to favourite_team filters
+  if (target_teams && target_teams.length > 0) {
+    const { data: teams } = await serviceClient
+      .from("featured_teams")
+      .select("team_name, braze_attribute_value")
+      .in("team_name", target_teams);
+
+    const unknownTeams = target_teams.filter(
+      (t) => !teams?.find((ft) => ft.team_name === t)
+    );
+    if (unknownTeams.length > 0) {
+      errors.push(`Unknown teams: ${unknownTeams.join(", ")}`);
+    }
+
+    const teamFilters = (teams || []).map((t) => ({
+      custom_attribute: {
+        custom_attribute_name: "favourite_team",
+        value: t.braze_attribute_value,
+      },
+    }));
+
+    details.target_teams_resolved = (teams || []).map((t) => ({
+      team: t.team_name,
+      attribute: t.braze_attribute_value,
+    }));
+
+    if (teamFilters.length > 0) {
+      resolvedAudience = { OR: teamFilters };
+    }
+  }
+
+  // 2. If raw audience object provided, use it (overrides target_teams)
+  if (audience) {
+    resolvedAudience = audience;
+    details.audience = audience;
+  }
+
+  // 3. If segment_id, wrap audience in AND with segment
+  if (segment_id) {
+    if (resolvedAudience) {
+      resolvedAudience = {
+        AND: [resolvedAudience, { segment_id }],
+      };
+    } else {
+      // segment_id alone — no audience filter needed, will be set on the payload
+      details.segment_id = segment_id;
+    }
+  }
+
+  // 4. If external_user_ids, populate recipients
+  if (external_user_ids && external_user_ids.length > 0) {
+    for (const id of external_user_ids) {
+      recipients.push({ external_user_id: id });
+    }
+    details.external_user_ids = external_user_ids;
+  }
+
+  // Validate at least one targeting method
+  if (!resolvedAudience && recipients.length === 0 && !segment_id) {
+    errors.push(
+      "No targeting specified. Provide target_teams, audience, segment_id, or external_user_ids."
+    );
+  }
+
+  return { audience: resolvedAudience, recipients, errors, details, segment_id };
+}
 
 async function executeTool(
   toolName: string,
@@ -195,49 +318,35 @@ async function executeTool(
       }
 
       case "preview_campaign": {
-        const { name, title, body, target_teams, schedule_time } = args as {
+        const { name, title, body, schedule_time } = args as {
           name: string;
           title: string;
           body: string;
-          target_teams: string[];
           schedule_time?: string;
         };
 
-        // Look up braze attribute values for target teams
-        const { data: teams } = await serviceClient
-          .from("featured_teams")
-          .select("team_name, braze_attribute_value")
-          .in("team_name", target_teams);
+        const targeting = await buildAudienceAndRecipients(args);
 
-        const targetSegments = (teams || []).map((t) => ({
-          team: t.team_name,
-          attribute: t.braze_attribute_value,
-        }));
-
-        const unknownTeams = target_teams.filter(
-          (t) => !teams?.find((ft) => ft.team_name === t)
-        );
+        const validationErrors = [
+          ...targeting.errors,
+          ...(title.length === 0 ? ["Title is required"] : []),
+          ...(body.length === 0 ? ["Body is required"] : []),
+        ];
 
         return JSON.stringify({
           preview: {
             name,
             title,
             body,
-            target_teams: targetSegments,
-            unknown_teams: unknownTeams,
+            targeting: targeting.details,
+            audience: targeting.audience,
+            recipients: targeting.recipients,
             schedule: schedule_time || "immediate",
             braze_campaign_id: BRAZE_CAMPAIGN_ID,
-            estimated_reach: "Based on Braze segment filters",
           },
           validation: {
-            valid: unknownTeams.length === 0 && title.length > 0 && body.length > 0,
-            errors: [
-              ...(unknownTeams.length > 0
-                ? [`Unknown teams: ${unknownTeams.join(", ")}`]
-                : []),
-              ...(title.length === 0 ? ["Title is required"] : []),
-              ...(body.length === 0 ? ["Body is required"] : []),
-            ],
+            valid: validationErrors.length === 0,
+            errors: validationErrors,
           },
         });
       }
@@ -258,31 +367,17 @@ async function executeTool(
           });
         }
 
-        const { name, title, body, target_teams, schedule_time } = args as {
+        const { name, title, body, schedule_time } = args as {
           name: string;
           title: string;
           body: string;
-          target_teams: string[];
           schedule_time?: string;
         };
 
-        // Look up braze attribute values
-        const { data: teams } = await serviceClient
-          .from("featured_teams")
-          .select("team_name, braze_attribute_value")
-          .in("team_name", target_teams);
-
-        if (!teams || teams.length === 0) {
-          return JSON.stringify({ error: "No valid target teams found" });
+        const targeting = await buildAudienceAndRecipients(args);
+        if (targeting.errors.length > 0) {
+          return JSON.stringify({ error: "Targeting errors", details: targeting.errors });
         }
-
-        // Build audience filter using custom attributes
-        const audienceFilter = teams.map((t) => ({
-          custom_attribute: {
-            custom_attribute_name: "favourite_team",
-            value: t.braze_attribute_value,
-          },
-        }));
 
         const triggerProperties = {
           title,
@@ -291,18 +386,30 @@ async function executeTool(
           sent_by: "copilot",
         };
 
-        // Call Braze API
+        // Build Braze payload
         const brazePayload: Record<string, unknown> = {
           campaign_id: BRAZE_CAMPAIGN_ID,
-          recipients: [],
-          audience: {
-            OR: audienceFilter,
-          },
           trigger_properties: triggerProperties,
         };
 
+        if (targeting.audience) {
+          brazePayload.audience = targeting.audience;
+        }
+        if (targeting.recipients.length > 0) {
+          brazePayload.recipients = targeting.recipients;
+        }
+        if (targeting.segment_id && !targeting.audience) {
+          // segment_id without audience filters — set on payload directly
+          brazePayload.audience = { AND: [{ segment_id: targeting.segment_id }] };
+        }
+
+        const segmentFilter = {
+          ...targeting.details,
+          audience: targeting.audience,
+          recipients: targeting.recipients,
+        };
+
         if (schedule_time && schedule_time !== "now") {
-          // Use schedule endpoint
           const brazeRes = await fetch(
             `${BRAZE_REST_ENDPOINT}/campaigns/trigger/schedule/create`,
             {
@@ -321,28 +428,22 @@ async function executeTool(
           const brazeData = await brazeRes.json();
 
           if (!brazeRes.ok) {
-            // Log error
             await serviceClient.from("copilot_campaigns").insert({
               name,
               status: "error",
-              segment_filter: { target_teams, audience: audienceFilter },
+              segment_filter: segmentFilter,
               trigger_properties: triggerProperties,
               braze_campaign_id: BRAZE_CAMPAIGN_ID,
               scheduled_at: schedule_time,
               created_by: userId,
             });
-
-            return JSON.stringify({
-              error: "Braze API error",
-              details: brazeData,
-            });
+            return JSON.stringify({ error: "Braze API error", details: brazeData });
           }
 
-          // Log success
           await serviceClient.from("copilot_campaigns").insert({
             name,
             status: "sent",
-            segment_filter: { target_teams, audience: audienceFilter },
+            segment_filter: segmentFilter,
             trigger_properties: triggerProperties,
             braze_campaign_id: BRAZE_CAMPAIGN_ID,
             braze_dispatch_id: brazeData.dispatch_id,
@@ -355,11 +456,7 @@ async function executeTool(
             function_name: "growth-copilot",
             action: "campaign_scheduled",
             reason: `Scheduled campaign "${name}" for ${schedule_time}`,
-            details: {
-              campaign_name: name,
-              target_teams,
-              dispatch_id: brazeData.dispatch_id,
-            },
+            details: { campaign_name: name, ...targeting.details, dispatch_id: brazeData.dispatch_id },
           });
 
           return JSON.stringify({
@@ -369,7 +466,6 @@ async function executeTool(
             scheduled_for: schedule_time,
           });
         } else {
-          // Immediate send
           const brazeRes = await fetch(
             `${BRAZE_REST_ENDPOINT}/campaigns/trigger/send`,
             {
@@ -388,22 +484,18 @@ async function executeTool(
             await serviceClient.from("copilot_campaigns").insert({
               name,
               status: "error",
-              segment_filter: { target_teams, audience: audienceFilter },
+              segment_filter: segmentFilter,
               trigger_properties: triggerProperties,
               braze_campaign_id: BRAZE_CAMPAIGN_ID,
               created_by: userId,
             });
-
-            return JSON.stringify({
-              error: "Braze API error",
-              details: brazeData,
-            });
+            return JSON.stringify({ error: "Braze API error", details: brazeData });
           }
 
           await serviceClient.from("copilot_campaigns").insert({
             name,
             status: "sent",
-            segment_filter: { target_teams, audience: audienceFilter },
+            segment_filter: segmentFilter,
             trigger_properties: triggerProperties,
             braze_campaign_id: BRAZE_CAMPAIGN_ID,
             braze_dispatch_id: brazeData.dispatch_id,
@@ -415,11 +507,7 @@ async function executeTool(
             function_name: "growth-copilot",
             action: "campaign_sent",
             reason: `Sent campaign "${name}" immediately`,
-            details: {
-              campaign_name: name,
-              target_teams,
-              dispatch_id: brazeData.dispatch_id,
-            },
+            details: { campaign_name: name, ...targeting.details, dispatch_id: brazeData.dispatch_id },
           });
 
           return JSON.stringify({
@@ -578,16 +666,13 @@ serve(async (req) => {
             content: toolResult,
           });
         }
-        // Continue loop to get AI's response after tool results
         continue;
       }
 
       // No tool calls — we have the final response
       const finalContent = assistantMessage.content || "";
 
-      // Save to copilot_messages if session_id provided
       if (session_id) {
-        // Save the last user message and assistant response
         const lastUserMsg = messages[messages.length - 1];
         if (lastUserMsg) {
           await serviceClient.from("copilot_messages").insert({
