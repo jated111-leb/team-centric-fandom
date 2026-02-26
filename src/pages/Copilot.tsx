@@ -137,7 +137,7 @@ const Copilot = () => {
                 className={`max-w-[80%] ${
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50"
+                    : "bg-muted/50 text-foreground"
                 }`}
               >
                 <CardContent className="p-3">
