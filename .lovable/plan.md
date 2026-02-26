@@ -1,36 +1,48 @@
 
 
-## Plan: Improve Copilot Onboarding Guide & Add Segment Size Awareness
+## Plan: Add Safe Testing Mode to Growth Copilot
 
-Two changes: (1) rewrite the FAQ/help section on the Copilot page to be clearer and more comprehensive, covering segments, filters, and the campaign design workflow with segment sizes; (2) add a `get_segment_details` tool and update the system prompt so the copilot automatically shows segment sizes during preview.
+The current `confirm_and_send` tool calls live Braze endpoints with no safeguard beyond "preview first." There's no dry-run mode, no test user restriction, and no sandbox flag. Here's what to add:
 
 ### Changes
 
-#### 1. Rewrite Copilot welcome screen (`src/pages/Copilot.tsx`)
+#### 1. Add `dry_run` mode to `confirm_and_send` (`supabase/functions/growth-copilot/index.ts`)
 
-Replace the current FAQ accordion with a restructured version:
+- Add a `dry_run` boolean parameter to the `confirm_and_send` tool definition
+- When `dry_run: true`, the function does everything **except** call Braze — it builds the full payload, validates targeting, logs the campaign to `copilot_campaigns` with `status: 'dry_run'`, and returns the exact Braze payload that **would** have been sent
+- This lets you verify the audience object, filters, segment targeting, and trigger properties are correct without touching a single user
 
-- **Segments** section — explain you can say a segment name and the copilot will look it up live from Braze, show matching segments with sizes, and let you pick one. Include example prompts.
-- **Filters & Conditions** section — expand with concrete examples of AND/OR logic, attribute operators, push/email subscription filters. Show a "recipe" style example combining segment + filter.
-- **Campaign Design & Audience Sizing** section — explain that during preview the copilot will fetch and display the segment size so you know how many users you're reaching before confirming. Describe the 3-step workflow (describe → preview with audience size → confirm).
-- **Scheduling** section — explain immediate vs scheduled sends with natural language time support.
-- Update the suggestion prompts to include a segment-lookup example like "Show me all available segments" and a filter combo example.
+#### 2. Add `test_mode` flag that restricts to a single test user (`supabase/functions/growth-copilot/index.ts`)
 
-#### 2. Add `get_segment_details` tool (`supabase/functions/growth-copilot/index.ts`)
+- When `test_mode: true`, the function overrides whatever audience/segment targeting was specified and sends **only** to `external_user_ids: ["874810"]` (the existing test user from `braze-canvas-test`)
+- This lets you actually trigger a real Braze send and verify the push arrives — but only to yourself
+- The AI system prompt will instruct the copilot to suggest test mode first before any real send
 
-- New tool: calls `GET {BRAZE_REST_ENDPOINT}/segments/details?segment_id={id}` 
-- Returns segment name, description, size (estimated audience count), tags, created/updated dates
-- This uses the `segments.details` permission from the new API key
+#### 3. Update system prompt with testing workflow (`supabase/functions/growth-copilot/index.ts`)
 
-#### 3. Update system prompt (`supabase/functions/growth-copilot/index.ts`)
+Add to the safety rules:
+- "When the user is testing or trying the copilot for the first time, suggest using `test_mode: true` which sends only to the test user (874810)"
+- "Offer `dry_run: true` to show the exact Braze payload without sending anything"
+- "Recommended workflow: dry_run first → test_mode send → full send"
 
-Add instructions:
-- "When previewing a campaign that targets a segment, always call `get_segment_details` to fetch the estimated audience size and include it in the preview."
-- "When the user asks to browse or explore segments, call `list_braze_segments` and present them in a formatted list with names and IDs."
-- "When combining a segment with filters, explain to the user that the filters will narrow down the segment audience."
+#### 4. Update Copilot welcome screen (`src/components/copilot/CopilotWelcome.tsx`)
+
+Add a **Safe Testing** section to the onboarding guide explaining:
+- **Dry Run**: "Ask the copilot to do a dry run — it will show you the exact Braze payload without sending anything"
+- **Test Mode**: "Ask the copilot to send in test mode — it sends only to the test account so you can verify the push arrives"
+- **Full Send**: "Only after verifying with dry run and test mode, confirm a full send"
+- Add a suggestion prompt: "Do a dry run campaign for Al Hilal fans"
+
+### How to Test Safely (after implementation)
+
+1. Ask the copilot: *"Send a test push to Al Hilal fans saying 'Match tonight!'"*
+2. The copilot previews with audience size, then asks to confirm
+3. Say: *"Do a dry run first"* — you'll see the full Braze payload, zero sends
+4. Say: *"Now send in test mode"* — only user 874810 gets the push
+5. Verify you received it, then say: *"OK send it for real"* — full audience
 
 ### Files Modified
 
-- `src/pages/Copilot.tsx` — rewritten welcome screen with better onboarding content
-- `supabase/functions/growth-copilot/index.ts` — new `get_segment_details` tool + system prompt updates
+- `supabase/functions/growth-copilot/index.ts` — `dry_run` + `test_mode` params on `confirm_and_send`, system prompt update
+- `src/components/copilot/CopilotWelcome.tsx` — safe testing section in onboarding guide
 
