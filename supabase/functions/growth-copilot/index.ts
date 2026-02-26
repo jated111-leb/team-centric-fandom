@@ -499,7 +499,7 @@ async function executeTool(
             brazePayload.recipients = targeting.recipients;
           }
           if (targeting.segment_id && !targeting.audience) {
-            brazePayload.audience = { AND: [{ segment_id: targeting.segment_id }] };
+            brazePayload.segment_id = targeting.segment_id;
           }
         }
 
