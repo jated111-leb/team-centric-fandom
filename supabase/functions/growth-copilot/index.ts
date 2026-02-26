@@ -27,15 +27,10 @@ Your capabilities:
 6. List available Braze segments (call list_braze_segments to find segment IDs)
 7. Get segment details including estimated audience size (call get_segment_details)
 
-CRITICAL — HOW BRAZE API-TRIGGERED CAMPAIGNS WORK:
-- This copilot triggers an existing Braze campaign (campaign_id) via /campaigns/trigger/send.
-- The title, body, and other trigger_properties you set are passed as ephemeral "send-time" properties.
-- They are NOT automatically used as the push title/body. The Braze campaign template MUST use Liquid tags like:
-  Push title: {{api_trigger_properties.\${title}}}
-  Push body: {{api_trigger_properties.\${body}}}
-- If the campaign template does not reference these Liquid tags, the title/body you set here will be SILENTLY IGNORED and the user receives whatever static copy is in the Braze dashboard template.
-- Always mention this dependency when showing dry run results or previews.
-- Re-eligibility rules on the campaign can silently prevent delivery even if the API returns 200.
+HOW THIS COPILOT SENDS PUSH NOTIFICATIONS:
+- This copilot sends push notifications via Braze /messages/send with explicit apple_push and android_push objects.
+- The title and body you compose are sent DIRECTLY in the push payload — no campaign template dependency, no Liquid tags needed.
+- This guarantees the exact content you specify reaches the user.
 - send_to_existing_only defaults to true: if the external_user_id doesn't exist in Braze, nothing sends.
 
 SEGMENT LOOKUP:
@@ -423,7 +418,10 @@ async function executeTool(
             audience: targeting.audience,
             recipients: targeting.recipients,
             schedule: schedule_time || "immediate",
-            braze_campaign_id: BRAZE_CAMPAIGN_ID,
+            messages: {
+              apple_push: { alert: { title, body }, extra: { campaign_name: name, sent_by: "copilot" } },
+              android_push: { title, alert: body, extra: { campaign_name: name, sent_by: "copilot" } },
+            },
           },
           validation: {
             valid: validationErrors.length === 0,
@@ -462,6 +460,7 @@ async function executeTool(
           return JSON.stringify({ error: "Targeting errors", details: targeting.errors });
         }
 
+        // Store for audit trail in DB (not sent to Braze)
         const triggerProperties = {
           title,
           body,
@@ -472,18 +471,26 @@ async function executeTool(
         // Generate unique send_id for traceability
         const sendId = `copilot-${name.replace(/\s+/g, '-').toLowerCase().slice(0, 40)}-${Date.now()}`;
 
-        // Build Braze payload
+        // Build Braze /messages/send payload with explicit push objects
         const brazePayload: Record<string, unknown> = {
-          campaign_id: BRAZE_CAMPAIGN_ID,
           send_id: sendId,
-          trigger_properties: triggerProperties,
+          messages: {
+            apple_push: {
+              alert: { title, body },
+              extra: { campaign_name: name, sent_by: "copilot" },
+            },
+            android_push: {
+              title,
+              alert: body,
+              extra: { campaign_name: name, sent_by: "copilot" },
+            },
+          },
         };
 
         // Test mode: override all targeting to send only to test user
         if (test_mode) {
-          // Clear any audience/segment targeting
           delete brazePayload.audience;
-          brazePayload.recipients = [{ external_user_id: "874810" }];
+          brazePayload.recipients = [{ external_user_id: "874810", send_to_existing_only: true }];
         } else {
           if (targeting.audience) {
             brazePayload.audience = targeting.audience;
@@ -528,7 +535,7 @@ async function executeTool(
             success: true,
             type: "dry_run",
             send_id: sendId,
-            message: "DRY RUN — no notifications were sent. Here is the exact Braze payload that would be sent. REMINDER: The Braze campaign template must use Liquid tags like {{api_trigger_properties.${title}}} for the title/body to appear in the notification.",
+            message: "DRY RUN — no notifications were sent. The payload below shows the exact apple_push and android_push objects that would be delivered. Title and body are sent directly — no template dependency.",
             braze_payload: brazePayload,
             schedule: schedule_time || "immediate",
             targeting_details: targeting.details,
@@ -540,7 +547,7 @@ async function executeTool(
 
         if (schedule_time && schedule_time !== "now") {
           const brazeRes = await fetch(
-            `${BRAZE_REST_ENDPOINT}/campaigns/trigger/schedule/create`,
+            `${BRAZE_REST_ENDPOINT}/messages/schedule/create`,
             {
               method: "POST",
               headers: {
@@ -602,7 +609,7 @@ async function executeTool(
           });
         } else {
           const brazeRes = await fetch(
-            `${BRAZE_REST_ENDPOINT}/campaigns/trigger/send`,
+            `${BRAZE_REST_ENDPOINT}/messages/send`,
             {
               method: "POST",
               headers: {
