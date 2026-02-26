@@ -24,6 +24,12 @@ Your capabilities:
 3. Preview a campaign (validate inputs, show what will be sent)
 4. Confirm and send a campaign via Braze API
 5. View campaign history
+6. List available Braze segments (call list_braze_segments to find segment IDs)
+
+SEGMENT LOOKUP:
+- When a user mentions targeting a segment by name (e.g. "weekly active users"), call list_braze_segments first to find the matching segment_id.
+- Present the matching segments to the user and confirm which one to use before proceeding.
+- Use the segment_id in preview_campaign / confirm_and_send.
 
 CRITICAL SAFETY RULES:
 - You MUST call preview_campaign before confirm_and_send. Never send without previewing first.
@@ -163,6 +169,23 @@ const tools = [
           },
         },
         required: ["name", "title", "body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_braze_segments",
+      description:
+        "List available Braze segments with their IDs, names, and sizes. Use this to find the correct segment_id when a user wants to target a specific segment.",
+      parameters: {
+        type: "object",
+        properties: {
+          page: {
+            type: "number",
+            description: "Page number for pagination (default 0, 100 segments per page)",
+          },
+        },
       },
     },
   },
@@ -516,6 +539,31 @@ async function executeTool(
             dispatch_id: brazeData.dispatch_id,
           });
         }
+      }
+
+      case "list_braze_segments": {
+        const page = (args.page as number) || 0;
+        const url = `${BRAZE_REST_ENDPOINT}/segments/list?page=${page}&sort_direction=desc`;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${BRAZE_API_KEY}` },
+        });
+        if (!res.ok) {
+          const errBody = await res.text();
+          throw new Error(`Braze API error ${res.status}: ${errBody}`);
+        }
+        const data = await res.json();
+        const segments = (data.segments || []).map((s: Record<string, unknown>) => ({
+          id: s.id,
+          name: s.name,
+          analytics_tracking_enabled: s.analytics_tracking_enabled,
+          tags: s.tags,
+        }));
+        return JSON.stringify({
+          segments,
+          count: segments.length,
+          page,
+          message: data.message,
+        });
       }
 
       case "get_campaign_history": {
