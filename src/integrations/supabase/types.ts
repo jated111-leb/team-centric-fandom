@@ -112,6 +112,78 @@ export type Database = {
           },
         ]
       }
+      copilot_campaigns: {
+        Row: {
+          braze_campaign_id: string | null
+          braze_dispatch_id: string | null
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          scheduled_at: string | null
+          segment_filter: Json | null
+          sent_at: string | null
+          status: string
+          trigger_properties: Json | null
+        }
+        Insert: {
+          braze_campaign_id?: string | null
+          braze_dispatch_id?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          scheduled_at?: string | null
+          segment_filter?: Json | null
+          sent_at?: string | null
+          status?: string
+          trigger_properties?: Json | null
+        }
+        Update: {
+          braze_campaign_id?: string | null
+          braze_dispatch_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          scheduled_at?: string | null
+          segment_filter?: Json | null
+          sent_at?: string | null
+          status?: string
+          trigger_properties?: Json | null
+        }
+        Relationships: []
+      }
+      copilot_messages: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          role: string
+          session_id: string
+          tool_calls: Json | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          role: string
+          session_id: string
+          tool_calls?: Json | null
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string
+          tool_calls?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       feature_flags: {
         Row: {
           created_at: string | null
