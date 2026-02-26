@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Sparkles, Bot, User, Loader2 } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Send, Sparkles, Bot, User, Loader2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface Message {
@@ -91,33 +92,93 @@ const Copilot = () => {
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-20">
+          <div className="flex flex-col items-center justify-center text-center gap-6 py-12 max-w-2xl mx-auto">
             <div className="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10">
               <Bot className="h-8 w-8 text-primary" />
             </div>
             <div>
               <h2 className="text-xl font-semibold mb-2">Welcome to Growth Copilot</h2>
-              <p className="text-muted-foreground max-w-md">
-                I can help you create and send Braze push campaigns. Try something like:
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Create and send Braze push campaigns using natural language. Try one of the prompts below or ask anything.
               </p>
             </div>
             <div className="grid gap-2 max-w-lg w-full">
               {[
                 "Send a push to Al Hilal fans about their next match",
-                "Show me all featured teams",
+                "Target segment 'Weekly Active Users' with a Ramadan promo",
+                "Send to users where favourite_team is Al Ahli AND push is opted in",
                 "What campaigns have been sent recently?",
-                "Schedule a Ramadan campaign for tomorrow at 7pm",
               ].map((suggestion) => (
                 <button
                   key={suggestion}
-                  onClick={() => {
-                    setInput(suggestion);
-                  }}
-                  className="text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-sm"
+                  onClick={() => setInput(suggestion)}
+                  className="text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-sm text-foreground"
                 >
                   {suggestion}
                 </button>
               ))}
+            </div>
+
+            {/* FAQ Section */}
+            <div className="w-full max-w-lg mt-4">
+              <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
+                <HelpCircle className="h-4 w-4" />
+                <span>How to use the Copilot</span>
+              </div>
+              <Accordion type="multiple" className="w-full text-left">
+                <AccordionItem value="targeting">
+                  <AccordionTrigger className="text-sm">What audience targeting can I use?</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                    <p>You can target audiences in four ways — alone or combined:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li><strong className="text-foreground">Team shorthand</strong> — mention a team name (e.g. "Al Hilal fans") and it auto-targets users with that favourite_team attribute.</li>
+                      <li><strong className="text-foreground">Braze Segments</strong> — reference any saved segment from your Braze account by name or ID (e.g. "target the 'Weekly Active Users' segment").</li>
+                      <li><strong className="text-foreground">Custom attribute filters</strong> — add any Braze custom attribute filter with AND/OR logic (e.g. "users where league_preference includes La Liga AND push is opted in").</li>
+                      <li><strong className="text-foreground">Individual users</strong> — target specific external user IDs for testing or one-off sends.</li>
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="filters">
+                  <AccordionTrigger className="text-sm">What filters and conditions are supported?</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                    <p>You can describe filters in plain English and the copilot translates them to Braze's API format:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li><strong className="text-foreground">Custom attributes</strong> — equals, not equals, matches regex, exists, includes value, etc.</li>
+                      <li><strong className="text-foreground">Push subscription</strong> — opted in, subscribed, unsubscribed.</li>
+                      <li><strong className="text-foreground">Email subscription</strong> — subscribed, opted in, unsubscribed.</li>
+                      <li><strong className="text-foreground">Combinations</strong> — AND/OR logic across any of the above.</li>
+                    </ul>
+                    <p>Example: <em>"Target users where favourite_team is Al Hilal AND push_subscription is opted_in"</em></p>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="workflow">
+                  <AccordionTrigger className="text-sm">What's the send workflow?</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                    <p>Every campaign follows a safe 3-step process:</p>
+                    <ol className="list-decimal pl-4 space-y-1">
+                      <li><strong className="text-foreground">Describe</strong> — tell the copilot what you want to send and to whom.</li>
+                      <li><strong className="text-foreground">Preview</strong> — the copilot validates your inputs and shows a preview card with the exact targeting, message, and schedule.</li>
+                      <li><strong className="text-foreground">Confirm</strong> — only after you approve does it actually call the Braze API.</li>
+                    </ol>
+                    <p>You can also schedule sends for a future time using ISO 8601 or natural language (e.g. "tomorrow at 7pm GST").</p>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="examples">
+                  <AccordionTrigger className="text-sm">Example prompts</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>"Send a push to the 'Lapsed Users' segment with title 'We miss you!' and body 'Check out tonight's matches'"</li>
+                      <li>"Target Al Hilal fans who have push opted in with a match reminder"</li>
+                      <li>"Schedule a Ramadan campaign for tomorrow at 7pm targeting all users where language is Arabic"</li>
+                      <li>"Send to external user IDs user_123 and user_456 for testing"</li>
+                      <li>"Show me the last 5 campaigns sent from copilot"</li>
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           </div>
         )}
