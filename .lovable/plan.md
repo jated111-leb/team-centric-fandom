@@ -1,37 +1,48 @@
 
 
-## Analysis & Answers to Your Questions
+## Switch Growth Copilot to `/messages/send` for Direct Push Content Control
 
-After reviewing the `growth-copilot/index.ts` implementation:
+### Why
+Currently the copilot passes `title` and `body` as `trigger_properties` to `/campaigns/trigger/send`. These are **ephemeral variables** — Braze silently ignores them unless the dashboard template has Liquid tags like `{{api_trigger_properties.${title}}}`. There's no way to validate this from code. Switching to `/messages/send` builds explicit `apple_push` and `android_push` objects, guaranteeing the content reaches the user exactly as the AI composed it.
 
-**Q1: Which endpoint?**
-The code uses `/campaigns/trigger/send` for immediate sends (line 585) and `/campaigns/trigger/schedule/create` for scheduled sends (line 526). It uses `BRAZE_CAMPAIGN_ID` (not canvas). This is separate from the sports scheduler which migrated to Canvas.
+### Changes (single file: `supabase/functions/growth-copilot/index.ts`)
 
-**Q2: Liquid in the Braze campaign?**
-This is the critical question only you can answer. If the campaign template in the Braze dashboard doesn't use `{{api_trigger_properties.${title}}}` and `{{api_trigger_properties.${body}}}`, then the title/body passed by the copilot are silently ignored and the user gets whatever static copy is in the template.
+**1. Update system prompt (lines 30-38)**
+- Remove the Liquid dependency warning
+- Replace with: "This copilot sends push via /messages/send with explicit apple_push and android_push objects. Title and body are sent directly — no campaign template dependency."
 
-**Q3-Q5: Need your input** before proceeding.
+**2. Replace payload construction in `confirm_and_send` (lines 465-497)**
+- Instead of `trigger_properties: { title, body, ... }` + `campaign_id`, build:
+```typescript
+const brazePayload = {
+  send_id: sendId,
+  messages: {
+    apple_push: {
+      alert: { title, body },
+      extra: { campaign_name: name, sent_by: "copilot" },
+    },
+    android_push: {
+      title,
+      alert: body,
+      extra: { campaign_name: name, sent_by: "copilot" },
+    },
+  },
+};
+```
+- Audience/recipients/segment targeting stays identical
 
----
+**3. Switch endpoint URLs**
+- Immediate (line 605): `/campaigns/trigger/send` → `/messages/send`
+- Scheduled (line 543): `/campaigns/trigger/schedule/create` → `/messages/schedule/create`
 
-## Plan: Address Braze Payload Correctness
+**4. Update dry run response (line 531)**
+- Remove the Liquid warning message
+- Show the new `messages` object in the payload preview
 
-### 1. Add `send_id` for traceability (`growth-copilot/index.ts`)
-- Generate a unique `send_id` per send (e.g. `copilot-{campaign_name}-{timestamp}`)
-- Include it in the Braze payload and store it in `copilot_campaigns`
-- This gives clean correlation between backend logs and Braze events
+**5. Keep `trigger_properties` in DB logging**
+- Still store `{ title, body, campaign_name, sent_by }` in `copilot_campaigns.trigger_properties` for audit trail — just no longer sent to Braze as trigger_properties
 
-### 2. Add `send_id` column to `copilot_campaigns` table
-- Migration: `ALTER TABLE copilot_campaigns ADD COLUMN send_id text;`
-
-### 3. Surface the endpoint and Liquid dependency in the system prompt
-- Update the system prompt to tell the AI: "The Braze campaign must have Liquid templates referencing `api_trigger_properties` for title/body to take effect"
-- When showing dry run results, include a note about this dependency
-
-### 4. Add `send_to_existing_only` parameter (optional)
-- Default `true` (current implicit behavior), but allow override if needed for create-on-send scenarios
-
-### Files Modified
-- `supabase/functions/growth-copilot/index.ts` — add `send_id`, update system prompt
-- Database migration — add `send_id` column
+**6. Remove `BRAZE_CAMPAIGN_ID` from payload**
+- `/messages/send` doesn't use `campaign_id` — content is fully inline
+- Keep the env var reference for now (used in DB logging) but don't include it in the Braze request body
 
