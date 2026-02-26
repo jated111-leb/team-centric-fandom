@@ -25,11 +25,22 @@ Your capabilities:
 4. Confirm and send a campaign via Braze API
 5. View campaign history
 6. List available Braze segments (call list_braze_segments to find segment IDs)
+7. Get segment details including estimated audience size (call get_segment_details)
 
 SEGMENT LOOKUP:
 - When a user mentions targeting a segment by name (e.g. "weekly active users"), call list_braze_segments first to find the matching segment_id.
 - Present the matching segments to the user and confirm which one to use before proceeding.
 - Use the segment_id in preview_campaign / confirm_and_send.
+
+AUDIENCE SIZING (CRITICAL):
+- When previewing a campaign that targets a segment, ALWAYS call get_segment_details to fetch the estimated audience size and include it in the preview.
+- Display the audience size prominently so the user knows how many users they are reaching BEFORE confirming.
+- When combining a segment with filters, explain to the user that the filters will narrow down the segment audience, so the actual reach will be smaller than the segment size shown.
+- If the audience looks too large, suggest adding filters. If too small, suggest broadening.
+
+SEGMENT BROWSING:
+- When the user asks to browse, explore, or list segments, call list_braze_segments and present them in a formatted list with names and IDs.
+- If the user wants more details on a specific segment (size, tags, description), call get_segment_details with that segment_id.
 
 CRITICAL SAFETY RULES:
 - You MUST call preview_campaign before confirm_and_send. Never send without previewing first.
@@ -63,9 +74,10 @@ All methods can be combined. For example, you can target a segment with addition
 
 When a user wants to send a campaign:
 1. Gather: campaign name, target audience, message title & body
-2. Call preview_campaign to validate and show preview
-3. Ask for confirmation
-4. Only then call confirm_and_send`;
+2. If targeting a segment, call get_segment_details to fetch and show audience size
+3. Call preview_campaign to validate and show preview (include audience size in your response)
+4. Ask for confirmation
+5. Only then call confirm_and_send`;
 
 const audienceParamSchema = {
   type: "object" as const,
@@ -186,6 +198,24 @@ const tools = [
             description: "Page number for pagination (default 0, 100 segments per page)",
           },
         },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_segment_details",
+      description:
+        "Get detailed information about a specific Braze segment including estimated audience size, description, and tags. Use this to show users how many people they will reach before sending.",
+      parameters: {
+        type: "object",
+        properties: {
+          segment_id: {
+            type: "string",
+            description: "The Braze segment ID to get details for",
+          },
+        },
+        required: ["segment_id"],
       },
     },
   },
@@ -563,6 +593,29 @@ async function executeTool(
           count: segments.length,
           page,
           message: data.message,
+        });
+      }
+
+      case "get_segment_details": {
+        const segmentId = args.segment_id as string;
+        const url = `${BRAZE_REST_ENDPOINT}/segments/details?segment_id=${segmentId}`;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${BRAZE_API_KEY}` },
+        });
+        if (!res.ok) {
+          const errBody = await res.text();
+          throw new Error(`Braze API error ${res.status}: ${errBody}`);
+        }
+        const data = await res.json();
+        return JSON.stringify({
+          segment_id: segmentId,
+          name: data.name,
+          description: data.description,
+          estimated_size: data.size,
+          tags: data.tags,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          analytics_tracking_enabled: data.analytics_tracking_enabled,
         });
       }
 
