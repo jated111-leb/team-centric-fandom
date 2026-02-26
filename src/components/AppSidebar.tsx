@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { Calendar, Settings, BarChart3, FileText, RefreshCw, LogOut } from "lucide-react";
+import { Calendar, Settings, BarChart3, FileText, RefreshCw, LogOut, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -18,11 +18,15 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 
-const navItems = [
+const sportsItems = [
   { title: "Schedule", url: "/", icon: Calendar },
   { title: "Admin", url: "/admin", icon: Settings },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
   { title: "Logs", url: "/admin/notification-logs", icon: FileText },
+];
+
+const campaignItems = [
+  { title: "Copilot", url: "/copilot", icon: Sparkles },
 ];
 
 export function AppSidebar() {
@@ -66,10 +70,32 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>⚽ Sports Scheduling</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {sportsItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === item.url}
+                    tooltip={item.title}
+                  >
+                    <NavLink to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>📣 Campaigns</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {campaignItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

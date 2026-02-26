@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.braze-congrats]
 verify_jwt = false
+
+[functions.growth-copilot]
+verify_jwt = false
