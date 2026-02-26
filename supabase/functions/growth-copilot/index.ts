@@ -42,11 +42,20 @@ SEGMENT BROWSING:
 - When the user asks to browse, explore, or list segments, call list_braze_segments and present them in a formatted list with names and IDs.
 - If the user wants more details on a specific segment (size, tags, description), call get_segment_details with that segment_id.
 
+SAFE TESTING WORKFLOW:
+- Recommended workflow: dry_run first → test_mode send → full send
+- When the user is testing or trying the copilot for the first time, suggest using test_mode: true which sends only to the test user (874810).
+- Offer dry_run: true to show the exact Braze payload without sending anything.
+- dry_run: true — builds the full payload, validates targeting, logs campaign with status 'dry_run', returns the exact Braze payload. Zero sends.
+- test_mode: true — overrides all targeting to send ONLY to external_user_id "874810" (test account). Real Braze send but only to one user.
+- Both flags can be set on confirm_and_send.
+
 CRITICAL SAFETY RULES:
 - You MUST call preview_campaign before confirm_and_send. Never send without previewing first.
 - Always ask the user for explicit confirmation before calling confirm_and_send.
 - Show the preview card and ask "Should I send this?" before proceeding.
 - If the user says "send" without a preview, call preview_campaign first.
+- When a user confirms a send for the first time, suggest dry_run or test_mode before doing a full send.
 
 AUDIENCE TARGETING:
 You can target campaigns using multiple methods, alone or combined:
@@ -167,7 +176,7 @@ const tools = [
     function: {
       name: "confirm_and_send",
       description:
-        "Actually send the campaign via Braze API. Only call this AFTER preview_campaign and user confirmation.",
+        "Actually send the campaign via Braze API. Only call this AFTER preview_campaign and user confirmation. Supports dry_run (no send, returns payload) and test_mode (sends only to test user 874810).",
       parameters: {
         type: "object",
         properties: {
@@ -178,6 +187,14 @@ const tools = [
           schedule_time: {
             type: "string",
             description: "ISO 8601 datetime or 'now'",
+          },
+          dry_run: {
+            type: "boolean",
+            description: "If true, build and validate the full Braze payload but do NOT send. Returns the exact payload that would be sent. Logs campaign with status 'dry_run'.",
+          },
+          test_mode: {
+            type: "boolean",
+            description: "If true, override all targeting to send ONLY to test user 874810. Real Braze send but restricted to one user.",
           },
         },
         required: ["name", "title", "body"],
@@ -420,15 +437,17 @@ async function executeTool(
           });
         }
 
-        const { name, title, body, schedule_time } = args as {
+        const { name, title, body, schedule_time, dry_run, test_mode } = args as {
           name: string;
           title: string;
           body: string;
           schedule_time?: string;
+          dry_run?: boolean;
+          test_mode?: boolean;
         };
 
         const targeting = await buildAudienceAndRecipients(args);
-        if (targeting.errors.length > 0) {
+        if (targeting.errors.length > 0 && !dry_run && !test_mode) {
           return JSON.stringify({ error: "Targeting errors", details: targeting.errors });
         }
 
@@ -445,22 +464,62 @@ async function executeTool(
           trigger_properties: triggerProperties,
         };
 
-        if (targeting.audience) {
-          brazePayload.audience = targeting.audience;
-        }
-        if (targeting.recipients.length > 0) {
-          brazePayload.recipients = targeting.recipients;
-        }
-        if (targeting.segment_id && !targeting.audience) {
-          // segment_id without audience filters — set on payload directly
-          brazePayload.audience = { AND: [{ segment_id: targeting.segment_id }] };
+        // Test mode: override all targeting to send only to test user
+        if (test_mode) {
+          // Clear any audience/segment targeting
+          delete brazePayload.audience;
+          brazePayload.recipients = [{ external_user_id: "874810" }];
+        } else {
+          if (targeting.audience) {
+            brazePayload.audience = targeting.audience;
+          }
+          if (targeting.recipients.length > 0) {
+            brazePayload.recipients = targeting.recipients;
+          }
+          if (targeting.segment_id && !targeting.audience) {
+            brazePayload.audience = { AND: [{ segment_id: targeting.segment_id }] };
+          }
         }
 
         const segmentFilter = {
           ...targeting.details,
           audience: targeting.audience,
           recipients: targeting.recipients,
+          dry_run: dry_run || false,
+          test_mode: test_mode || false,
         };
+
+        // DRY RUN: log and return payload without calling Braze
+        if (dry_run) {
+          await serviceClient.from("copilot_campaigns").insert({
+            name: `[DRY RUN] ${name}`,
+            status: "dry_run",
+            segment_filter: segmentFilter,
+            trigger_properties: triggerProperties,
+            braze_campaign_id: BRAZE_CAMPAIGN_ID,
+            scheduled_at: schedule_time && schedule_time !== "now" ? schedule_time : null,
+            created_by: userId,
+          });
+
+          await serviceClient.from("scheduler_logs").insert({
+            function_name: "growth-copilot",
+            action: "campaign_dry_run",
+            reason: `Dry run for campaign "${name}"`,
+            details: { campaign_name: name, ...targeting.details },
+          });
+
+          return JSON.stringify({
+            success: true,
+            type: "dry_run",
+            message: "DRY RUN — no notifications were sent. Here is the exact Braze payload that would be sent:",
+            braze_payload: brazePayload,
+            schedule: schedule_time || "immediate",
+            targeting_details: targeting.details,
+          });
+        }
+
+        // Log test_mode in scheduler logs
+        const modeLabel = test_mode ? "test_mode" : "full";
 
         if (schedule_time && schedule_time !== "now") {
           const brazeRes = await fetch(
@@ -493,8 +552,9 @@ async function executeTool(
             return JSON.stringify({ error: "Braze API error", details: brazeData });
           }
 
+          const nameWithMode = test_mode ? `[TEST] ${name}` : name;
           await serviceClient.from("copilot_campaigns").insert({
-            name,
+            name: nameWithMode,
             status: "sent",
             segment_filter: segmentFilter,
             trigger_properties: triggerProperties,
@@ -507,16 +567,18 @@ async function executeTool(
 
           await serviceClient.from("scheduler_logs").insert({
             function_name: "growth-copilot",
-            action: "campaign_scheduled",
-            reason: `Scheduled campaign "${name}" for ${schedule_time}`,
-            details: { campaign_name: name, ...targeting.details, dispatch_id: brazeData.dispatch_id },
+            action: `campaign_scheduled_${modeLabel}`,
+            reason: `Scheduled ${modeLabel} campaign "${name}" for ${schedule_time}`,
+            details: { campaign_name: name, mode: modeLabel, ...targeting.details, dispatch_id: brazeData.dispatch_id },
           });
 
           return JSON.stringify({
             success: true,
             type: "scheduled",
+            mode: modeLabel,
             dispatch_id: brazeData.dispatch_id,
             scheduled_for: schedule_time,
+            ...(test_mode ? { note: "TEST MODE: sent only to test user 874810" } : {}),
           });
         } else {
           const brazeRes = await fetch(
@@ -545,8 +607,9 @@ async function executeTool(
             return JSON.stringify({ error: "Braze API error", details: brazeData });
           }
 
+          const nameWithMode2 = test_mode ? `[TEST] ${name}` : name;
           await serviceClient.from("copilot_campaigns").insert({
-            name,
+            name: nameWithMode2,
             status: "sent",
             segment_filter: segmentFilter,
             trigger_properties: triggerProperties,
@@ -558,15 +621,17 @@ async function executeTool(
 
           await serviceClient.from("scheduler_logs").insert({
             function_name: "growth-copilot",
-            action: "campaign_sent",
-            reason: `Sent campaign "${name}" immediately`,
-            details: { campaign_name: name, ...targeting.details, dispatch_id: brazeData.dispatch_id },
+            action: `campaign_sent_${modeLabel}`,
+            reason: `Sent ${modeLabel} campaign "${name}" immediately`,
+            details: { campaign_name: name, mode: modeLabel, ...targeting.details, dispatch_id: brazeData.dispatch_id },
           });
 
           return JSON.stringify({
             success: true,
             type: "immediate",
+            mode: modeLabel,
             dispatch_id: brazeData.dispatch_id,
+            ...(test_mode ? { note: "TEST MODE: sent only to test user 874810" } : {}),
           });
         }
       }

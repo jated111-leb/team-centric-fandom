@@ -1,4 +1,4 @@
-import { Bot, HelpCircle } from "lucide-react";
+import { Bot, HelpCircle, ShieldCheck } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface CopilotWelcomeProps {
@@ -7,6 +7,7 @@ interface CopilotWelcomeProps {
 
 const suggestions = [
   "Show me all available segments",
+  "Do a dry run campaign for Al Hilal fans",
   "Send a push to Al Hilal fans about their next match",
   "Target the 'Weekly Active Users' segment where push is opted in",
   "What campaigns have been sent recently?",
@@ -44,7 +45,34 @@ export function CopilotWelcome({ onSuggestionClick }: CopilotWelcomeProps) {
           <HelpCircle className="h-4 w-4" />
           <span>How to use the Copilot</span>
         </div>
-        <Accordion type="multiple" className="w-full text-left">
+        <Accordion type="multiple" defaultValue={["safe-testing"]} className="w-full text-left">
+
+          {/* Safe Testing */}
+          <AccordionItem value="safe-testing">
+            <AccordionTrigger className="text-sm">
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                Safe testing workflow
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="text-sm text-muted-foreground space-y-2">
+              <p>Test campaigns safely before sending to real audiences:</p>
+              <ol className="list-decimal pl-4 space-y-2">
+                <li>
+                  <strong className="text-foreground">Dry Run</strong> — ask the copilot to do a dry run. It builds the full Braze payload, validates targeting, and shows you exactly what <em>would</em> be sent — without sending anything.
+                </li>
+                <li>
+                  <strong className="text-foreground">Test Mode</strong> — ask the copilot to send in test mode. It sends a real push but <em>only</em> to the test account (user 874810) so you can verify the notification arrives.
+                </li>
+                <li>
+                  <strong className="text-foreground">Full Send</strong> — only after verifying with dry run and test mode, confirm a full send to the real audience.
+                </li>
+              </ol>
+              <p className="text-xs mt-2 border-l-2 border-primary/30 pl-2">
+                💡 Try: <em>"Do a dry run campaign for Al Hilal fans saying Match tonight!"</em> → see the payload → <em>"Now send in test mode"</em> → verify push arrives → <em>"OK send for real"</em>
+              </p>
+            </AccordionContent>
+          </AccordionItem>
 
           {/* Segments */}
           <AccordionItem value="segments">
