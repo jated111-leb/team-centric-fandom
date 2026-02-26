@@ -1,0 +1,1 @@
+ALTER TABLE public.copilot_campaigns ADD COLUMN send_id text;

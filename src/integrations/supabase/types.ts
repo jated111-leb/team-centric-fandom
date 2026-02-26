@@ -122,6 +122,7 @@ export type Database = {
           name: string
           scheduled_at: string | null
           segment_filter: Json | null
+          send_id: string | null
           sent_at: string | null
           status: string
           trigger_properties: Json | null
@@ -135,6 +136,7 @@ export type Database = {
           name: string
           scheduled_at?: string | null
           segment_filter?: Json | null
+          send_id?: string | null
           sent_at?: string | null
           status?: string
           trigger_properties?: Json | null
@@ -148,6 +150,7 @@ export type Database = {
           name?: string
           scheduled_at?: string | null
           segment_filter?: Json | null
+          send_id?: string | null
           sent_at?: string | null
           status?: string
           trigger_properties?: Json | null

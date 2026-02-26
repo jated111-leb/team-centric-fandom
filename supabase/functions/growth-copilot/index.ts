@@ -27,6 +27,17 @@ Your capabilities:
 6. List available Braze segments (call list_braze_segments to find segment IDs)
 7. Get segment details including estimated audience size (call get_segment_details)
 
+CRITICAL — HOW BRAZE API-TRIGGERED CAMPAIGNS WORK:
+- This copilot triggers an existing Braze campaign (campaign_id) via /campaigns/trigger/send.
+- The title, body, and other trigger_properties you set are passed as ephemeral "send-time" properties.
+- They are NOT automatically used as the push title/body. The Braze campaign template MUST use Liquid tags like:
+  Push title: {{api_trigger_properties.\${title}}}
+  Push body: {{api_trigger_properties.\${body}}}
+- If the campaign template does not reference these Liquid tags, the title/body you set here will be SILENTLY IGNORED and the user receives whatever static copy is in the Braze dashboard template.
+- Always mention this dependency when showing dry run results or previews.
+- Re-eligibility rules on the campaign can silently prevent delivery even if the API returns 200.
+- send_to_existing_only defaults to true: if the external_user_id doesn't exist in Braze, nothing sends.
+
 SEGMENT LOOKUP:
 - When a user mentions targeting a segment by name (e.g. "weekly active users"), call list_braze_segments first to find the matching segment_id.
 - Present the matching segments to the user and confirm which one to use before proceeding.
@@ -458,9 +469,13 @@ async function executeTool(
           sent_by: "copilot",
         };
 
+        // Generate unique send_id for traceability
+        const sendId = `copilot-${name.replace(/\s+/g, '-').toLowerCase().slice(0, 40)}-${Date.now()}`;
+
         // Build Braze payload
         const brazePayload: Record<string, unknown> = {
           campaign_id: BRAZE_CAMPAIGN_ID,
+          send_id: sendId,
           trigger_properties: triggerProperties,
         };
 
@@ -499,6 +514,7 @@ async function executeTool(
             braze_campaign_id: BRAZE_CAMPAIGN_ID,
             scheduled_at: schedule_time && schedule_time !== "now" ? schedule_time : null,
             created_by: userId,
+            send_id: sendId,
           });
 
           await serviceClient.from("scheduler_logs").insert({
@@ -511,7 +527,8 @@ async function executeTool(
           return JSON.stringify({
             success: true,
             type: "dry_run",
-            message: "DRY RUN — no notifications were sent. Here is the exact Braze payload that would be sent:",
+            send_id: sendId,
+            message: "DRY RUN — no notifications were sent. Here is the exact Braze payload that would be sent. REMINDER: The Braze campaign template must use Liquid tags like {{api_trigger_properties.${title}}} for the title/body to appear in the notification.",
             braze_payload: brazePayload,
             schedule: schedule_time || "immediate",
             targeting_details: targeting.details,
@@ -548,6 +565,7 @@ async function executeTool(
               braze_campaign_id: BRAZE_CAMPAIGN_ID,
               scheduled_at: schedule_time,
               created_by: userId,
+              send_id: sendId,
             });
             return JSON.stringify({ error: "Braze API error", details: brazeData });
           }
@@ -563,19 +581,21 @@ async function executeTool(
             scheduled_at: schedule_time,
             sent_at: new Date().toISOString(),
             created_by: userId,
+            send_id: sendId,
           });
 
           await serviceClient.from("scheduler_logs").insert({
             function_name: "growth-copilot",
             action: `campaign_scheduled_${modeLabel}`,
             reason: `Scheduled ${modeLabel} campaign "${name}" for ${schedule_time}`,
-            details: { campaign_name: name, mode: modeLabel, ...targeting.details, dispatch_id: brazeData.dispatch_id },
+            details: { campaign_name: name, mode: modeLabel, send_id: sendId, ...targeting.details, dispatch_id: brazeData.dispatch_id },
           });
 
           return JSON.stringify({
             success: true,
             type: "scheduled",
             mode: modeLabel,
+            send_id: sendId,
             dispatch_id: brazeData.dispatch_id,
             scheduled_for: schedule_time,
             ...(test_mode ? { note: "TEST MODE: sent only to test user 874810" } : {}),
@@ -603,6 +623,7 @@ async function executeTool(
               trigger_properties: triggerProperties,
               braze_campaign_id: BRAZE_CAMPAIGN_ID,
               created_by: userId,
+              send_id: sendId,
             });
             return JSON.stringify({ error: "Braze API error", details: brazeData });
           }
@@ -617,19 +638,21 @@ async function executeTool(
             braze_dispatch_id: brazeData.dispatch_id,
             sent_at: new Date().toISOString(),
             created_by: userId,
+            send_id: sendId,
           });
 
           await serviceClient.from("scheduler_logs").insert({
             function_name: "growth-copilot",
             action: `campaign_sent_${modeLabel}`,
             reason: `Sent ${modeLabel} campaign "${name}" immediately`,
-            details: { campaign_name: name, mode: modeLabel, ...targeting.details, dispatch_id: brazeData.dispatch_id },
+            details: { campaign_name: name, mode: modeLabel, send_id: sendId, ...targeting.details, dispatch_id: brazeData.dispatch_id },
           });
 
           return JSON.stringify({
             success: true,
             type: "immediate",
             mode: modeLabel,
+            send_id: sendId,
             dispatch_id: brazeData.dispatch_id,
             ...(test_mode ? { note: "TEST MODE: sent only to test user 874810" } : {}),
           });
