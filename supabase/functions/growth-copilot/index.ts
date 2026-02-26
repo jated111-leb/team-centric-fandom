@@ -10,7 +10,7 @@ const corsHeaders = {
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const BRAZE_API_KEY = Deno.env.get("BRAZE_COPILOT_API_KEY")!;
 const BRAZE_REST_ENDPOINT = Deno.env.get("BRAZE_REST_ENDPOINT")!;
-const BRAZE_CAMPAIGN_ID = Deno.env.get("BRAZE_CAMPAIGN_ID")!;
+// BRAZE_CAMPAIGN_ID removed — /messages/send doesn't use campaign_id
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -33,7 +33,7 @@ HOW THIS COPILOT SENDS NOTIFICATIONS:
 - In-App Messages (IAM): uses the in_app_message object. Supports slideup, modal, and full types.
 - You can send push only, IAM only, or both together in a single campaign.
 - This guarantees the exact content you specify reaches the user.
-- send_to_existing_only defaults to true: if the external_user_id doesn't exist in Braze, nothing sends.
+- When using external_user_ids (individual targeting), send_to_existing_only is set to true on each recipient — if the user doesn't exist in Braze, that recipient is skipped silently. This does NOT apply to segment or audience-based targeting.
 
 IN-APP MESSAGE (IAM) GUIDELINES:
 - Use channels: ["push", "iam"] or channels: ["iam"] to include in-app messages.
@@ -432,7 +432,7 @@ async function buildAudienceAndRecipients(args: Record<string, unknown>) {
   // 4. If external_user_ids, populate recipients
   if (external_user_ids && external_user_ids.length > 0) {
     for (const id of external_user_ids) {
-      recipients.push({ external_user_id: id });
+      recipients.push({ external_user_id: id, send_to_existing_only: true });
     }
     details.external_user_ids = external_user_ids;
   }
@@ -614,7 +614,6 @@ async function executeTool(
             status: "dry_run",
             segment_filter: segmentFilter,
             trigger_properties: triggerProperties,
-            braze_campaign_id: BRAZE_CAMPAIGN_ID,
             scheduled_at: schedule_time && schedule_time !== "now" ? schedule_time : null,
             created_by: userId,
             send_id: sendId,
@@ -665,7 +664,6 @@ async function executeTool(
               status: "error",
               segment_filter: segmentFilter,
               trigger_properties: triggerProperties,
-              braze_campaign_id: BRAZE_CAMPAIGN_ID,
               scheduled_at: schedule_time,
               created_by: userId,
               send_id: sendId,
@@ -679,7 +677,6 @@ async function executeTool(
             status: "sent",
             segment_filter: segmentFilter,
             trigger_properties: triggerProperties,
-            braze_campaign_id: BRAZE_CAMPAIGN_ID,
             braze_dispatch_id: brazeData.dispatch_id,
             scheduled_at: schedule_time,
             sent_at: new Date().toISOString(),
@@ -724,7 +721,6 @@ async function executeTool(
               status: "error",
               segment_filter: segmentFilter,
               trigger_properties: triggerProperties,
-              braze_campaign_id: BRAZE_CAMPAIGN_ID,
               created_by: userId,
               send_id: sendId,
             });
@@ -737,7 +733,6 @@ async function executeTool(
             status: "sent",
             segment_filter: segmentFilter,
             trigger_properties: triggerProperties,
-            braze_campaign_id: BRAZE_CAMPAIGN_ID,
             braze_dispatch_id: brazeData.dispatch_id,
             sent_at: new Date().toISOString(),
             created_by: userId,
