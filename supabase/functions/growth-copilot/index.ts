@@ -30,6 +30,9 @@ Your capabilities:
 HOW THIS COPILOT SENDS NOTIFICATIONS:
 - This copilot sends via Braze /messages/send with explicit messaging objects.
 - Push: uses apple_push and android_push objects. Title and body are sent directly — no campaign template or Liquid tags needed.
+- Rich Push (images): You can attach an image to push notifications. Provide image_url (a publicly accessible URL to a JPEG, PNG, or GIF).
+  - iOS: sets asset_url + asset_file_type + mutable_content on the apple_push object. iOS rich notifications support JPEG, PNG, GIF (max 10MB, recommended 1038x1038).
+  - Android: sets appboy_image_url in the extra object for "Big Picture" expanded notifications. Images should be 2:1 aspect ratio, at least 600x300px. Only static JPEG/PNG supported.
 - In-App Messages (IAM): uses the in_app_message object. Supports slideup, modal, and full types.
 - You can send push only, IAM only, or both together in a single campaign.
 - This guarantees the exact content you specify reaches the user.
@@ -134,6 +137,10 @@ const commonTargetingParams = {
 };
 
 const channelParams = {
+  image_url: {
+    type: "string" as const,
+    description: "Optional publicly accessible image URL (JPEG, PNG, or GIF) to attach to the push notification as a rich notification. iOS: appears as expanded media. Android: appears as Big Picture expanded image (2:1 aspect ratio recommended).",
+  },
   channels: {
     type: "array" as const,
     items: { type: "string" as const, enum: ["push", "iam"] },
@@ -305,11 +312,22 @@ const tools = [
   },
 ];
 
+// Infer file type from URL for iOS asset_file_type
+function inferAssetFileType(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes(".png")) return "png";
+  if (lower.includes(".gif")) return "gif";
+  if (lower.includes(".jpg") || lower.includes(".jpeg")) return "jpg";
+  // Default to jpg for unknown
+  return "jpg";
+}
+
 // Build messaging objects based on channels
 function buildMessagesObject(args: Record<string, unknown>, name: string) {
   const channels = (args.channels as string[]) || ["push"];
   const title = args.title as string;
   const body = args.body as string;
+  const imageUrl = args.image_url as string | undefined;
   const iamType = (args.iam_type as string) || "slideup";
   const iamHeader = args.iam_header as string | undefined;
   const iamBody = (args.iam_body as string) || body;
@@ -319,14 +337,32 @@ function buildMessagesObject(args: Record<string, unknown>, name: string) {
   const messages: Record<string, unknown> = {};
 
   if (channels.includes("push")) {
-    messages.apple_push = {
+    const applePush: Record<string, unknown> = {
       alert: { title, body },
       extra: { campaign_name: name, sent_by: "copilot" },
     };
+
+    const androidExtra: Record<string, string> = {
+      campaign_name: name,
+      sent_by: "copilot",
+    };
+
+    // Rich push: attach image
+    if (imageUrl) {
+      // iOS: asset_url + asset_file_type + mutable_content
+      applePush.asset_url = imageUrl;
+      applePush.asset_file_type = inferAssetFileType(imageUrl);
+      applePush.mutable_content = true;
+
+      // Android: appboy_image_url in extra for Big Picture
+      androidExtra.appboy_image_url = imageUrl;
+    }
+
+    messages.apple_push = applePush;
     messages.android_push = {
       title,
       alert: body,
-      extra: { campaign_name: name, sent_by: "copilot" },
+      extra: androidExtra,
     };
   }
 
