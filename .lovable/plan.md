@@ -1,23 +1,31 @@
 
 
-## Switch Growth Copilot to `/messages/send` — COMPLETED ✅
+## Braze Payload Hardening — Production-Grade Fixes
 
-### Status: All changes implemented
+Based on your feedback, here are the changes to `supabase/functions/growth-copilot/index.ts`:
 
-**1. `/messages/send` with explicit `apple_push` + `android_push` objects** ✅
-**2. `/messages/schedule/create` for scheduled sends** ✅
-**3. IAM support (`in_app_message` object) with slideup/modal/full types** ✅
-**4. `BRAZE_CAMPAIGN_ID` removed from all Braze payloads and DB inserts** ✅
-**5. `send_to_existing_only: true` correctly applied only to `recipients` array (not segment/audience targeting)** ✅
-**6. System prompt updated to accurately describe behavior** ✅
-**7. Dry run returns `messages` object in payload preview** ✅
-**8. Audit trail stored in `copilot_campaigns.trigger_properties`** ✅
+### 1. Add `broadcast: true` for segment-only sends (must-fix per docs)
+In `confirm_and_send`, when the payload uses `segment_id` without `recipients`, add `broadcast: true` to the payload. This is required by Braze for segment sends.
 
-### API Permissions Required on `BRAZE_COPILOT_API_KEY`
-- `messages.send` ✅ (confirmed by user)
-- `messages.schedule.create` ✅ (confirmed by user)
-- `messages.schedule.update` ✅ (confirmed by user)
-- `messages.schedule.delete` ✅ (confirmed by user)
-- `segments.list` ✅ (confirmed by user)
-- `segments.details` ✅ (confirmed by user)
-- `messages.schedule_broadcasts` ✅ (confirmed by user)
+### 2. Add `send_to_most_recent_device_only: true` on both push objects
+In `buildMessagesObject`, set this flag on both `apple_push` and `android_push` to prevent multi-device spam.
+
+### 3. Add deep link (`custom_uri`) support to push notifications
+- Add a `deep_link` parameter to both `preview_campaign` and `confirm_and_send` tool schemas.
+- In `buildMessagesObject`, if `deep_link` is provided:
+  - iOS: set `custom_uri` on `apple_push`
+  - Android: set `custom_uri` on `android_push`
+- Update system prompt to mention deep links and recommend them.
+
+### 4. Update system prompt with production guidelines
+Add a section advising the AI to:
+- Suggest adding a deep link when none is provided
+- Warn about image spec requirements (Android 2:1 ≥600×300, iOS max 10MB)
+- Note payload size limits (iOS 1912 bytes, Android 4000 bytes)
+
+### 5. Scheduled sends also get `broadcast: true`
+Same logic applies to the `/messages/schedule/create` path.
+
+### Files changed
+- `supabase/functions/growth-copilot/index.ts` — all changes in this single file, then redeploy.
+
