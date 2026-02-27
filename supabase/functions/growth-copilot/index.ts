@@ -109,7 +109,17 @@ When a user wants to send a campaign:
 2. If targeting a segment, call get_segment_details to fetch and show audience size
 3. Call preview_campaign to validate and show preview (include audience size in your response)
 4. Ask for confirmation
-5. Only then call confirm_and_send`;
+5. Only then call confirm_and_send
+
+TIMEZONE HANDLING:
+- The default timezone for this system is Asia/Baghdad (Iraq Standard Time, UTC+3).
+- When the user says a time without specifying a timezone (e.g. "send at 7pm", "schedule for tomorrow at 3:30pm"), ALWAYS interpret it as Asia/Baghdad time and convert to UTC (ISO 8601) before passing to schedule_time.
+- Conversion: subtract 3 hours from Baghdad time to get UTC. Example: "7pm Baghdad" = "16:00 UTC" → "2026-02-28T16:00:00Z"
+- Iraq does not currently observe daylight saving time, so the offset is always +03:00.
+- When showing times back to the user, display both Baghdad local time AND UTC. Example: "Scheduled for 7:00 PM Baghdad (4:00 PM UTC)"
+- If the user explicitly provides a timezone (e.g. "3pm GST", "2pm UTC"), respect their timezone instead.
+- The schedule_time parameter sent to Braze must ALWAYS be in UTC ISO 8601 format.`;
+
 
 const audienceParamSchema = {
   type: "object" as const,
