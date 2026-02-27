@@ -118,7 +118,16 @@ TIMEZONE HANDLING:
 - Iraq does not currently observe daylight saving time, so the offset is always +03:00.
 - When showing times back to the user, display both Baghdad local time AND UTC. Example: "Scheduled for 7:00 PM Baghdad (4:00 PM UTC)"
 - If the user explicitly provides a timezone (e.g. "3pm GST", "2pm UTC"), respect their timezone instead.
-- The schedule_time parameter sent to Braze must ALWAYS be in UTC ISO 8601 format.`;
+- The schedule_time parameter sent to Braze must ALWAYS be in UTC ISO 8601 format.
+
+BIDI TEXT OPTIMIZATION (CRITICAL FOR ARABIC):
+- Braze frequently breaks bidirectional (BiDi) text rendering in push notifications, especially with mixed Arabic + English/numbers/URLs.
+- When the user writes or you generate Arabic push text that contains ANY LTR islands (Latin words, numbers, domains, URLs, coupon codes, Liquid variables like {{first_name}}), you MUST apply BiDi optimization.
+- Call the optimize_bidi tool with the text to get a Braze-safe version with proper Unicode directional marks embedded.
+- ALWAYS use the BiDi-optimized version in the final push payload (title and body).
+- If the user provides purely English text with no Arabic, skip BiDi optimization.
+- When previewing a campaign with Arabic text, show the annotated QA version so the user can verify mark placement.
+- The optimize_bidi tool returns both the Braze-ready string (with real invisible Unicode marks) and an annotated QA version with visible [RLE], [LRE], [PDF] tags.`;
 
 
 const audienceParamSchema = {
@@ -317,6 +326,33 @@ const tools = [
             description: "Number of campaigns to return (default 10)",
           },
         },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "optimize_bidi",
+      description:
+        "Apply BiDi (bidirectional) optimization to Arabic text that contains LTR islands (English words, numbers, URLs, Liquid variables). Returns a Braze-safe string with proper Unicode directional marks (RLE/LRE/PDF) embedded, plus an annotated QA version. MUST be called for any Arabic push text containing mixed LTR content before sending.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "The Arabic text (which may contain English words, numbers, URLs, coupon codes, or Liquid variables) to optimize for BiDi rendering.",
+          },
+          ltr_tokens: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional list of known LTR tokens/variables in the text to help detect islands (e.g. ['1001', '{{coupon_code}}', 'Kabul'])",
+          },
+          max_length: {
+            type: "number",
+            description: "Maximum character limit for the output. Default: 140",
+          },
+        },
+        required: ["text"],
       },
     },
   },
@@ -860,6 +896,65 @@ async function executeTool(
           .limit(limit);
         if (error) throw error;
         return JSON.stringify({ campaigns: data });
+      }
+
+      case "optimize_bidi": {
+        const text = args.text as string;
+        const ltrTokens = (args.ltr_tokens as string[]) || [];
+        const maxLength = (args.max_length as number) || 140;
+
+        // Use the AI model itself to apply BiDi optimization
+        const bidiPrompt = `You are a BiDi-safe copy generator for Braze push notifications (plain text, no HTML).
+Your job: take the Arabic sentence (which may include English words, numbers, domains, coupon codes, or Liquid variables) and output a Braze-ready line that renders correctly in mixed RTL/LTR on iOS and Android.
+
+RULES (Embedding method):
+1. Start the entire sentence with RLE (U+202B).
+2. Wrap EVERY LTR "island" (any Latin-script token, number, URL, coupon code, or Liquid variable likely to resolve to Latin/digits) with LRE (U+202A) … PDF (U+202C).
+3. Example islands: Kabul, 1001, 1001.tv, {{coupon_code}}, {{first_name}} if it may be Latin.
+4. Keep normal spaces OUTSIDE the LRE/PDF wrappers.
+5. Keep punctuation inside the surrounding RTL span; end the whole sentence with a closing PDF (U+202C).
+6. Output MUST be plain text with the ACTUAL invisible Unicode marks (not \\u escapes, not HTML).
+7. Limit to max ${maxLength} characters unless the input is already shorter.
+
+OUTPUT FORMAT (exactly two lines, no other text):
+Line 1: Braze-ready final string with real control characters embedded.
+Line 2: Annotated QA version where each invisible mark is replaced by tags [RLE], [LRE], [PDF] so humans can verify placement.
+
+${ltrTokens.length > 0 ? `Known LTR tokens: ${ltrTokens.join(", ")}` : ""}
+
+Process this text: ${text}`;
+
+        const bidiRes = await fetch(
+          "https://openrouter.ai/api/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://lovable.dev",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [{ role: "user", content: bidiPrompt }],
+              temperature: 0.1,
+            }),
+          }
+        );
+
+        if (!bidiRes.ok) {
+          throw new Error(`BiDi optimization failed: ${bidiRes.status}`);
+        }
+
+        const bidiData = await bidiRes.json();
+        const bidiOutput = bidiData.choices?.[0]?.message?.content || "";
+        const lines = bidiOutput.trim().split("\n").filter((l: string) => l.trim());
+
+        return JSON.stringify({
+          original: text,
+          braze_ready: lines[0] || text,
+          annotated_qa: lines[1] || "(no QA annotation)",
+          note: "The braze_ready string contains invisible Unicode directional marks (RLE/LRE/PDF). Use this in the push payload. The annotated_qa version shows where each mark is placed.",
+        });
       }
 
       default:

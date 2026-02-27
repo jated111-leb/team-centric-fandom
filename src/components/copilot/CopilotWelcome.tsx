@@ -218,6 +218,22 @@ export function CopilotWelcome({ onSuggestionClick }: CopilotWelcomeProps) {
             </AccordionContent>
           </AccordionItem>
 
+          {/* BiDi Optimization */}
+          <AccordionItem value="bidi">
+            <AccordionTrigger className="text-sm">Arabic BiDi text optimization</AccordionTrigger>
+            <AccordionContent className="text-sm text-muted-foreground space-y-2">
+              <p>Mixed Arabic + English text often renders incorrectly in Braze push notifications due to bidirectional (BiDi) issues. The copilot fixes this automatically:</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li><strong className="text-foreground">Auto-detection</strong> — when your push text contains Arabic mixed with English words, numbers, URLs, or Liquid variables, the copilot applies BiDi optimization.</li>
+                <li><strong className="text-foreground">Unicode marks</strong> — embeds invisible RLE/LRE/PDF directional marks so text renders correctly on both iOS and Android.</li>
+                <li><strong className="text-foreground">QA view</strong> — shows an annotated version with visible <code>[RLE]</code>, <code>[LRE]</code>, <code>[PDF]</code> tags so you can verify mark placement before sending.</li>
+              </ul>
+              <p className="text-xs mt-2 border-l-2 border-primary/30 pl-2">
+                💡 Just write your Arabic text naturally — the copilot handles the rest. Example: <em>"شجع فريقك على 1001.tv"</em> → auto-wrapped with directional marks for correct rendering.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
         </Accordion>
       </div>
     </div>
