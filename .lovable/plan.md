@@ -1,31 +1,25 @@
 
 
-## Braze Payload Hardening — Production-Grade Fixes
+## Fix: Braze "send_id requires campaign_id" error
 
-Based on your feedback, here are the changes to `supabase/functions/growth-copilot/index.ts`:
+**Root cause:** Line 700-702 in `growth-copilot/index.ts` — the payload always includes `send_id` but never includes `campaign_id`. Braze requires both or neither.
 
-### 1. Add `broadcast: true` for segment-only sends (must-fix per docs)
-In `confirm_and_send`, when the payload uses `segment_id` without `recipients`, add `broadcast: true` to the payload. This is required by Braze for segment sends.
+**Fix approach:** Include `BRAZE_CAMPAIGN_ID` in the payload when `send_id` is present. The secret already exists in the project.
 
-### 2. Add `send_to_most_recent_device_only: true` on both push objects
-In `buildMessagesObject`, set this flag on both `apple_push` and `android_push` to prevent multi-device spam.
+### Implementation
 
-### 3. Add deep link (`custom_uri`) support to push notifications
-- Add a `deep_link` parameter to both `preview_campaign` and `confirm_and_send` tool schemas.
-- In `buildMessagesObject`, if `deep_link` is provided:
-  - iOS: set `custom_uri` on `apple_push`
-  - Android: set `custom_uri` on `android_push`
-- Update system prompt to mention deep links and recommend them.
+**File:** `supabase/functions/growth-copilot/index.ts`
 
-### 4. Update system prompt with production guidelines
-Add a section advising the AI to:
-- Suggest adding a deep link when none is provided
-- Warn about image spec requirements (Android 2:1 ≥600×300, iOS max 10MB)
-- Note payload size limits (iOS 1912 bytes, Android 4000 bytes)
+1. Read `BRAZE_CAMPAIGN_ID` from env at the top of the function (alongside the existing `BRAZE_COPILOT_API_KEY` read).
+2. In the `brazePayload` construction (~line 700), add `campaign_id` alongside `send_id`:
+   ```typescript
+   const brazePayload: Record<string, unknown> = {
+     campaign_id: brazeCampaignId,
+     send_id: sendId,
+     messages,
+   };
+   ```
+3. Also add it to the scheduled send path if it has the same issue.
 
-### 5. Scheduled sends also get `broadcast: true`
-Same logic applies to the `/messages/schedule/create` path.
-
-### Files changed
-- `supabase/functions/growth-copilot/index.ts` — all changes in this single file, then redeploy.
+**Redeploy** the `growth-copilot` edge function.
 
