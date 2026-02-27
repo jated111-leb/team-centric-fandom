@@ -70,6 +70,7 @@ SAFE TESTING WORKFLOW:
 - When the user is testing or trying the copilot for the first time, suggest using test_mode: true which sends only to the test user (874810).
 - Offer dry_run: true to show the exact Braze payload without sending anything.
 - dry_run: true — builds the full payload, validates targeting, logs campaign with status 'dry_run', returns the exact Braze payload. Zero sends.
+- CRITICAL: When a dry_run completes, you MUST display the FULL braze_payload JSON from the tool result in a formatted JSON code block. Never summarize or omit the payload — the whole point of dry_run is for the user to inspect the exact payload that would be sent to Braze.
 - test_mode: true — overrides all targeting to send ONLY to external_user_id "874810" (test account). Real Braze send but only to one user.
 - Both flags can be set on confirm_and_send.
 
