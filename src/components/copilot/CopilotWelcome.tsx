@@ -138,23 +138,64 @@ export function CopilotWelcome({ onSuggestionClick }: CopilotWelcomeProps) {
             </AccordionContent>
           </AccordionItem>
 
-          {/* Scheduling */}
+          {/* Scheduling & Timezone */}
           <AccordionItem value="scheduling">
-            <AccordionTrigger className="text-sm">Scheduling sends</AccordionTrigger>
+            <AccordionTrigger className="text-sm">Scheduling & timezone</AccordionTrigger>
             <AccordionContent className="text-sm text-muted-foreground space-y-2">
               <p>You can send immediately or schedule for a future time:</p>
               <ul className="list-disc pl-4 space-y-1">
                 <li><strong className="text-foreground">Immediate</strong> — just describe the campaign and confirm. It fires right away.</li>
-                <li><strong className="text-foreground">Scheduled</strong> — include a time in your prompt using ISO 8601 or natural language:
+                <li><strong className="text-foreground">Scheduled</strong> — include a time in your prompt using natural language:
                   <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                    <li><em>"Schedule for tomorrow at 7pm GST"</em></li>
-                    <li><em>"Send at 2026-03-01T15:00:00Z"</em></li>
+                    <li><em>"Schedule for tomorrow at 7pm"</em></li>
                     <li><em>"Send in 2 hours"</em></li>
                   </ul>
                 </li>
               </ul>
+              <p className="font-medium text-foreground mt-3">Default timezone: Baghdad (UTC+3)</p>
+              <p>All times are interpreted as <strong className="text-foreground">Asia/Baghdad</strong> unless you specify otherwise. The copilot converts to UTC automatically for Braze.</p>
               <p className="text-xs mt-2 border-l-2 border-primary/30 pl-2">
-                💡 Tip: The copilot will show the exact UTC time in the preview so you can double-check before confirming.
+                💡 <em>"Send at 7pm"</em> → interpreted as 7:00 PM Baghdad → scheduled for 4:00 PM UTC. Both times shown in the preview.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Channels: Push & IAM */}
+          <AccordionItem value="channels">
+            <AccordionTrigger className="text-sm">Channels: Push & In-App Messages</AccordionTrigger>
+            <AccordionContent className="text-sm text-muted-foreground space-y-2">
+              <p>The copilot supports two delivery channels — use them alone or together:</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li><strong className="text-foreground">Push notifications</strong> — default channel. Delivered to both iOS and Android.</li>
+                <li><strong className="text-foreground">In-App Messages (IAM)</strong> — displayed when the user next opens the app. Three types:
+                  <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                    <li><strong className="text-foreground">Slideup</strong> — say <em>"tooltip"</em>, <em>"toast"</em>, or <em>"slide-up"</em></li>
+                    <li><strong className="text-foreground">Modal</strong> — say <em>"popup"</em>, <em>"dialog"</em>, or <em>"overlay"</em></li>
+                    <li><strong className="text-foreground">Full</strong> — say <em>"takeover"</em> or <em>"full screen"</em></li>
+                  </ul>
+                </li>
+              </ul>
+              <p className="text-xs mt-2 border-l-2 border-primary/30 pl-2">
+                💡 <em>"Send a push and a tooltip to Al Hilal fans"</em> → delivers both a push notification AND a slideup IAM in one campaign.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Rich Push Images */}
+          <AccordionItem value="images">
+            <AccordionTrigger className="text-sm">Rich push images</AccordionTrigger>
+            <AccordionContent className="text-sm text-muted-foreground space-y-2">
+              <p>Attach an image to your push notification using the 📷 button next to the input:</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li><strong className="text-foreground">Formats</strong> — JPEG, PNG, or GIF (GIF animates on iOS only)</li>
+                <li><strong className="text-foreground">Size</strong> — under 10 MB (recommended under 5 MB)</li>
+                <li><strong className="text-foreground">Dimensions</strong> — at least 600×300px, 2:1 aspect ratio recommended for Android</li>
+                <li><strong className="text-foreground">iOS</strong> — shows as an expanded rich notification (up to 1038×1038)</li>
+                <li><strong className="text-foreground">Android</strong> — shows as a "Big Picture" expanded notification</li>
+              </ul>
+              <p>The upload validates your image against these guidelines and warns you if anything is off before sending.</p>
+              <p className="text-xs mt-2 border-l-2 border-primary/30 pl-2">
+                💡 Attach an image → type your campaign → the copilot automatically includes it in the push payload for both platforms.
               </p>
             </AccordionContent>
           </AccordionItem>
