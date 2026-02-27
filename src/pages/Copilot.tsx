@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -15,6 +14,7 @@ import {
 import { Send, Sparkles, Bot, User, Loader2, Plus, History, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { CopilotWelcome } from "@/components/copilot/CopilotWelcome";
+import { CopilotChatInput } from "@/components/copilot/CopilotChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -30,7 +30,6 @@ interface SessionSummary {
 
 const Copilot = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -126,17 +125,14 @@ const Copilot = () => {
   const startNewChat = () => {
     setSessionId(crypto.randomUUID());
     setMessages([]);
-    setInput("");
   };
 
-  const sendMessage = async () => {
-    const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
+  const sendMessage = async (messageText: string) => {
+    if (!messageText.trim() || isLoading) return;
 
-    const userMsg: Message = { role: "user", content: trimmed };
+    const userMsg: Message = { role: "user", content: messageText };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
-    setInput("");
     setIsLoading(true);
 
     try {
@@ -170,12 +166,7 @@ const Copilot = () => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  // handleKeyDown removed — now handled by CopilotChatInput
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -253,7 +244,7 @@ const Copilot = () => {
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         {messages.length === 0 && (
-          <CopilotWelcome onSuggestionClick={(s) => setInput(s)} />
+          <CopilotWelcome onSuggestionClick={(s) => sendMessage(s)} />
         )}
 
         <div className="space-y-4 max-w-3xl mx-auto">
@@ -305,27 +296,7 @@ const Copilot = () => {
       </ScrollArea>
 
       {/* Input */}
-      <div className="border-t border-border p-4">
-        <div className="flex gap-2 max-w-3xl mx-auto">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Describe the campaign you want to send..."
-            className="min-h-[44px] max-h-32 resize-none"
-            rows={1}
-            disabled={isLoading}
-          />
-          <Button
-            onClick={sendMessage}
-            disabled={!input.trim() || isLoading}
-            size="icon"
-            className="h-[44px] w-[44px] shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <CopilotChatInput onSend={sendMessage} isLoading={isLoading} />
     </div>
   );
 };
