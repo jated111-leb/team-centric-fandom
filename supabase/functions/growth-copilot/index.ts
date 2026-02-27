@@ -925,13 +925,12 @@ ${ltrTokens.length > 0 ? `Known LTR tokens: ${ltrTokens.join(", ")}` : ""}
 Process this text: ${text}`;
 
         const bidiRes = await fetch(
-          "https://openrouter.ai/api/v1/chat/completions",
+          "https://ai.gateway.lovable.dev/v1/chat/completions",
           {
             method: "POST",
             headers: {
               Authorization: `Bearer ${LOVABLE_API_KEY}`,
               "Content-Type": "application/json",
-              "HTTP-Referer": "https://lovable.dev",
             },
             body: JSON.stringify({
               model: "google/gemini-2.5-flash",
