@@ -38,6 +38,13 @@ HOW THIS COPILOT SENDS NOTIFICATIONS:
 - This guarantees the exact content you specify reaches the user.
 - When using external_user_ids (individual targeting), send_to_existing_only is set to true on each recipient — if the user doesn't exist in Braze, that recipient is skipped silently. This does NOT apply to segment or audience-based targeting.
 
+PRODUCTION PAYLOAD GUIDELINES:
+- Deep links: Always suggest adding a deep_link when the user doesn't provide one. Deep links drive deterministic actions from push notifications. Pass deep_link to preview_campaign and confirm_and_send — it maps to custom_uri on iOS and Android.
+- Image specs: Android Big Picture requires 2:1 aspect ratio, minimum 600×300px. iOS rich push supports JPEG/PNG/GIF up to 10MB (recommended 1038×1038).
+- Payload size limits: iOS combined alert+extra must not exceed 1912 bytes. Android alert+extra must not exceed 4000 bytes. Warn the user if content looks large.
+- broadcast:true is automatically added when targeting a segment_id without individual recipients — this is required by Braze docs.
+- send_to_most_recent_device_only is set to true on both push platforms to prevent multi-device spam.
+
 IN-APP MESSAGE (IAM) GUIDELINES:
 - Use channels: ["push", "iam"] or channels: ["iam"] to include in-app messages.
 - Default channel is ["push"] if not specified.
@@ -162,6 +169,10 @@ const channelParams = {
   image_url: {
     type: "string" as const,
     description: "Optional publicly accessible image URL (JPEG, PNG, or GIF) to attach to the push notification as a rich notification. iOS: appears as expanded media. Android: appears as Big Picture expanded image (2:1 aspect ratio recommended).",
+  },
+  deep_link: {
+    type: "string" as const,
+    description: "Optional deep link URI to open when the push notification is tapped. Maps to custom_uri on both iOS and Android. Example: 'myapp://match/12345' or 'https://example.com/page'.",
   },
   channels: {
     type: "array" as const,
@@ -383,12 +394,14 @@ function buildMessagesObject(args: Record<string, unknown>, name: string) {
   const iamImageUrl = args.iam_image_url as string | undefined;
   const iamClickAction = args.iam_click_action as string | undefined;
 
+  const deepLink = args.deep_link as string | undefined;
   const messages: Record<string, unknown> = {};
 
   if (channels.includes("push")) {
     const applePush: Record<string, unknown> = {
       alert: { title, body },
       extra: { campaign_name: name, sent_by: "copilot" },
+      send_to_most_recent_device_only: true,
     };
 
     const androidExtra: Record<string, string> = {
@@ -407,12 +420,23 @@ function buildMessagesObject(args: Record<string, unknown>, name: string) {
       androidExtra.appboy_image_url = imageUrl;
     }
 
+    // Deep link support
+    if (deepLink) {
+      applePush.custom_uri = deepLink;
+    }
+
     messages.apple_push = applePush;
-    messages.android_push = {
+
+    const androidPush: Record<string, unknown> = {
       title,
       alert: body,
       extra: androidExtra,
+      send_to_most_recent_device_only: true,
     };
+    if (deepLink) {
+      androidPush.custom_uri = deepLink;
+    }
+    messages.android_push = androidPush;
   }
 
   if (channels.includes("iam")) {
@@ -679,8 +703,12 @@ async function executeTool(
           if (targeting.recipients.length > 0) {
             brazePayload.recipients = targeting.recipients;
           }
-          if (targeting.segment_id && !targeting.audience) {
+        if (targeting.segment_id && !targeting.audience) {
             brazePayload.segment_id = targeting.segment_id;
+          }
+          // broadcast:true required by Braze when using segment_id without recipients
+          if (targeting.segment_id && targeting.recipients.length === 0) {
+            brazePayload.broadcast = true;
           }
         }
 
