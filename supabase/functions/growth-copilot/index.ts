@@ -719,6 +719,7 @@ async function executeTool(
           // broadcast:true required by Braze when using segment_id without recipients
           if (targeting.segment_id && targeting.recipients.length === 0) {
             brazePayload.broadcast = true;
+            brazePayload.send_to_existing_only = true;
           }
         }
 
@@ -749,12 +750,16 @@ async function executeTool(
             details: { campaign_name: name, ...targeting.details },
           });
 
+          // Strip internal-only fields before showing payload
+          const displayPayload = { ...brazePayload };
+          delete displayPayload.schedule;
+
           return JSON.stringify({
             success: true,
             type: "dry_run",
             send_id: sendId,
             message: `DRY RUN — no notifications were sent. Channels: ${channels.join(", ")}. The payload below shows the exact messaging objects that would be delivered.`,
-            braze_payload: brazePayload,
+            braze_payload: displayPayload,
             schedule: schedule_time || "immediate",
             targeting_details: targeting.details,
           });
