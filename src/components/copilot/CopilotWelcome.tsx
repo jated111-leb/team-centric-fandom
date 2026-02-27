@@ -218,6 +218,21 @@ export function CopilotWelcome({ onSuggestionClick }: CopilotWelcomeProps) {
             </AccordionContent>
           </AccordionItem>
 
+          {/* Device Targeting */}
+          <AccordionItem value="device-targeting">
+            <AccordionTrigger className="text-sm">Device targeting</AccordionTrigger>
+            <AccordionContent className="text-sm text-muted-foreground space-y-2">
+              <p>By default, push notifications are sent to <strong className="text-foreground">all devices</strong> registered to each user. You can change this:</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li><strong className="text-foreground">All devices (default)</strong> — a user with both an iPhone and an Android phone will receive the push on both.</li>
+                <li><strong className="text-foreground">Most recent device only</strong> — sends only to the last device the user was active on. Useful to avoid annoying multi-device spam.</li>
+              </ul>
+              <p className="text-xs mt-2 border-l-2 border-primary/30 pl-2">
+                💡 To enable it, just say <em>"send to most recent device only"</em> in your prompt. Example: <em>"Send a push to Al Hilal fans about the match, most recent device only"</em>
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
           {/* BiDi Optimization */}
           <AccordionItem value="bidi">
             <AccordionTrigger className="text-sm">Arabic BiDi text optimization</AccordionTrigger>
