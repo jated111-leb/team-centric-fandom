@@ -43,7 +43,7 @@ PRODUCTION PAYLOAD GUIDELINES:
 - Image specs: Android Big Picture requires 2:1 aspect ratio, minimum 600×300px. iOS rich push supports JPEG/PNG/GIF up to 10MB (recommended 1038×1038).
 - Payload size limits: iOS combined alert+extra must not exceed 1912 bytes. Android alert+extra must not exceed 4000 bytes. Warn the user if content looks large.
 - broadcast:true is automatically added when targeting a segment_id without individual recipients — this is required by Braze docs.
-- send_to_most_recent_device_only is set to true on both push platforms to prevent multi-device spam.
+- send_to_most_recent_device_only defaults to false (all devices). If the user asks to send to the most recent device only, set send_to_most_recent_device_only: true in preview_campaign / confirm_and_send.
 
 IN-APP MESSAGE (IAM) GUIDELINES:
 - Use channels: ["push", "iam"] or channels: ["iam"] to include in-app messages.
@@ -173,6 +173,10 @@ const channelParams = {
   deep_link: {
     type: "string" as const,
     description: "Optional deep link URI to open when the push notification is tapped. Maps to custom_uri on both iOS and Android. Example: 'myapp://match/12345' or 'https://example.com/page'.",
+  },
+  send_to_most_recent_device_only: {
+    type: "boolean" as const,
+    description: "If true, send only to the user's most recently used device. Default: false (send to all devices).",
   },
   channels: {
     type: "array" as const,
@@ -401,8 +405,12 @@ function buildMessagesObject(args: Record<string, unknown>, name: string) {
     const applePush: Record<string, unknown> = {
       alert: { title, body },
       extra: { campaign_name: name, sent_by: "copilot" },
-      send_to_most_recent_device_only: true,
     };
+
+    const sendToMostRecent = !!(args.send_to_most_recent_device_only);
+    if (sendToMostRecent) {
+      applePush.send_to_most_recent_device_only = true;
+    }
 
     const androidExtra: Record<string, string> = {
       campaign_name: name,
@@ -431,8 +439,10 @@ function buildMessagesObject(args: Record<string, unknown>, name: string) {
       title,
       alert: body,
       extra: androidExtra,
-      send_to_most_recent_device_only: true,
     };
+    if (sendToMostRecent) {
+      androidPush.send_to_most_recent_device_only = true;
+    }
     if (deepLink) {
       androidPush.custom_uri = deepLink;
     }
