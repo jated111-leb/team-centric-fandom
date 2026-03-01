@@ -10,7 +10,7 @@ const corsHeaders = {
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const BRAZE_API_KEY = Deno.env.get("BRAZE_COPILOT_API_KEY")!;
 const BRAZE_REST_ENDPOINT = Deno.env.get("BRAZE_REST_ENDPOINT")!;
-const BRAZE_CAMPAIGN_ID = Deno.env.get("BRAZE_CAMPAIGN_ID")!;
+// campaign_id removed — /messages/send works without it
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -698,8 +698,6 @@ async function executeTool(
         // Build Braze /messages/send payload with messaging objects
         const { messages } = buildMessagesObject(args, name);
         const brazePayload: Record<string, unknown> = {
-          campaign_id: BRAZE_CAMPAIGN_ID,
-          send_id: sendId,
           messages,
         };
 
