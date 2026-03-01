@@ -36,7 +36,7 @@ HOW THIS COPILOT SENDS NOTIFICATIONS:
 - In-App Messages (IAM): uses the in_app_message object. Supports slideup, modal, and full types.
 - You can send push only, IAM only, or both together in a single campaign.
 - This guarantees the exact content you specify reaches the user.
-- When using external_user_ids (individual targeting), send_to_existing_only is set to true on each recipient — if the user doesn't exist in Braze, that recipient is skipped silently. This does NOT apply to segment or audience-based targeting.
+- When using external_user_ids (individual targeting), the recipient objects contain only external_user_id. If a user doesn't exist in Braze, Braze will skip them.
 
 PRODUCTION PAYLOAD GUIDELINES:
 - Deep links: Always suggest adding a deep_link when the user doesn't provide one. Deep links drive deterministic actions from push notifications. Pass deep_link to preview_campaign and confirm_and_send — it maps to custom_uri on iOS and Android.
@@ -551,7 +551,7 @@ async function buildAudienceAndRecipients(args: Record<string, unknown>) {
   // 4. If external_user_ids, populate recipients
   if (external_user_ids && external_user_ids.length > 0) {
     for (const id of external_user_ids) {
-      recipients.push({ external_user_id: id, send_to_existing_only: true });
+      recipients.push({ external_user_id: id });
     }
     details.external_user_ids = external_user_ids;
   }
@@ -698,13 +698,14 @@ async function executeTool(
         // Build Braze /messages/send payload with messaging objects
         const { messages } = buildMessagesObject(args, name);
         const brazePayload: Record<string, unknown> = {
+          send_id: sendId,
           messages,
         };
 
         // Test mode: override all targeting to send only to test user
         if (test_mode) {
           delete brazePayload.audience;
-          brazePayload.recipients = [{ external_user_id: "874810", send_to_existing_only: true }];
+          brazePayload.recipients = [{ external_user_id: "874810" }];
         } else {
           if (targeting.audience) {
             brazePayload.audience = targeting.audience;
@@ -718,7 +719,6 @@ async function executeTool(
           // broadcast:true required by Braze when using segment_id without recipients
           if (targeting.segment_id && targeting.recipients.length === 0) {
             brazePayload.broadcast = true;
-            brazePayload.send_to_existing_only = true;
           }
         }
 
