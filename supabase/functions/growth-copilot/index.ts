@@ -698,7 +698,6 @@ async function executeTool(
         // Build Braze /messages/send payload with messaging objects
         const { messages } = buildMessagesObject(args, name);
         const brazePayload: Record<string, unknown> = {
-          send_id: sendId,
           messages,
         };
 
