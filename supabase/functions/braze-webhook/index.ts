@@ -182,10 +182,32 @@ serve(async (req) => {
     const matchDetailsMap = new Map<number, { home_team: string; away_team: string; competition: string; utc_date: string }>();
 
     if (matchIdsToFetch.size > 0) {
-      const { data: matchesData } = await supabase
+      const matchIdArray = Array.from(matchIdsToFetch);
+      let matchesData: Array<{ id: number; home_team: string; away_team: string; competition: string; utc_date: string }> | null = null;
+
+      // Attempt 1
+      const { data: firstAttempt, error: firstError } = await supabase
         .from('matches')
         .select('id, home_team, away_team, competition, utc_date')
-        .in('id', Array.from(matchIdsToFetch));
+        .in('id', matchIdArray);
+
+      if (firstAttempt) {
+        matchesData = firstAttempt;
+      } else {
+        console.warn('⚠️ Matches query attempt 1 failed, retrying...', firstError?.message);
+        // Attempt 2 (retry)
+        const { data: secondAttempt, error: secondError } = await supabase
+          .from('matches')
+          .select('id, home_team, away_team, competition, utc_date')
+          .in('id', matchIdArray);
+
+        if (secondAttempt) {
+          matchesData = secondAttempt;
+          console.log('✅ Matches query succeeded on retry');
+        } else {
+          console.error('❌ Matches query failed on both attempts — enrichment will be skipped for this batch', secondError?.message);
+        }
+      }
 
       if (matchesData) {
         for (const match of matchesData) {
@@ -197,6 +219,14 @@ serve(async (req) => {
           });
         }
         console.log(`📊 Fetched ${matchesData.length} match details in single query`);
+      } else {
+        // Log enrichment failure so it's visible in logs
+        await supabase.from('scheduler_logs').insert({
+          function_name: 'braze-webhook',
+          action: 'enrichment_failed',
+          reason: `Failed to fetch match details for ${matchIdArray.length} match IDs after 2 attempts`,
+          details: { match_ids: matchIdArray },
+        });
       }
     }
 
@@ -330,6 +360,42 @@ serve(async (req) => {
         throw insertError;
       }
       console.log(`✅ Inserted ${notificationRecords.length} new notification records`);
+
+      // ===== Post-insert backfill fallback =====
+      // If any inserted records have a match_id but NULL team data (enrichment missed),
+      // do a server-side UPDATE to fill them from the matches table
+      const matchIdsNeedingBackfill = notificationRecords
+        .filter(r => r.match_id && (!r.home_team || !r.away_team))
+        .map(r => r.match_id!);
+
+      if (matchIdsNeedingBackfill.length > 0) {
+        const uniqueBackfillIds = [...new Set(matchIdsNeedingBackfill)];
+        console.log(`🔧 Post-insert backfill: ${uniqueBackfillIds.length} match IDs have NULL team data, backfilling...`);
+
+        // Fetch match details for the ones we're missing
+        const { data: backfillMatches } = await supabase
+          .from('matches')
+          .select('id, home_team, away_team, competition, utc_date')
+          .in('id', uniqueBackfillIds);
+
+        if (backfillMatches && backfillMatches.length > 0) {
+          const backfillPromises = backfillMatches.map(match =>
+            supabase
+              .from('notification_sends')
+              .update({
+                home_team: match.home_team,
+                away_team: match.away_team,
+                competition: match.competition,
+                kickoff_utc: match.utc_date,
+              })
+              .eq('match_id', match.id)
+              .is('home_team', null)
+          );
+
+          await Promise.all(backfillPromises);
+          console.log(`✅ Post-insert backfill completed for ${backfillMatches.length} matches`);
+        }
+      }
     } else {
       console.log(`ℹ️ No new records to insert (all ${eventCount} events were duplicates)`);
     }
