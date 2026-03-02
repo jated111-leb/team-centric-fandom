@@ -1,25 +1,36 @@
 
 
-## Fix: Braze "send_id requires campaign_id" error
+## Fix: Resilient match enrichment in braze-webhook
 
-**Root cause:** Line 700-702 in `growth-copilot/index.ts` — the payload always includes `send_id` but never includes `campaign_id`. Braze requires both or neither.
+### Root cause
+Braze always sends empty strings for team metadata in webhook payloads — this is expected. Our `braze-webhook` function is supposed to enrich from the `matches` table, but the query can silently fail on some batches, leaving rows with NULL team data.
 
-**Fix approach:** Include `BRAZE_CAMPAIGN_ID` in the payload when `send_id` is present. The secret already exists in the project.
+### Changes to `supabase/functions/braze-webhook/index.ts`
 
-### Implementation
+1. **Add retry logic for matches query** — if the first attempt returns null/error, retry once before giving up
 
-**File:** `supabase/functions/growth-copilot/index.ts`
+2. **Log when enrichment fails** — add explicit error logging when `matchesData` is null so we can detect this in logs instead of silently proceeding
 
-1. Read `BRAZE_CAMPAIGN_ID` from env at the top of the function (alongside the existing `BRAZE_COPILOT_API_KEY` read).
-2. In the `brazePayload` construction (~line 700), add `campaign_id` alongside `send_id`:
-   ```typescript
-   const brazePayload: Record<string, unknown> = {
-     campaign_id: brazeCampaignId,
-     send_id: sendId,
-     messages,
-   };
-   ```
-3. Also add it to the scheduled send path if it has the same issue.
+3. **Add a backfill fallback** — after insertion, if any records have NULL team data but a valid match_id, do a post-insert UPDATE to fill them from the matches table (belt-and-suspenders)
 
-**Redeploy** the `growth-copilot` edge function.
+### Database migration: Backfill existing N/A rows
+
+```sql
+UPDATE notification_sends ns
+SET 
+  home_team = m.home_team,
+  away_team = m.away_team,
+  competition = m.competition,
+  kickoff_utc = m.utc_date
+FROM matches m
+WHERE ns.match_id = m.id
+  AND ns.match_id IS NOT NULL
+  AND (ns.home_team IS NULL OR ns.away_team IS NULL);
+```
+
+This fixes both the ~314 existing rows for match 544461 and any other historical N/A rows that have a valid match_id.
+
+### Summary
+- **2 changes**: edge function hardening + one-time data backfill
+- Braze behavior is expected (empty strings) — the fix is making our enrichment more resilient
 
