@@ -405,28 +405,33 @@ const Analytics = () => {
 
         {/* Tabbed Sections */}
         <Tabs defaultValue="users" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              User Insights
-            </TabsTrigger>
-            <TabsTrigger value="content" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Content Performance
-            </TabsTrigger>
-            <TabsTrigger value="delivery" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Delivery Health
-            </TabsTrigger>
-            <TabsTrigger value="scheduler" className="flex items-center gap-2">
-              <Server className="h-4 w-4" />
-              Scheduler Health
-            </TabsTrigger>
-            <TabsTrigger value="congrats" className="flex items-center gap-2">
-              <Trophy className="h-4 w-4" />
-              Congrats
-            </TabsTrigger>
-          </TabsList>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Match Reminders</p>
+            <TabsList className="inline-flex h-10 w-auto gap-1">
+              <TabsTrigger value="users" className="inline-flex items-center gap-1.5 px-3">
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                <span>User Insights</span>
+              </TabsTrigger>
+              <TabsTrigger value="content" className="inline-flex items-center gap-1.5 px-3">
+                <BarChart3 className="h-3.5 w-3.5 shrink-0" />
+                <span>Content</span>
+              </TabsTrigger>
+              <TabsTrigger value="delivery" className="inline-flex items-center gap-1.5 px-3">
+                <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                <span>Delivery</span>
+              </TabsTrigger>
+              <TabsTrigger value="scheduler" className="inline-flex items-center gap-1.5 px-3">
+                <Server className="h-3.5 w-3.5 shrink-0" />
+                <span>Scheduler</span>
+              </TabsTrigger>
+              <div className="w-px h-6 bg-border mx-1 self-center" />
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider self-center px-1">Congrats</p>
+              <TabsTrigger value="congrats" className="inline-flex items-center gap-1.5 px-3">
+                <Trophy className="h-3.5 w-3.5 shrink-0" />
+                <span>Delivery</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="users">
             {analyticsData && <UserInsightsSection data={analyticsData} />}
