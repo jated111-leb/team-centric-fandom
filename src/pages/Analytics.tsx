@@ -5,12 +5,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, RefreshCw, Users, TrendingUp, BarChart3, Calendar, Server } from "lucide-react";
+import { Download, RefreshCw, Users, TrendingUp, BarChart3, Calendar, Server, Trophy } from "lucide-react";
 import { UserInsightsSection } from "@/components/analytics/UserInsightsSection";
 import { ContentPerformanceSection } from "@/components/analytics/ContentPerformanceSection";
 import { DeliveryHealthSection } from "@/components/analytics/DeliveryHealthSection";
 import { ExecutiveKPIs } from "@/components/analytics/ExecutiveKPIs";
 import { SchedulerHealthSection } from "@/components/analytics/SchedulerHealthSection";
+import { CongratsAnalyticsSection } from "@/components/analytics/CongratsAnalyticsSection";
 import { subDays, startOfDay, endOfDay, startOfYesterday, endOfYesterday } from "date-fns";
 
 export interface NotificationAnalytics {
@@ -404,7 +405,7 @@ const Analytics = () => {
 
         {/* Tabbed Sections */}
         <Tabs defaultValue="users" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               User Insights
@@ -420,6 +421,10 @@ const Analytics = () => {
             <TabsTrigger value="scheduler" className="flex items-center gap-2">
               <Server className="h-4 w-4" />
               Scheduler Health
+            </TabsTrigger>
+            <TabsTrigger value="congrats" className="flex items-center gap-2">
+              <Trophy className="h-4 w-4" />
+              Congrats
             </TabsTrigger>
           </TabsList>
 
@@ -437,6 +442,10 @@ const Analytics = () => {
 
           <TabsContent value="scheduler">
             {analyticsData && <SchedulerHealthSection data={analyticsData.schedulerHealth} />}
+          </TabsContent>
+
+          <TabsContent value="congrats">
+            <CongratsAnalyticsSection />
           </TabsContent>
         </Tabs>
       </div>

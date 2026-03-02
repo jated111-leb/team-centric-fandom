@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.growth-copilot]
 verify_jwt = false
+
+[functions.sync-campaign-analytics]
+verify_jwt = false

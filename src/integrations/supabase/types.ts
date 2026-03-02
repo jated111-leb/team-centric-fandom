@@ -44,6 +44,54 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_analytics: {
+        Row: {
+          body_clicks: number
+          bounces: number
+          campaign_id: string
+          conversions: number
+          date: string
+          direct_opens: number
+          id: string
+          notification_type: string
+          raw_data: Json | null
+          sent: number
+          synced_at: string
+          total_opens: number
+          unique_recipients: number
+        }
+        Insert: {
+          body_clicks?: number
+          bounces?: number
+          campaign_id: string
+          conversions?: number
+          date: string
+          direct_opens?: number
+          id?: string
+          notification_type?: string
+          raw_data?: Json | null
+          sent?: number
+          synced_at?: string
+          total_opens?: number
+          unique_recipients?: number
+        }
+        Update: {
+          body_clicks?: number
+          bounces?: number
+          campaign_id?: string
+          conversions?: number
+          date?: string
+          direct_opens?: number
+          id?: string
+          notification_type?: string
+          raw_data?: Json | null
+          sent?: number
+          synced_at?: string
+          total_opens?: number
+          unique_recipients?: number
+        }
+        Relationships: []
+      }
       competition_translations: {
         Row: {
           arabic_name: string
