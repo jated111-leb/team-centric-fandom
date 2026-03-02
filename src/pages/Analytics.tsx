@@ -136,7 +136,7 @@ const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
-  const [dateRange, setDateRange] = useState('30');
+  const [dateRange, setDateRange] = useState('7');
   const [serverStats, setServerStats] = useState<ServerAnalyticsSummary | null>(null);
 
   useEffect(() => {
@@ -278,8 +278,8 @@ const Analytics = () => {
     } catch (error: any) {
       console.error('Error fetching analytics:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch analytics data",
+        title: "Analytics Timeout",
+        description: "Match reminder data took too long. Try a shorter date range, or use the Congrats tab which loads independently.",
         variant: "destructive",
       });
     } finally {
