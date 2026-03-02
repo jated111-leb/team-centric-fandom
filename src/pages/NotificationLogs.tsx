@@ -57,6 +57,10 @@ const NotificationLogs = () => {
   }, [logs, userIdFilter, eventTypeFilter, competitionFilter, dateFilter]);
 
   useEffect(() => {
+    calculateStats(filteredLogs);
+  }, [filteredLogs]);
+
+  useEffect(() => {
     // Set up realtime subscription
     const channel = supabase
       .channel('notification-logs-changes')
@@ -131,7 +135,8 @@ const NotificationLogs = () => {
       if (error) throw error;
 
       setLogs(data || []);
-      calculateStats(data || []);
+      // Stats are now derived from filteredLogs via useEffect
+      
     } catch (error: any) {
       console.error('Error fetching logs:', error);
       toast({
