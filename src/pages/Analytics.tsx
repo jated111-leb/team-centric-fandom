@@ -56,17 +56,12 @@ export interface AnalyticsData {
     avgWebhookLatency: number;
   };
   schedulerHealth: {
-    matchesWithMultipleDispatchIds: number;
-    avgDispatchIdsPerMatch: number;
+    avgDeliveryBatches: number;
     scheduleLedgerDuplicates: number;
+    stalePendingCount: number;
+    stalePendingMatches: { matchId: number; homeTeam: string; awayTeam: string; sendAtUtc: string; createdAt: string }[];
     webhookDuplicatesSkipped: number;
-    topAnomalies: {
-      matchId: number;
-      homeTeam: string;
-      awayTeam: string;
-      dispatchIdCount: number;
-      scheduleCount: number;
-    }[];
+    ledgerDuplicateDetails: { matchId: number; homeTeam: string; awayTeam: string; scheduleCount: number }[];
   };
 }
 
@@ -102,17 +97,12 @@ interface ServerAnalyticsSummary {
     affectedUsers: number;
   };
   schedulerHealth: {
-    matchesWithMultipleDispatchIds: number;
-    avgDispatchIdsPerMatch: number;
+    avgDeliveryBatches: number;
     scheduleLedgerDuplicates: number;
+    stalePendingCount: number;
+    stalePendingMatches: any[] | null;
     webhookDuplicatesSkipped: number;
-    topAnomalies: {
-      matchId: number;
-      homeTeam: string;
-      awayTeam: string;
-      dispatchIdCount: number;
-      scheduleCount: number;
-    }[] | null;
+    ledgerDuplicateDetails: any[] | null;
   };
   dateRange: {
     start: string;
@@ -267,11 +257,12 @@ const Analytics = () => {
           avgWebhookLatency: summary.deliveryStats.avgWebhookLatency || 0
         },
         schedulerHealth: {
-          matchesWithMultipleDispatchIds: summary.schedulerHealth?.matchesWithMultipleDispatchIds || 0,
-          avgDispatchIdsPerMatch: summary.schedulerHealth?.avgDispatchIdsPerMatch || 0,
+          avgDeliveryBatches: summary.schedulerHealth?.avgDeliveryBatches || 0,
           scheduleLedgerDuplicates: summary.schedulerHealth?.scheduleLedgerDuplicates || 0,
+          stalePendingCount: summary.schedulerHealth?.stalePendingCount || 0,
+          stalePendingMatches: summary.schedulerHealth?.stalePendingMatches || [],
           webhookDuplicatesSkipped: summary.schedulerHealth?.webhookDuplicatesSkipped || 0,
-          topAnomalies: summary.schedulerHealth?.topAnomalies || []
+          ledgerDuplicateDetails: summary.schedulerHealth?.ledgerDuplicateDetails || []
         }
       });
 
