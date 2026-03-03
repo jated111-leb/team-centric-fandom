@@ -12,8 +12,47 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // ==================== AUTH ====================
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Missing authorization' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    // Validate the user's JWT
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify admin role
+    const userId = claimsData.claims.sub;
+    const { data: roleData } = await userClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!roleData) {
+      return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('✅ Authenticated admin user for canvas test');
+
     const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
     const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
     const brazeCanvasId = Deno.env.get('BRAZE_CANVAS_ID');
