@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { email } = await req.json();
+    const { email, action } = await req.json();
 
     if (!email || typeof email !== 'string') {
       throw new Error('Email is required');
@@ -74,6 +74,63 @@ Deno.serve(async (req) => {
       }
     );
 
+    // Handle resend action
+    if (action === 'resend') {
+      // Find the existing invite
+      const { data: existingInvite } = await supabaseAdmin
+        .from('admin_invites')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (!existingInvite) {
+        throw new Error('No invite found for this email');
+      }
+
+      if (existingInvite.status === 'accepted') {
+        throw new Error('This invite has already been accepted');
+      }
+
+      // Find the user and generate a new invite link
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const existingUser = existingUsers?.users?.find(u => u.email === email);
+
+      if (existingUser) {
+        // Generate a password reset email so they can set their password
+        const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: email,
+        });
+
+        if (resetError) {
+          console.error('Failed to resend invite:', resetError);
+          throw new Error(`Failed to resend invite: ${resetError.message}`);
+        }
+      }
+
+      // Update resend tracking
+      await supabaseAdmin
+        .from('admin_invites')
+        .update({
+          last_resent_at: new Date().toISOString(),
+          resend_count: (existingInvite.resend_count || 0) + 1,
+        })
+        .eq('id', existingInvite.id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Invite resent successfully',
+          email: email,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // ===== Standard invite flow =====
+    
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
@@ -92,7 +149,7 @@ Deno.serve(async (req) => {
       const { data: newUser, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
         email: email,
         password: tempPassword,
-        email_confirm: true, // Auto-confirm email
+        email_confirm: true,
       });
 
       if (signUpError) {
@@ -139,6 +196,29 @@ Deno.serve(async (req) => {
 
     if (roleInsertError) {
       throw new Error(`Failed to grant admin role: ${roleInsertError.message}`);
+    }
+
+    // Track the invite
+    await supabaseAdmin
+      .from('admin_invites')
+      .upsert({
+        email: email,
+        invited_by: user.id,
+        status: existingUser ? 'accepted' : 'pending',
+        user_id: userId,
+        accepted_at: existingUser ? new Date().toISOString() : null,
+      }, { onConflict: 'email' });
+
+    // If new user, generate a password reset so they can set their password
+    if (isNewUser) {
+      try {
+        await supabaseAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: email,
+        });
+      } catch (e) {
+        console.error('Failed to generate invite link:', e);
+      }
     }
 
     console.log('Granted admin role to user:', email);

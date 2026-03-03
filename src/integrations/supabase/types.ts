@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          id: string
+          invited_by: string
+          last_resent_at: string | null
+          resend_count: number
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          invited_by: string
+          last_resent_at?: string | null
+          resend_count?: number
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string
+          last_resent_at?: string | null
+          resend_count?: number
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       analytics_cache: {
         Row: {
           computed_at: string
