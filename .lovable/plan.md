@@ -1,63 +1,41 @@
 
 
-## Plan: Congrats Campaign Analytics via Braze API
+## Plan: Reframe Scheduler Health + Keep Real Anomaly Detection
 
-### What we're building
+### Problem
+The current Scheduler Health tab incorrectly flags normal Braze delivery batching (multiple `dispatch_id`s per match) as anomalies. Each `dispatch_id` represents an internal Braze batch of ~50-180 users, not a duplicate schedule.
 
-A new "Congrats" tab on the Analytics page that pulls **real delivery data** from the Braze `/campaigns/data_series` API endpoint. This is completely separate from match reminder analytics.
+### What changes
 
-### Braze API Response Structure
+**1. Reframe metrics in `SchedulerHealthSection.tsx`**
+- **Remove**: "Multi-Dispatch Matches" card and "Avg Dispatch IDs/Match" card (these reflect normal Braze batching, not bugs)
+- **Keep**: "Ledger Duplicates" card (real anomaly: scheduler ran twice for same match)
+- **Keep**: "Webhook Duplicates Blocked" card (dedup protection stats)
+- **Add**: "Delivery Batches" card -- informational, shows avg batches per match as context (not flagged as error)
+- **Add**: "Stale Pending" card -- matches past kickoff still in `pending` status (real anomaly: notification never confirmed sent)
 
-Per the docs, `/campaigns/data_series` returns daily entries with nested `messages` containing per-channel stats (`ios_push`, `android_push`). Each channel has: `sent`, `direct_opens`, `total_opens`, `bounces`, `body_clicks`. Top-level has `unique_recipients` and `conversions`.
+**2. Reframe the anomaly table**
+- Only show rows where `scheduleCount > 1` (real ledger duplicates)
+- Remove dispatch_id count as an anomaly signal
+- Add a "stale pending" section: matches from `schedule_ledger` where `status = 'pending'` and `send_at_utc` is in the past
 
-We'll aggregate `ios_push` + `android_push` stats per day.
+**3. Update health status logic**
+- `hasIssues` = `scheduleLedgerDuplicates > 0` OR stale pending entries exist
+- Dispatch ID count is purely informational
 
-### Components
+**4. Update the SQL in `compute_analytics_summary`**
+- Keep `scheduleLedgerDuplicates` query as-is (real signal)
+- Keep `webhookDuplicatesSkipped` as-is
+- Change `matchesWithMultipleDispatchIds` to `avgDeliveryBatches` (informational only)
+- Add `stalePendingCount`: `SELECT COUNT(*) FROM schedule_ledger WHERE status = 'pending' AND send_at_utc < now()`
+- Simplify `topAnomalies` to only flag `schedule_count > 1` rows
 
-**1. New table: `campaign_analytics`**
+**5. Update explanation card text**
+- Explain that delivery batches are normal Braze behavior
+- Focus anomaly language on ledger duplicates and stale pending
 
-| Column | Type |
-|--------|------|
-| id | uuid PK |
-| campaign_id | text |
-| notification_type | text (`'congrats'`) |
-| date | date |
-| unique_recipients | int |
-| sent | int |
-| direct_opens | int |
-| total_opens | int |
-| bounces | int |
-| body_clicks | int |
-| conversions | int |
-| raw_data | jsonb |
-| synced_at | timestamptz |
-
-Unique on `(campaign_id, date)`. RLS: admin-only select/insert/update.
-
-**2. New edge function: `sync-campaign-analytics`**
-- Auth: admin JWT or cron secret
-- Calls `GET {BRAZE_REST_ENDPOINT}/campaigns/data_series?campaign_id={BRAZE_CONGRATS_CAMPAIGN_ID}&length={days}&ending_at={date}`
-- Sums `ios_push` + `android_push` arrays per day for `sent`, `direct_opens`, `total_opens`, `bounces`, `body_clicks`
-- Uses top-level `unique_recipients` and `conversions`
-- Upserts into `campaign_analytics`
-- Accepts optional `length` param (default 30, max 100)
-- Config: `verify_jwt = false` (validates auth in code like other functions)
-
-**3. New UI: `CongratsAnalyticsSection.tsx`**
-- KPI cards: Total Sent, Unique Recipients, Open Rate (direct_opens/sent), Click Rate (body_clicks/sent)
-- Daily trend chart (sent + opens over time) using Recharts
-- "Sync Now" button that invokes the edge function
-- "Last synced" timestamp from most recent `synced_at`
-
-**4. Analytics page update**
-- Add 5th tab "Congrats" with Trophy icon
-- Fetches from `campaign_analytics` table directly (no changes to `compute_analytics_summary`)
-- All 4 existing tabs remain untouched
-
-### Files changed/created
-- **Migration:** Create `campaign_analytics` table + RLS
-- **New:** `supabase/functions/sync-campaign-analytics/index.ts`
-- **New:** `src/components/analytics/CongratsAnalyticsSection.tsx`
-- **Edit:** `src/pages/Analytics.tsx` — add Congrats tab
-- **Edit:** `supabase/config.toml` — add function config (auto-managed)
+### Files changed
+- `src/components/analytics/SchedulerHealthSection.tsx` -- reframe cards, table, and logic
+- `src/pages/Analytics.tsx` -- update interface + data mapping for new fields
+- Database migration -- update `compute_analytics_summary` function
 
