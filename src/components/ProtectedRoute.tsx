@@ -5,29 +5,62 @@ import { Session } from "@supabase/supabase-js";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requireAdmin?: boolean;
 }
 
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
   const [session, setSession] = useState<Session | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(requireAdmin ? null : true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    let isMounted = true;
+
+    const resolveAccess = async (nextSession: Session | null) => {
+      if (!isMounted) return;
+
+      setSession(nextSession);
+
+      if (!nextSession) {
+        setIsAdmin(requireAdmin ? false : true);
+        setLoading(false);
+        return;
+      }
+
+      if (!requireAdmin) {
+        setIsAdmin(true);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', nextSession.user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      setIsAdmin(!error && !!data);
       setLoading(false);
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      void resolveAccess(session);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      void resolveAccess(nextSession);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [requireAdmin]);
 
   if (loading) {
     return (
@@ -39,6 +72,10 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   if (!session) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (requireAdmin && !isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
