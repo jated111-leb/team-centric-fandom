@@ -238,6 +238,11 @@ export function CopilotChatInput({ onSend, isLoading }: CopilotChatInputProps) {
   return (
     <div className="border-t border-border p-4">
       <div className="max-w-3xl mx-auto space-y-2">
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>Uploaded push images use public URLs for delivery, so don&apos;t attach sensitive or internal-only content.</p>
+        </div>
+
         {/* Image preview with validation */}
         {attachedImage && (
           <div className="rounded-lg border border-border bg-muted/30 overflow-hidden">
