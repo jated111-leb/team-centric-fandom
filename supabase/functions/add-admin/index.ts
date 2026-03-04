@@ -29,15 +29,18 @@ Deno.serve(async (req) => {
     );
 
     // Verify the requesting user is an admin
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    const requestingUserId = claimsData?.claims?.sub;
+
+    if (claimsError || !requestingUserId) {
       throw new Error('Unauthorized: Invalid user');
     }
 
     const { data: adminRole, error: roleError } = await supabaseClient
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
+      .eq('user_id', requestingUserId)
       .eq('role', 'admin')
       .maybeSingle();
 
@@ -46,20 +49,26 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { email, action } = await req.json();
+    const { email, action, inviteId, userId } = await req.json();
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const normalizedInviteId = typeof inviteId === 'string' ? inviteId.trim() : '';
+    const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+    const isResendAction = action === 'resend';
 
-    if (!email || typeof email !== 'string') {
-      throw new Error('Email is required');
-    }
+    if (!isResendAction) {
+      if (!normalizedEmail) {
+        throw new Error('Email is required');
+      }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      throw new Error('Invalid email format');
-    }
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        throw new Error('Invalid email format');
+      }
 
-    if (email.length > 255) {
-      throw new Error('Email must be less than 255 characters');
+      if (normalizedEmail.length > 255) {
+        throw new Error('Email must be less than 255 characters');
+      }
     }
 
     // Create admin client with service role
@@ -76,30 +85,40 @@ Deno.serve(async (req) => {
 
     // Handle resend action
     if (action === 'resend') {
-      // Find the existing invite
-      const { data: existingInvite } = await supabaseAdmin
+      let inviteLookup = supabaseAdmin
         .from('admin_invites')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
+        .select('*');
+
+      if (normalizedInviteId) {
+        inviteLookup = inviteLookup.eq('id', normalizedInviteId);
+      } else if (normalizedUserId) {
+        inviteLookup = inviteLookup.eq('user_id', normalizedUserId);
+      } else if (normalizedEmail) {
+        inviteLookup = inviteLookup.eq('email', normalizedEmail);
+      } else {
+        throw new Error('Invite identifier is required');
+      }
+
+      const { data: existingInvite } = await inviteLookup.maybeSingle();
 
       if (!existingInvite) {
-        throw new Error('No invite found for this email');
+        throw new Error('No invite found for this user');
       }
 
       if (existingInvite.status === 'accepted') {
         throw new Error('This invite has already been accepted');
       }
 
+      const targetEmail = existingInvite.email;
+
       // Find the user and generate a new invite link
       const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-      const existingUser = existingUsers?.users?.find(u => u.email === email);
+      const existingUser = existingUsers?.users?.find(u => u.email === targetEmail);
 
       if (existingUser) {
-        // Generate a password reset email so they can set their password
         const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
           type: 'magiclink',
-          email: email,
+          email: targetEmail,
         });
 
         if (resetError) {
@@ -108,7 +127,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Update resend tracking
       await supabaseAdmin
         .from('admin_invites')
         .update({
@@ -121,7 +139,6 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: true,
           message: 'Invite resent successfully',
-          email: email,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -133,21 +150,19 @@ Deno.serve(async (req) => {
     
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    const existingUser = existingUsers?.users?.find(u => u.email === normalizedEmail);
 
     let userId: string;
     let isNewUser = false;
 
     if (existingUser) {
-      console.log('User already exists:', email);
+      console.log('User already exists:', normalizedEmail);
       userId = existingUser.id;
     } else {
-      // Generate a temporary password (user should reset it)
       const tempPassword = crypto.randomUUID();
 
-      // Create the admin user
       const { data: newUser, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
-        email: email,
+        email: normalizedEmail,
         password: tempPassword,
         email_confirm: true,
       });
@@ -162,7 +177,7 @@ Deno.serve(async (req) => {
 
       userId = newUser.user.id;
       isNewUser = true;
-      console.log('Created new user:', email);
+      console.log('Created new user:', normalizedEmail);
     }
 
     // Check if admin role already exists
@@ -202,32 +217,31 @@ Deno.serve(async (req) => {
     await supabaseAdmin
       .from('admin_invites')
       .upsert({
-        email: email,
-        invited_by: user.id,
+        email: normalizedEmail,
+        invited_by: requestingUserId,
         status: existingUser ? 'accepted' : 'pending',
         user_id: userId,
         accepted_at: existingUser ? new Date().toISOString() : null,
       }, { onConflict: 'email' });
 
-    // If new user, generate a password reset so they can set their password
     if (isNewUser) {
       try {
         await supabaseAdmin.auth.admin.generateLink({
           type: 'magiclink',
-          email: email,
+          email: normalizedEmail,
         });
       } catch (e) {
         console.error('Failed to generate invite link:', e);
       }
     }
 
-    console.log('Granted admin role to user:', email);
+    console.log('Granted admin role to user:', normalizedEmail);
 
     return new Response(
       JSON.stringify({
         success: true,
         message: 'Admin user added successfully',
-        email: email,
+        email: normalizedEmail,
         user_id: userId,
         is_new_user: isNewUser,
         note: isNewUser ? 'User will receive an email to set their password' : 'Existing user granted admin role',

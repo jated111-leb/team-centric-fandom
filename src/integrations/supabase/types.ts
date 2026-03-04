@@ -665,6 +665,19 @@ export type Database = {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
       }
+      get_admin_invites_masked: {
+        Args: never
+        Returns: {
+          accepted_at: string
+          created_at: string
+          id: string
+          last_resent_at: string
+          masked_email: string
+          resend_count: number
+          status: string
+          user_id: string
+        }[]
+      }
       get_match_performance: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json

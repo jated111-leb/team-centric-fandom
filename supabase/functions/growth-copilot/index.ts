@@ -936,6 +936,7 @@ async function executeTool(
         const { data, error } = await serviceClient
           .from("copilot_campaigns")
           .select("*")
+          .eq("created_by", userId)
           .order("created_at", { ascending: false })
           .limit(limit);
         if (error) throw error;

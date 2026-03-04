@@ -1,0 +1,1 @@
+drop policy if exists "Users can view their own admin invites" on public.admin_invites;

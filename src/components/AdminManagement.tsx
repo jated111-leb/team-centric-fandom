@@ -33,6 +33,17 @@ interface AdminUser {
   resend_count: number;
 }
 
+interface MaskedAdminInvite {
+  id: string;
+  user_id: string | null;
+  created_at: string;
+  accepted_at: string | null;
+  last_resent_at: string | null;
+  resend_count: number;
+  status: 'pending' | 'accepted';
+  masked_email: string;
+}
+
 export function AdminManagement() {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,13 +77,16 @@ export function AdminManagement() {
         return;
       }
 
-      // Get invite data
-      const { data: invites } = await supabase
-        .from('admin_invites')
-        .select('*');
+      // Get masked invite data
+      const { data: invites, error: invitesError } = await supabase
+        .rpc('get_admin_invites_masked');
+
+      if (invitesError) throw invitesError;
 
       const inviteMap = new Map(
-        (invites || []).map(inv => [inv.user_id, inv])
+        ((invites || []) as MaskedAdminInvite[])
+          .filter((inv) => inv.user_id)
+          .map(inv => [inv.user_id as string, inv])
       );
 
       const adminsWithStatus: AdminUser[] = roles.map(role => {
@@ -80,7 +94,7 @@ export function AdminManagement() {
         return {
           id: role.id,
           user_id: role.user_id,
-          email: invite?.email || 'Unknown',
+          email: invite?.masked_email || 'Unknown',
           created_at: role.created_at,
           invite_status: invite ? (invite.status as 'pending' | 'accepted') : 'no_invite',
           last_resent_at: invite?.last_resent_at || null,
@@ -159,7 +173,7 @@ export function AdminManagement() {
     setResending(admin.id);
     try {
       const { data, error } = await supabase.functions.invoke('add-admin', {
-        body: { email: admin.email, action: 'resend' },
+        body: { userId: admin.user_id, action: 'resend' },
       });
 
       if (error) throw error;
@@ -229,7 +243,7 @@ export function AdminManagement() {
   };
 
   const maskEmail = (email: string) => {
-    if (!email.includes('@')) return email;
+    if (!email.includes('@') || email.includes('•')) return email;
 
     const [localPart, domain] = email.split('@');
     const visibleLocal = localPart.slice(0, Math.min(2, localPart.length));
