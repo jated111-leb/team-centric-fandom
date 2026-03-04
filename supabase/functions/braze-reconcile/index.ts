@@ -6,6 +6,8 @@ const corsHeaders = {
 };
 
 const LOCK_TIMEOUT_MINUTES = 10; // Increased for safety
+const RECONCILE_LOCK_KEY = 41002;
+const WEBHOOK_GRACE_MINUTES = 20;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,37 +23,29 @@ Deno.serve(async (req) => {
   let lockAcquired = false;
 
   try {
-    // Acquire row-level lock using scheduler_locks table with two-step approach
+    // Acquire an advisory lock first so concurrent reconcile runs can't overlap
     const lockExpiry = new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
     const lockCheckTime = new Date();
-    
-    // Step 1: Check current lock state
-    const { data: currentLock, error: checkError } = await supabase
-      .from('scheduler_locks')
-      .select('locked_at, locked_by, expires_at')
-      .eq('lock_name', 'braze-reconcile')
-      .maybeSingle();
 
-    if (checkError) {
-      console.error('Error checking lock state:', checkError);
-      throw new Error('Failed to check lock state');
+    const { data: advisoryLockGranted, error: advisoryLockError } = await supabase.rpc('pg_try_advisory_lock', {
+      key: RECONCILE_LOCK_KEY,
+    });
+
+    if (advisoryLockError) {
+      console.error('Error acquiring advisory lock:', advisoryLockError);
+      throw new Error('Failed to acquire reconcile execution lock');
     }
 
-    // Step 2: Determine if we can acquire the lock
-    const canAcquire = 
-      !currentLock?.locked_at || 
-      !currentLock?.expires_at ||
-      new Date(currentLock.expires_at) < lockCheckTime;
-
-    if (!canAcquire) {
-      console.log(`Another reconcile process is running - skipping (locked by: ${currentLock?.locked_by}, expires: ${currentLock?.expires_at})`);
+    if (!advisoryLockGranted) {
+      console.log('Another reconcile process is already running - skipping');
       return new Response(
         JSON.stringify({ message: 'Already running', cancelled: 0, cleaned: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Step 3: Acquire the lock with simple update
+    lockAcquired = true;
+
     const { error: lockError } = await supabase
       .from('scheduler_locks')
       .update({ 
@@ -62,11 +56,12 @@ Deno.serve(async (req) => {
       .eq('lock_name', 'braze-reconcile');
 
     if (lockError) {
-      console.error('Error acquiring lock:', lockError);
-      throw new Error('Failed to acquire lock');
+      console.error('Error updating lock state:', lockError);
+      await supabase.rpc('pg_advisory_unlock', { key: RECONCILE_LOCK_KEY });
+      lockAcquired = false;
+      throw new Error('Failed to persist reconcile lock state');
     }
 
-    lockAcquired = true;
     console.log(`Lock acquired: ${lockId}, expires: ${lockExpiry}`);
 
     // Check if scheduler is currently running - avoid conflicts
@@ -292,11 +287,12 @@ Deno.serve(async (req) => {
     // Only mark as 'sent' if we have webhook confirmation in notification_sends
     // Otherwise mark as 'failed' to flag for investigation
     
-    // Fetch pending schedules that are past their send time
+    // Fetch pending schedules that are past their send time beyond the webhook grace window
+    const webhookGraceCutoff = new Date(now.getTime() - WEBHOOK_GRACE_MINUTES * 60 * 1000);
     const { data: pastPendingSchedules, error: fetchPastError } = await supabase
       .from('schedule_ledger')
       .select('id, match_id, braze_schedule_id, send_at_utc')
-      .lt('send_at_utc', now.toISOString())
+      .lt('send_at_utc', webhookGraceCutoff.toISOString())
       .eq('status', 'pending');
 
     if (fetchPastError) {
@@ -337,17 +333,18 @@ Deno.serve(async (req) => {
           .eq('id', schedule.id);
         
         markedAsFailed++;
-        console.warn(`⚠️ Match ${schedule.match_id}: NO webhook confirmation - marking as cancelled`);
+        console.warn(`⚠️ Match ${schedule.match_id}: no webhook confirmation after ${WEBHOOK_GRACE_MINUTES} minute grace window - marking as cancelled`);
         
         // Log critical alert for failed delivery
         await supabase.from('scheduler_logs').insert({
           function_name: 'braze-reconcile',
           match_id: schedule.match_id,
           action: 'delivery_failed',
-          reason: 'Past send time with no webhook confirmation',
+          reason: 'Past grace window with no webhook confirmation',
           details: { 
             braze_schedule_id: schedule.braze_schedule_id, 
-            send_at_utc: schedule.send_at_utc 
+            send_at_utc: schedule.send_at_utc,
+            webhook_grace_minutes: WEBHOOK_GRACE_MINUTES,
           },
         });
       }
@@ -399,11 +396,14 @@ Deno.serve(async (req) => {
   } finally {
     // Always release the lock
     if (lockAcquired) {
-      await supabase
-        .from('scheduler_locks')
-        .update({ locked_at: null, locked_by: null, expires_at: null })
-        .eq('lock_name', 'braze-reconcile')
-        .eq('locked_by', lockId);
+      await Promise.allSettled([
+        supabase
+          .from('scheduler_locks')
+          .update({ locked_at: null, locked_by: null, expires_at: null })
+          .eq('lock_name', 'braze-reconcile')
+          .eq('locked_by', lockId),
+        supabase.rpc('pg_advisory_unlock', { key: RECONCILE_LOCK_KEY }),
+      ]);
       console.log(`Lock released: ${lockId}`);
     }
   }

@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const PRE_SEND_LOCK_KEY = 41003;
+
 // This function should be called via cron job every 10 minutes
 // It checks schedules that are due to send in the next 30 minutes
 // and verifies they still exist in Braze, recreating them if necessary
@@ -13,6 +15,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  let supabase: ReturnType<typeof createClient> | null = null;
+  let lockAcquired = false;
 
   try {
     const brazeApiKey = Deno.env.get('BRAZE_API_KEY');
@@ -29,9 +34,59 @@ Deno.serve(async (req) => {
       throw new Error('Missing required Supabase configuration');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: advisoryLockGranted, error: advisoryLockError } = await supabase.rpc('pg_try_advisory_lock', {
+      key: PRE_SEND_LOCK_KEY,
+    });
+
+    if (advisoryLockError) {
+      console.error('Error acquiring advisory lock:', advisoryLockError);
+      throw new Error('Failed to acquire pre-send verification lock');
+    }
+
+    if (!advisoryLockGranted) {
+      console.log('Another pre-send verification process is already running - skipping');
+      return new Response(
+        JSON.stringify({ success: true, message: 'Already running', checked: 0, verified: 0, recreated: 0, failed: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    lockAcquired = true;
     const now = new Date();
     const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000);
+
+    const { data: flag } = await supabase
+      .from('feature_flags')
+      .select('enabled')
+      .eq('flag_name', 'braze_notifications_enabled')
+      .single();
+
+    if (!flag?.enabled) {
+      console.log('Feature flag disabled - skipping pre-send verification');
+      return new Response(
+        JSON.stringify({ success: true, message: 'Feature disabled', checked: 0, verified: 0, recreated: 0, failed: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: activeLocks, error: activeLocksError } = await supabase
+      .from('scheduler_locks')
+      .select('lock_name, expires_at')
+      .in('lock_name', ['braze-scheduler', 'braze-reconcile']);
+
+    if (activeLocksError) {
+      throw new Error(`Failed to check active scheduler locks: ${activeLocksError.message}`);
+    }
+
+    const conflictingLock = (activeLocks || []).find(lock => lock.expires_at && new Date(lock.expires_at) > now);
+    if (conflictingLock) {
+      console.log(`${conflictingLock.lock_name} is currently running - skipping pre-send verification to avoid conflicts`);
+      return new Response(
+        JSON.stringify({ success: true, message: `${conflictingLock.lock_name} running`, checked: 0, verified: 0, recreated: 0, failed: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log(`🔍 Pre-send verification: checking schedules between ${now.toISOString()} and ${thirtyMinutesFromNow.toISOString()}`);
 
@@ -275,5 +330,9 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
+  } finally {
+    if (lockAcquired && supabase) {
+      await supabase.rpc('pg_advisory_unlock', { key: PRE_SEND_LOCK_KEY });
+    }
   }
 });

@@ -24,6 +24,7 @@ const FEATURED_TEAMS = [
 const SEND_OFFSET_MINUTES = 60; // Send 60 minutes before kickoff
 const UPDATE_BUFFER_MINUTES = 20; // Don't update schedules within 20 minutes of send time
 const LOCK_TIMEOUT_MINUTES = 10; // Lock expires after 10 minutes (increased for safety)
+const SCHEDULER_LOCK_KEY = 41001;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -39,37 +40,29 @@ Deno.serve(async (req) => {
   let lockAcquired = false;
 
   try {
-    // Acquire row-level lock using scheduler_locks table with two-step approach
+    // Acquire an advisory lock first so concurrent runs can't overlap
     const lockExpiry = new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
     const lockCheckTime = new Date();
-    
-    // Step 1: Check current lock state
-    const { data: currentLock, error: checkError } = await supabase
-      .from('scheduler_locks')
-      .select('locked_at, locked_by, expires_at')
-      .eq('lock_name', 'braze-scheduler')
-      .maybeSingle();
 
-    if (checkError) {
-      console.error('Error checking lock state:', checkError);
-      throw new Error('Failed to check lock state');
+    const { data: advisoryLockGranted, error: advisoryLockError } = await supabase.rpc('pg_try_advisory_lock', {
+      key: SCHEDULER_LOCK_KEY,
+    });
+
+    if (advisoryLockError) {
+      console.error('Error acquiring advisory lock:', advisoryLockError);
+      throw new Error('Failed to acquire scheduler execution lock');
     }
 
-    // Step 2: Determine if we can acquire the lock
-    const canAcquire = 
-      !currentLock?.locked_at || 
-      !currentLock?.expires_at ||
-      new Date(currentLock.expires_at) < lockCheckTime;
-
-    if (!canAcquire) {
-      console.log(`Another scheduler process is running - skipping (locked by: ${currentLock?.locked_by}, expires: ${currentLock?.expires_at})`);
+    if (!advisoryLockGranted) {
+      console.log('Another scheduler process is already running - skipping');
       return new Response(
         JSON.stringify({ message: 'Already running', scheduled: 0, updated: 0, skipped: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Step 3: Acquire the lock with simple update
+    lockAcquired = true;
+
     const { error: lockError } = await supabase
       .from('scheduler_locks')
       .update({ 
@@ -80,11 +73,12 @@ Deno.serve(async (req) => {
       .eq('lock_name', 'braze-scheduler');
 
     if (lockError) {
-      console.error('Error acquiring lock:', lockError);
-      throw new Error('Failed to acquire lock');
+      console.error('Error updating lock state:', lockError);
+      await supabase.rpc('pg_advisory_unlock', { key: SCHEDULER_LOCK_KEY });
+      lockAcquired = false;
+      throw new Error('Failed to persist scheduler lock state');
     }
 
-    lockAcquired = true;
     console.log(`Lock acquired: ${lockId}, expires: ${lockExpiry}`);
 
     // Check feature flag
@@ -727,11 +721,14 @@ Deno.serve(async (req) => {
   } finally {
     // Always release the lock
     if (lockAcquired) {
-      await supabase
-        .from('scheduler_locks')
-        .update({ locked_at: null, locked_by: null, expires_at: null })
-        .eq('lock_name', 'braze-scheduler')
-        .eq('locked_by', lockId);
+      await Promise.allSettled([
+        supabase
+          .from('scheduler_locks')
+          .update({ locked_at: null, locked_by: null, expires_at: null })
+          .eq('lock_name', 'braze-scheduler')
+          .eq('locked_by', lockId),
+        supabase.rpc('pg_advisory_unlock', { key: SCHEDULER_LOCK_KEY }),
+      ]);
       console.log(`Lock released: ${lockId}`);
     }
   }
