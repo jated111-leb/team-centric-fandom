@@ -228,6 +228,16 @@ export function AdminManagement() {
     }
   };
 
+  const maskEmail = (email: string) => {
+    if (!email.includes('@')) return email;
+
+    const [localPart, domain] = email.split('@');
+    const visibleLocal = localPart.slice(0, Math.min(2, localPart.length));
+    const maskedLocal = `${visibleLocal}${'•'.repeat(Math.max(localPart.length - visibleLocal.length, 1))}`;
+
+    return `${maskedLocal}@${domain}`;
+  };
+
   const getStatusBadge = (admin: AdminUser) => {
     switch (admin.invite_status) {
       case 'accepted':
@@ -309,7 +319,7 @@ export function AdminManagement() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Public signup is disabled. Only invited users can access the app. They'll receive an email to set their password.
+              Public signup is disabled. Only invited users can access the app. They'll receive an email to set their password, and email addresses are partially masked in this dashboard for privacy.
             </p>
           </div>
 
@@ -344,7 +354,7 @@ export function AdminManagement() {
                     {admins.map((admin) => (
                       <TableRow key={admin.id}>
                         <TableCell className="font-medium text-sm">
-                          {admin.email !== 'Unknown' ? admin.email : (
+                          {admin.email !== 'Unknown' ? maskEmail(admin.email) : (
                             <span className="font-mono text-xs text-muted-foreground">{admin.user_id.slice(0, 8)}...</span>
                           )}
                         </TableCell>
@@ -403,7 +413,7 @@ export function AdminManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Admin Access?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will revoke admin privileges for {adminToDelete?.email || 'this user'}. They will no longer be able to access the admin panel.
+              This will revoke admin privileges for {adminToDelete?.email ? maskEmail(adminToDelete.email) : 'this user'}. They will no longer be able to access the admin panel.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
