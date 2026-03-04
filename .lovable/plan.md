@@ -1,41 +1,62 @@
 
+What I found
 
-## Plan: Reframe Scheduler Health + Keep Real Anomaly Detection
+- Your public endpoint is `supabase/functions/braze-webhook/index.ts`, and it currently has no external-request verification at all.
+- The earlier recommendation to use a Braze-generated `BRAZE_WEBHOOK_SECRET` / `X-Braze-Signature` was likely too specific for your setup.
+- Braze’s Currents/setup docs appear to focus on partner auth methods like API tokens, auth keys, certificates, and IP allowlisting, which matches your experience of not seeing a dashboard-generated “webhook secret”.
 
-### Problem
-The current Scheduler Health tab incorrectly flags normal Braze delivery batching (multiple `dispatch_id`s per match) as anomalies. Each `dispatch_id` represents an internal Braze batch of ~50-180 users, not a duplicate schedule.
+What this means
 
-### What changes
+- You are probably not missing it.
+- More likely, Braze does not expose the exact signing-secret mechanism that the warning text assumed for the integration type you’re using.
+- So the correct fix is not “find the hidden Braze secret”, but “secure `braze-webhook` with the auth mechanism Braze actually supports for this outbound integration”.
 
-**1. Reframe metrics in `SchedulerHealthSection.tsx`**
-- **Remove**: "Multi-Dispatch Matches" card and "Avg Dispatch IDs/Match" card (these reflect normal Braze batching, not bugs)
-- **Keep**: "Ledger Duplicates" card (real anomaly: scheduler ran twice for same match)
-- **Keep**: "Webhook Duplicates Blocked" card (dedup protection stats)
-- **Add**: "Delivery Batches" card -- informational, shows avg batches per match as context (not flagged as error)
-- **Add**: "Stale Pending" card -- matches past kickoff still in `pending` status (real anomaly: notification never confirmed sent)
+Revised fix plan
 
-**2. Reframe the anomaly table**
-- Only show rows where `scheduleCount > 1` (real ledger duplicates)
-- Remove dispatch_id count as an anomaly signal
-- Add a "stale pending" section: matches from `schedule_ledger` where `status = 'pending'` and `send_at_utc` is in the past
+1. Identify the exact Braze source calling `braze-webhook`
+   - Currents / event export
+   - Canvas webhook step
+   - Campaign webhook
+   - Other outbound integration
 
-**3. Update health status logic**
-- `hasIssues` = `scheduleLedgerDuplicates > 0` OR stale pending entries exist
-- Dispatch ID count is purely informational
+2. Use the right protection for that source
+   - If Braze lets you add a custom auth header or basic auth:
+     validate a shared secret/header in `braze-webhook`.
+   - If Braze only lets you call a URL:
+     add a long secret token in the webhook URL and validate it server-side.
+   - If Braze supports neither:
+     use IP allowlisting as the compensating control.
 
-**4. Update the SQL in `compute_analytics_summary`**
-- Keep `scheduleLedgerDuplicates` query as-is (real signal)
-- Keep `webhookDuplicatesSkipped` as-is
-- Change `matchesWithMultipleDispatchIds` to `avgDeliveryBatches` (informational only)
-- Add `stalePendingCount`: `SELECT COUNT(*) FROM schedule_ledger WHERE status = 'pending' AND send_at_utc < now()`
-- Simplify `topAnomalies` to only flag `schedule_count > 1` rows
+3. Still fix the other warn-level issues
+   - Change `verify_jwt = true` for:
+     - `braze-canvas-test`
+     - `growth-copilot`
+   - Add an admin-only route guard for:
+     - `/admin`
+     - `/admin/notification-logs`
+     - `/admin/analytics`
+     - `/copilot`
 
-**5. Update explanation card text**
-- Explain that delivery batches are normal Braze behavior
-- Focus anomaly language on ledger duplicates and stale pending
+4. Update the security finding based on the real control used
+   - Resolve the open-endpoint warning with the actual Braze-supported auth method instead of `X-Braze-Signature`.
 
-### Files changed
-- `src/components/analytics/SchedulerHealthSection.tsx` -- reframe cards, table, and logic
-- `src/pages/Analytics.tsx` -- update interface + data mapping for new fields
-- Database migration -- update `compute_analytics_summary` function
+Technical details
 
+- Files involved:
+  - `supabase/functions/braze-webhook/index.ts`
+  - `supabase/config.toml`
+  - `src/components/ProtectedRoute.tsx`
+  - `src/App.tsx`
+- Important nuance:
+  `braze-webhook` cannot require normal user JWT auth because Braze is the caller, so it needs external request verification, not app-login protection.
+
+Most likely next implementation direction
+
+- Stop waiting on a Braze “webhook secret”.
+- Replace that part of the fix with one of these:
+  - shared secret header,
+  - secretized callback URL,
+  - or IP allowlisting,
+  depending on the exact Braze screen sending the requests.
+
+If we proceed, I would plan around the shared-secret-header or secretized-URL approach first, because those are usually the cleanest fit for a public webhook endpoint.
