@@ -36,7 +36,7 @@ const App = () => (
           <Route
             path="/admin"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <Layout>
                   <Admin />
                 </Layout>
@@ -46,7 +46,7 @@ const App = () => (
           <Route
             path="/admin/notification-logs"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <Layout>
                   <NotificationLogs />
                 </Layout>
@@ -56,7 +56,7 @@ const App = () => (
           <Route
             path="/admin/analytics"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <Layout>
                   <Analytics />
                 </Layout>
@@ -66,7 +66,7 @@ const App = () => (
           <Route
             path="/copilot"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <Layout>
                   <Copilot />
                 </Layout>
