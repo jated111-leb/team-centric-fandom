@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const WEBHOOK_GRACE_MINUTES = 20;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -46,7 +48,7 @@ Deno.serve(async (req) => {
 
     for (const schedule of schedules || []) {
       const sendAtDate = new Date(schedule.send_at_utc);
-      const isPast = sendAtDate < now;
+      const isPast = sendAtDate.getTime() < now.getTime() - WEBHOOK_GRACE_MINUTES * 60 * 1000;
       const match = schedule.matches;
       const hasDispatchId = !!schedule.dispatch_id;
       
@@ -78,9 +80,9 @@ Deno.serve(async (req) => {
             // Has webhook but status wasn't updated
             results.past_with_webhook.push({ ...scheduleInfo, note: 'Has webhooks but status not updated' });
           } else {
-            // STALE: No webhook received
+            // STALE: No webhook received after the grace window
             results.stale_pending.push(scheduleInfo);
-            console.warn(`⚠️ STALE PENDING: Match ${schedule.match_id} (${match?.home_team} vs ${match?.away_team}) - no webhook received!`);
+            console.warn(`⚠️ STALE PENDING: Match ${schedule.match_id} (${match?.home_team} vs ${match?.away_team}) - no webhook received after ${WEBHOOK_GRACE_MINUTES} minute grace window!`);
           }
         }
       } else {
@@ -100,10 +102,11 @@ Deno.serve(async (req) => {
       await supabase.from('scheduler_logs').insert({
         function_name: 'verify-braze-schedules',
         action: 'stale_pending_detected',
-        reason: `Found ${results.stale_pending.length} schedules with no webhook received`,
+        reason: `Found ${results.stale_pending.length} schedules with no webhook received after the grace window`,
         details: { 
           stale_schedules: results.stale_pending,
-          checked_at: now.toISOString()
+          checked_at: now.toISOString(),
+          webhook_grace_minutes: WEBHOOK_GRACE_MINUTES,
         },
       });
     }
