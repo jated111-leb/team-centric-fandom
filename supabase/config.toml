@@ -57,6 +57,12 @@ verify_jwt = false
 [functions.braze-congrats]
 verify_jwt = false
 
+[functions.set-game-reminder]
+verify_jwt = false
+
+[functions.braze-reminder-scheduler]
+verify_jwt = false
+
 [functions.growth-copilot]
 verify_jwt = false
 

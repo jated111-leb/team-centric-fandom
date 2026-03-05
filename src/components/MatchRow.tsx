@@ -2,6 +2,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
 import { CompetitionBadge } from "./CompetitionBadge";
+import { RemindMeButton } from "./RemindMeButton";
 import type { Match } from "@/types/match";
 import { formatMatchDateTime } from "@/lib/timezone";
 
@@ -43,6 +44,9 @@ export const MatchRow = ({ match }: MatchRowProps) => {
       <TableCell className="text-center text-sm">{match.priorityScore}</TableCell>
       <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
         {match.reason || "—"}
+      </TableCell>
+      <TableCell>
+        <RemindMeButton matchId={match.id} matchDate={match.utcDate || ''} />
       </TableCell>
     </TableRow>
   );
