@@ -2,12 +2,28 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-app-secret',
 };
+
+const MAX_ACTIVE_REMINDERS_PER_USER = 20;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // ==================== AUTH ====================
+  // APP_SECRET must be set in Edge Function secrets and sent by the mobile app
+  // as the X-App-Secret header on every request.
+  const appSecret = Deno.env.get('APP_SECRET');
+  if (appSecret) {
+    const clientSecret = req.headers.get('X-App-Secret');
+    if (clientSecret !== appSecret) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   }
 
   const supabase = createClient(
@@ -28,7 +44,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate match exists and is still in the future
+    // Validate match exists and is available for reminders
     const { data: match, error: matchError } = await supabase
       .from('matches')
       .select('id, utc_date, home_team, away_team, status')
@@ -44,6 +60,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (['FINISHED', 'CANCELLED', 'POSTPONED'].includes(match.status)) {
+      return new Response(
+        JSON.stringify({ error: 'Match is not available for reminders' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const kickoffUtc = new Date(match.utc_date);
     const now = new Date();
 
@@ -51,6 +74,23 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Cannot set a reminder for a past or in-play match' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Cap: refuse if user already has MAX_ACTIVE_REMINDERS_PER_USER active reminders.
+    // This prevents a compromised or abusive client from flooding the table.
+    const { count, error: countError } = await supabase
+      .from('game_reminders')
+      .select('id', { count: 'exact', head: true })
+      .eq('external_user_id', String(external_user_id))
+      .in('reminder_status', ['pending', 'scheduled']);
+
+    if (countError) throw countError;
+
+    if ((count ?? 0) >= MAX_ACTIVE_REMINDERS_PER_USER) {
+      return new Response(
+        JSON.stringify({ error: `Maximum of ${MAX_ACTIVE_REMINDERS_PER_USER} active reminders allowed` }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

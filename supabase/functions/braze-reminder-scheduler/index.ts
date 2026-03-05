@@ -7,8 +7,9 @@ const corsHeaders = {
 };
 
 const SEND_OFFSET_MINUTES = 30;   // Notify 30 min before kickoff
-const UPDATE_BUFFER_MINUTES = 10; // Don't reschedule within 10 min of the existing send time
+const UPDATE_BUFFER_MINUTES = 10; // Don't reschedule within 10 min of the current send_at
 const LOCK_TIMEOUT_MINUTES = 10;
+const STALE_CANCELLED_DAYS = 30;  // Delete cancelled rows older than this
 const BAGHDAD_TIMEZONE = 'Asia/Baghdad';
 
 Deno.serve(async (req) => {
@@ -210,77 +211,90 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`📋 Found ${reminders.length} reminders to process`);
+    console.log(`📋 Found ${reminders.length} reminders across matches`);
+
+    // ==================== GROUP BY MATCH ====================
+    // Processing per-match (not per-reminder) reduces Braze API calls from O(users)
+    // to O(matches) — all users for the same match are sent in a single Braze API call.
+    const byMatch = new Map<number, typeof reminders>();
+    for (const r of reminders) {
+      if (!byMatch.has(r.match_id)) byMatch.set(r.match_id, []);
+      byMatch.get(r.match_id)!.push(r);
+    }
+
+    console.log(`📋 ${byMatch.size} distinct matches to process`);
 
     let scheduled = 0;
     let updated = 0;
     let skipped = 0;
     let errors = 0;
 
-    // ==================== PROCESS EACH REMINDER ====================
-    for (const reminder of reminders) {
-      try {
-        const match = reminder.matches as any;
+    // ==================== PROCESS EACH MATCH GROUP ====================
+    for (const [matchId, group] of byMatch) {
+      const allIds = group.map((r) => r.id);
+      const match = group[0].matches as any;
 
+      try {
         if (!match) {
-          console.error(`Reminder ${reminder.id}: match data missing`);
-          errors++;
+          console.error(`Match ${matchId}: match data missing for ${group.length} reminders`);
+          errors += group.length;
           continue;
         }
 
-        // Cancel reminders for matches that are no longer upcoming
+        // Cancel the whole group if match is no longer upcoming
         if (['FINISHED', 'CANCELLED', 'POSTPONED'].includes(match.status)) {
-          console.log(`Reminder ${reminder.id}: match ${match.id} is ${match.status} - cancelling`);
+          console.log(`Match ${matchId}: status=${match.status} — cancelling ${group.length} reminders`);
           await supabase
             .from('game_reminders')
             .update({ reminder_status: 'cancelled', updated_at: now.toISOString() })
-            .eq('id', reminder.id);
+            .in('id', allIds);
           await supabase.from('scheduler_logs').insert({
             function_name: 'braze-reminder-scheduler',
-            match_id: match.id,
+            match_id: matchId,
             action: 'reminder_cancelled',
             reason: `Match status: ${match.status}`,
-            details: { reminder_id: reminder.id, external_user_id: reminder.external_user_id },
+            details: { reminder_count: group.length },
           });
-          skipped++;
+          skipped += group.length;
           continue;
         }
 
         const kickoffUtc = new Date(match.utc_date);
         const sendAt = new Date(kickoffUtc.getTime() - SEND_OFFSET_MINUTES * 60 * 1000);
 
-        // Miss window: send_at is less than 5 minutes away or already past
+        // Cancel the whole group if the send window has passed
         if (sendAt <= new Date(now.getTime() + 5 * 60 * 1000)) {
-          console.log(`Reminder ${reminder.id}: send window missed (send_at=${sendAt.toISOString()}) - cancelling`);
+          console.log(`Match ${matchId}: send window missed (send_at=${sendAt.toISOString()}) — cancelling ${group.length} reminders`);
           await supabase
             .from('game_reminders')
             .update({ reminder_status: 'cancelled', updated_at: now.toISOString() })
-            .eq('id', reminder.id);
-          skipped++;
+            .in('id', allIds);
+          skipped += group.length;
           continue;
         }
 
-        // Detect kickoff drift: does the football API report a different time than we last scheduled?
-        const storedKickoff = reminder.kickoff_utc ? new Date(reminder.kickoff_utc) : null;
-        const kickoffChanged =
-          reminder.reminder_status === 'scheduled' &&
-          storedKickoff !== null &&
-          storedKickoff.getTime() !== kickoffUtc.getTime();
+        const pendingGroup = group.filter((r) => r.reminder_status === 'pending');
+        const scheduledGroup = group.filter((r) => r.reminder_status === 'scheduled');
 
-        // Already scheduled and no drift → nothing to do
-        if (reminder.reminder_status === 'scheduled' && !kickoffChanged) {
-          console.log(`Reminder ${reminder.id}: scheduled, kickoff unchanged - skipping`);
-          skipped++;
+        // Drift: any scheduled reminder whose stored kickoff differs from the current match time
+        const kickoffChanged = scheduledGroup.some(
+          (r) => r.kickoff_utc && new Date(r.kickoff_utc).getTime() !== kickoffUtc.getTime()
+        );
+
+        // CASE 1: No pending reminders and no drift → nothing to do
+        if (pendingGroup.length === 0 && !kickoffChanged) {
+          console.log(`Match ${matchId}: ${scheduledGroup.length} scheduled, kickoff unchanged — skipping`);
+          skipped += group.length;
           continue;
         }
 
-        // Build Arabic translations (same auto-generate pattern as braze-scheduler)
+        // Get Arabic translations once per match (cached across matches in teamArabicMap)
         const home_ar = await ensureTeamTranslation(match.home_team);
         const away_ar = await ensureTeamTranslation(match.away_team);
 
         if (!home_ar || !away_ar) {
-          console.error(`Reminder ${reminder.id}: missing Arabic translations - skipping`);
-          skipped++;
+          console.error(`Match ${matchId}: missing Arabic translations — skipping ${group.length} reminders`);
+          skipped += group.length;
           continue;
         }
 
@@ -291,7 +305,7 @@ Deno.serve(async (req) => {
         const game_time_baghdad = formatInTimeZone(kickoffUtc, BAGHDAD_TIMEZONE, 'HH:mm');
 
         const triggerProperties = {
-          match_id: String(match.id),
+          match_id: String(matchId),
           team_1_en: match.home_team,
           team_2_en: match.away_team,
           team_1_ar: home_ar,
@@ -303,22 +317,50 @@ Deno.serve(async (req) => {
           kickoff_utc: kickoffUtc.toISOString(),
         };
 
-        // ---- UPDATE existing Braze scheduled send (kickoff time drifted) ----
-        if (kickoffChanged && reminder.braze_schedule_id) {
+        // CASE 2: Kickoff time drifted on already-scheduled reminders
+        // Delete all existing Braze scheduled sends for this match and recreate with fresh
+        // trigger_properties and the new send_at. This also consolidates multiple schedule IDs
+        // (from different scheduler runs) into a single one.
+        if (kickoffChanged) {
           const minutesToSend = (sendAt.getTime() - now.getTime()) / 60000;
           if (minutesToSend < UPDATE_BUFFER_MINUTES) {
             console.log(
-              `Reminder ${reminder.id}: within update buffer (${minutesToSend.toFixed(1)} min) - skipping`
+              `Match ${matchId}: within update buffer (${minutesToSend.toFixed(1)} min) — skipping`
             );
-            skipped++;
+            skipped += group.length;
             continue;
           }
 
-          console.log(
-            `🔄 Updating Braze schedule for reminder ${reminder.id}: new send_at=${sendAt.toISOString()}`
-          );
+          // All users in the group (pending + scheduled) get the new schedule
+          const recipients = group.map((r) => ({ external_user_id: r.external_user_id }));
 
-          const updateRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/update`, {
+          // Delete each distinct Braze schedule ID that was previously created for this match
+          const distinctScheduleIds = [
+            ...new Set(scheduledGroup.map((r) => r.braze_schedule_id).filter(Boolean)),
+          ];
+          for (const schedId of distinctScheduleIds) {
+            const delRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/delete`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${brazeApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ campaign_id: brazeCampaignId, schedule_id: schedId }),
+            });
+            if (!delRes.ok) {
+              // Non-fatal: log and continue. The old send may fire at the wrong time,
+              // but the new create below will still send at the correct time.
+              console.warn(
+                `Match ${matchId}: Braze delete failed for schedule ${schedId} (${delRes.status}) — continuing`
+              );
+            }
+          }
+
+          // Create new schedule for all users in the group with fresh trigger_properties
+          console.log(
+            `🔄 Recreating Braze schedule for match ${matchId}: ${recipients.length} users, send_at=${sendAt.toISOString()}`
+          );
+          const createRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/create`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${brazeApiKey}`,
@@ -326,57 +368,65 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               campaign_id: brazeCampaignId,
-              schedule_id: reminder.braze_schedule_id,
               schedule: { time: sendAt.toISOString() },
+              recipients,
+              trigger_properties: triggerProperties,
             }),
           });
 
-          const updateResult = await updateRes.json();
+          const createResult = await createRes.json();
 
-          if (!updateRes.ok) {
-            console.error(`❌ Braze update failed for reminder ${reminder.id}:`, updateResult);
+          if (!createRes.ok) {
+            console.error(`❌ Braze create (drift) failed for match ${matchId}:`, createResult);
             await supabase.from('scheduler_logs').insert({
               function_name: 'braze-reminder-scheduler',
-              match_id: match.id,
+              match_id: matchId,
               action: 'error',
-              reason: `Braze schedule update failed: ${updateRes.status}`,
-              details: { reminder_id: reminder.id, braze_response: updateResult },
+              reason: `Braze schedule create (drift) failed: ${createRes.status}`,
+              details: { reminder_count: group.length, braze_response: createResult },
             });
-            errors++;
+            errors += group.length;
             continue;
           }
+
+          const newScheduleId = createResult.schedule_id || createResult.dispatch_id || null;
 
           await supabase
             .from('game_reminders')
             .update({
+              reminder_status: 'scheduled',
+              braze_schedule_id: newScheduleId,
               scheduled_send_at: sendAt.toISOString(),
               kickoff_utc: kickoffUtc.toISOString(),
               updated_at: now.toISOString(),
             })
-            .eq('id', reminder.id);
+            .in('id', allIds);
 
           await supabase.from('scheduler_logs').insert({
             function_name: 'braze-reminder-scheduler',
-            match_id: match.id,
+            match_id: matchId,
             action: 'reminder_updated',
-            reason: 'Kickoff time changed — Braze schedule updated',
+            reason: 'Kickoff time changed — Braze schedule recreated with fresh trigger_properties',
             details: {
-              reminder_id: reminder.id,
-              external_user_id: reminder.external_user_id,
-              old_kickoff: storedKickoff?.toISOString(),
-              new_kickoff: kickoffUtc.toISOString(),
+              reminder_count: group.length,
               new_send_at: sendAt.toISOString(),
+              new_schedule_id: newScheduleId,
+              deleted_schedule_ids: distinctScheduleIds,
             },
           });
 
-          console.log(`✅ Reminder ${reminder.id}: schedule updated to ${sendAt.toISOString()}`);
-          updated++;
+          console.log(`✅ Match ${matchId}: ${group.length} reminders rescheduled (Braze ID: ${newScheduleId})`);
+          updated += group.length;
           continue;
         }
 
-        // ---- CREATE new Braze scheduled send ----
+        // CASE 3: New pending reminders (no drift on existing scheduled ones)
+        // Create one Braze scheduled send for all pending users in this match.
+        // Scheduled reminders in this group already have a valid Braze send — leave them alone.
+        const recipients = pendingGroup.map((r) => ({ external_user_id: r.external_user_id }));
+
         console.log(
-          `📅 Creating Braze schedule for reminder ${reminder.id}: send_at=${sendAt.toISOString()}`
+          `📅 Creating Braze schedule for match ${matchId}: ${recipients.length} users, send_at=${sendAt.toISOString()}`
         );
 
         const createRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/create`, {
@@ -388,7 +438,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             campaign_id: brazeCampaignId,
             schedule: { time: sendAt.toISOString() },
-            recipients: [{ external_user_id: reminder.external_user_id }],
+            recipients,
             trigger_properties: triggerProperties,
           }),
         });
@@ -396,23 +446,23 @@ Deno.serve(async (req) => {
         const createResult = await createRes.json();
 
         if (!createRes.ok) {
-          console.error(`❌ Braze create failed for reminder ${reminder.id}:`, createResult);
+          console.error(`❌ Braze create failed for match ${matchId}:`, createResult);
           await supabase
             .from('game_reminders')
             .update({ reminder_status: 'error', updated_at: now.toISOString() })
-            .eq('id', reminder.id);
+            .in('id', pendingGroup.map((r) => r.id));
           await supabase.from('scheduler_logs').insert({
             function_name: 'braze-reminder-scheduler',
-            match_id: match.id,
+            match_id: matchId,
             action: 'error',
             reason: `Braze schedule create failed: ${createRes.status}`,
-            details: { reminder_id: reminder.id, braze_response: createResult },
+            details: { reminder_count: pendingGroup.length, braze_response: createResult },
           });
-          errors++;
+          errors += pendingGroup.length;
+          skipped += scheduledGroup.length;
           continue;
         }
 
-        // Braze returns schedule_id for scheduled sends
         const brazeScheduleId = createResult.schedule_id || createResult.dispatch_id || null;
 
         await supabase
@@ -424,16 +474,15 @@ Deno.serve(async (req) => {
             kickoff_utc: kickoffUtc.toISOString(),
             updated_at: now.toISOString(),
           })
-          .eq('id', reminder.id);
+          .in('id', pendingGroup.map((r) => r.id));
 
         await supabase.from('scheduler_logs').insert({
           function_name: 'braze-reminder-scheduler',
-          match_id: match.id,
+          match_id: matchId,
           action: 'reminder_scheduled',
-          reason: `Reminder scheduled ${SEND_OFFSET_MINUTES} min before kickoff`,
+          reason: `${pendingGroup.length} reminder(s) scheduled ${SEND_OFFSET_MINUTES} min before kickoff`,
           details: {
-            reminder_id: reminder.id,
-            external_user_id: reminder.external_user_id,
+            reminder_count: pendingGroup.length,
             braze_schedule_id: brazeScheduleId,
             send_at: sendAt.toISOString(),
             team_1: match.home_team,
@@ -442,20 +491,38 @@ Deno.serve(async (req) => {
         });
 
         console.log(
-          `✅ Reminder ${reminder.id}: scheduled for ${sendAt.toISOString()} (Braze ID: ${brazeScheduleId})`
+          `✅ Match ${matchId}: ${pendingGroup.length} reminder(s) scheduled for ${sendAt.toISOString()} (Braze ID: ${brazeScheduleId})`
         );
-        scheduled++;
-      } catch (reminderError) {
-        console.error(`❌ Error processing reminder ${reminder.id}:`, reminderError);
+        scheduled += pendingGroup.length;
+        skipped += scheduledGroup.length; // already scheduled, no drift
+      } catch (matchError) {
+        console.error(`❌ Error processing match ${matchId}:`, matchError);
         await supabase.from('scheduler_logs').insert({
           function_name: 'braze-reminder-scheduler',
-          match_id: (reminder.matches as any)?.id,
+          match_id: matchId,
           action: 'error',
-          reason: reminderError instanceof Error ? reminderError.message : 'Unknown error',
-          details: { reminder_id: reminder.id },
+          reason: matchError instanceof Error ? matchError.message : 'Unknown error',
+          details: { reminder_count: group.length },
         });
-        errors++;
+        errors += group.length;
       }
+    }
+
+    // ==================== CLEANUP STALE CANCELLED ROWS ====================
+    // Cancelled rows accumulate over time. Remove ones older than STALE_CANCELLED_DAYS
+    // to keep the table lean. Active rows (pending/scheduled) are never touched here.
+    const staleThreshold = new Date(
+      now.getTime() - STALE_CANCELLED_DAYS * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const { count: deletedCount } = await supabase
+      .from('game_reminders')
+      .delete({ count: 'exact' })
+      .eq('reminder_status', 'cancelled')
+      .lt('updated_at', staleThreshold);
+
+    if (deletedCount && deletedCount > 0) {
+      console.log(`🧹 Cleaned up ${deletedCount} stale cancelled reminder row(s)`);
     }
 
     console.log(
