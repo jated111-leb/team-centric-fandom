@@ -47,13 +47,28 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Case-insensitive match on team names + exact date.
-    // Using ilike with escaped values to avoid SQL injection via the service role client.
+    // Resolve app-supplied team names to canonical names using the same team_mappings
+    // patterns used across braze-scheduler, braze-congrats, and gap-detection.
+    // Canonical names match exactly what's stored in matches.home_team / matches.away_team,
+    // so "barca", "Real Madrid", "Man Utd", etc. all resolve correctly.
+    // Non-featured teams that have no pattern fall back to case-insensitive ilike.
+    const { data: teamMappings } = await supabase.from('team_mappings').select('pattern, canonical_name');
+
+    const findCanonicalTeam = (name: string): string | null => {
+      for (const mapping of teamMappings || []) {
+        if (new RegExp(mapping.pattern, 'i').test(name)) return mapping.canonical_name;
+      }
+      return null;
+    };
+
+    const resolvedHome = findCanonicalTeam(home_team) ?? home_team;
+    const resolvedAway = findCanonicalTeam(away_team) ?? away_team;
+
     const { data: matches, error: matchError } = await supabase
       .from('matches')
       .select('id, utc_date, home_team, away_team, status')
-      .ilike('home_team', home_team)
-      .ilike('away_team', away_team)
+      .ilike('home_team', resolvedHome)
+      .ilike('away_team', resolvedAway)
       .eq('match_date', match_date);
 
     if (matchError) throw matchError;
