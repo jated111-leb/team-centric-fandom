@@ -35,30 +35,47 @@ Deno.serve(async (req) => {
     let body: any = {};
     try { body = await req.json(); } catch { body = {}; }
 
-    const { match_id, external_user_id } = body;
+    // Accept a lookup by (home_team, away_team, match_date) because the app's match IDs
+    // come from its own backend and don't correspond to our matches.id values.
+    // match_date must be a date string: YYYY-MM-DD (Baghdad local date of the match).
+    const { home_team, away_team, match_date, external_user_id } = body;
 
-    if (!match_id || !external_user_id) {
+    if (!home_team || !away_team || !match_date || !external_user_id) {
       return new Response(
-        JSON.stringify({ error: 'match_id and external_user_id are required' }),
+        JSON.stringify({ error: 'home_team, away_team, match_date (YYYY-MM-DD), and external_user_id are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate match exists and is available for reminders
-    const { data: match, error: matchError } = await supabase
+    // Case-insensitive match on team names + exact date.
+    // Using ilike with escaped values to avoid SQL injection via the service role client.
+    const { data: matches, error: matchError } = await supabase
       .from('matches')
       .select('id, utc_date, home_team, away_team, status')
-      .eq('id', Number(match_id))
-      .maybeSingle();
+      .ilike('home_team', home_team)
+      .ilike('away_team', away_team)
+      .eq('match_date', match_date);
 
     if (matchError) throw matchError;
 
-    if (!match) {
+    if (!matches || matches.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Match not found' }),
+        JSON.stringify({ error: `No match found for ${home_team} vs ${away_team} on ${match_date}` }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    if (matches.length > 1) {
+      // Extremely rare (same fixture on the same date in different competitions).
+      // The app can disambiguate by including a 'competition' field in the request.
+      return new Response(
+        JSON.stringify({ error: `Multiple matches found for ${home_team} vs ${away_team} on ${match_date} — add competition to disambiguate` }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const match = matches[0];
+    const match_id = match.id;
 
     if (['FINISHED', 'CANCELLED', 'POSTPONED'].includes(match.status)) {
       return new Response(
@@ -114,7 +131,7 @@ Deno.serve(async (req) => {
     if (upsertError) throw upsertError;
 
     console.log(
-      `✅ Reminder set: user=${external_user_id} match=${match_id} (${match.home_team} vs ${match.away_team})`
+      `✅ Reminder set: user=${external_user_id} match=${match_id} (${match.home_team} vs ${match.away_team} on ${match_date})`
     );
 
     await supabase.from('scheduler_logs').insert({
