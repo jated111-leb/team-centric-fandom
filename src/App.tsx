@@ -74,6 +74,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          <Route path="/world-cup" element={<WorldCup />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route
             path="*"
