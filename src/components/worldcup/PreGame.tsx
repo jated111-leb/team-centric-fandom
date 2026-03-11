@@ -49,44 +49,6 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         )}
       </div>
 
-      {/* Match Facts */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">إحصائيات المواجهة</h3>
-        <div className="flex justify-center gap-6 mb-3">
-          <div className="text-center">
-            <p className="text-wc-text font-bold text-lg">{mockMatchFacts.headToHead.teamAWins}</p>
-            <p className="text-[10px] text-wc-muted">فوز العراق</p>
-          </div>
-          <div className="text-center">
-            <p className="text-wc-text font-bold text-lg">{mockMatchFacts.headToHead.draws}</p>
-            <p className="text-[10px] text-wc-muted">تعادل</p>
-          </div>
-          <div className="text-center">
-            <p className="text-wc-text font-bold text-lg">{mockMatchFacts.headToHead.teamBWins}</p>
-            <p className="text-[10px] text-wc-muted">فوز ألمانيا</p>
-          </div>
-        </div>
-        <div className="flex justify-center gap-3">
-          <div className="flex gap-1">
-            {mockMatchFacts.form.teamA.map((r, i) => (
-              <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-wc-accent-foreground ${
-                r === "W" ? "bg-wc-accent" : r === "D" ? "bg-wc-warning" : "bg-wc-danger"
-              }`}>
-                {r}
-              </span>
-            ))}
-          </div>
-          <div className="flex gap-1">
-            {mockMatchFacts.form.teamB.map((r, i) => (
-              <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-wc-accent-foreground ${
-                r === "W" ? "bg-wc-accent" : r === "D" ? "bg-wc-warning" : "bg-wc-danger"
-              }`}>
-                {r}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Prediction */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
