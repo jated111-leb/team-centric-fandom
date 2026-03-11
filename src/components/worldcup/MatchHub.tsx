@@ -41,7 +41,7 @@ const MatchHub = ({ onBack, onNavigateToSubscription }: MatchHubProps) => {
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3 text-wc-text">
           <Share2 size={18} />
-          <Cast size={18} />
+          
         </div>
         <button onClick={onBack} className="text-wc-text">
           <ArrowRight size={20} />
