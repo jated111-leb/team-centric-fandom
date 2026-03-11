@@ -72,26 +72,6 @@ const PostGame = () => {
         </div>
       </div>
 
-      {/* Highlights */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">أبرز اللحظات</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {mockHighlights.map((h) => (
-            <div key={h.id} className="rounded-xl overflow-hidden relative bg-wc-elevated border border-wc-border">
-              <div className="h-20 flex items-center justify-center text-2xl" style={{ background: "var(--wc-gradient-card)" }}>
-                🎬
-              </div>
-              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-bold text-wc-accent-foreground bg-wc-danger">
-                TOD
-              </div>
-              <div className="p-2">
-                <p className="text-wc-text text-[10px] font-medium leading-tight">{h.title}</p>
-                <p className="text-[9px] mt-0.5 text-wc-muted">{h.minute}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Next Match Reminder */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
