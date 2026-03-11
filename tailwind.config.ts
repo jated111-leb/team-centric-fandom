@@ -52,10 +52,22 @@ export default {
   				medium: 'hsl(var(--priority-medium))',
   				low: 'hsl(var(--priority-low))'
   			},
-  			status: {
+   			status: {
   				scheduled: 'hsl(var(--status-scheduled))',
   				live: 'hsl(var(--status-live))',
   				finished: 'hsl(var(--status-finished))'
+  			},
+  			wc: {
+  				bg: 'hsl(var(--wc-bg))',
+  				surface: 'hsl(var(--wc-surface))',
+  				elevated: 'hsl(var(--wc-surface-elevated))',
+  				accent: 'hsl(var(--wc-accent))',
+  				'accent-foreground': 'hsl(var(--wc-accent-foreground))',
+  				text: 'hsl(var(--wc-text))',
+  				muted: 'hsl(var(--wc-text-muted))',
+  				danger: 'hsl(var(--wc-danger))',
+  				warning: 'hsl(var(--wc-warning))',
+  				border: 'hsl(var(--wc-border))',
   			},
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',

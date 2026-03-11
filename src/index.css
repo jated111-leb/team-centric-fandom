@@ -53,6 +53,20 @@ All colors MUST be HSL.
     --shadow-card: 0 2px 8px -2px hsl(0 0% 0% / 0.4);
     --shadow-elevated: 0 8px 24px -8px hsl(0 0% 0% / 0.6);
 
+    /* World Cup / 1001 mobile tokens */
+    --wc-bg: 215 40% 7%;
+    --wc-surface: 215 35% 11%;
+    --wc-surface-elevated: 215 30% 14%;
+    --wc-accent: 145 63% 49%;
+    --wc-accent-foreground: 0 0% 100%;
+    --wc-text: 0 0% 100%;
+    --wc-text-muted: 215 15% 58%;
+    --wc-danger: 4 72% 56%;
+    --wc-warning: 36 100% 50%;
+    --wc-border: 215 25% 18%;
+    --wc-gradient-hero: linear-gradient(180deg, hsl(150 40% 10%) 0%, hsl(215 35% 11%) 100%);
+    --wc-gradient-card: linear-gradient(135deg, hsl(215 35% 11%) 0%, hsl(150 25% 9%) 100%);
+
     --sidebar-background: 210 50% 6%;
     --sidebar-foreground: 0 0% 95%;
     --sidebar-primary: 145 100% 50%;
