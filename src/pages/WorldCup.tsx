@@ -20,7 +20,6 @@ const WorldCup = () => {
       <div
         className="relative flex flex-col w-full max-w-[390px] min-h-screen overflow-hidden bg-wc-bg font-arabic"
         dir="rtl"
-        style={{ fontFamily: "'Inter', sans-serif" }}
       >
         <StatusBar />
 
