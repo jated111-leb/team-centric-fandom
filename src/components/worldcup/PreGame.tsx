@@ -24,7 +24,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center gap-3 mb-3" style={{ direction: "ltr" }}>
           <img src={todLogo} alt="TOD" className="h-6 w-auto" />
-          <span className="text-wc-text text-sm font-medium">هذه المباراة تُبث مباشرة على TOD</span>
+          <span className="text-wc-text text-sm font-medium">هذه المباراة تُبث مباشرة على</span>
         </div>
         {!todActivated ? (
           <div className="space-y-2">
