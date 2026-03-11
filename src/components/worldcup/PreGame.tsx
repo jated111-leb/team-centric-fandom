@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Share2, Users, MessageCircle } from "lucide-react";
 import { mockMatchFacts, mockChatMessages } from "@/lib/worldcupMockData";
+import todLogo from "@/assets/tod-logo.png";
 
 interface PreGameProps {
   todActivated: boolean;
