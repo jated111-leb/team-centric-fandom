@@ -1,10 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Star, Bell, Share2, Crown } from "lucide-react";
-import { mockLeaderboard, mockHighlights, mockRelatedContent } from "@/lib/worldcupMockData";
+import { mockHighlights, mockRelatedContent } from "@/lib/worldcupMockData";
+import {
+  getTotalPoints,
+  getUserRank,
+  getLeaderboard,
+  getQuizAccuracy,
+  getPrediction,
+  awardPredictionPoints,
+  type LeaderboardEntry,
+} from "@/lib/pointsStore";
 
 const PostGame = () => {
   const [rating, setRating] = useState(0);
   const [reminded, setReminded] = useState(false);
+  const [totalPoints, setTotalPoints] = useState(getTotalPoints);
+  const [userRank, setUserRank] = useState(getUserRank);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(getLeaderboard);
+  const [accuracy] = useState(getQuizAccuracy);
+  const [predictionCorrect] = useState(() => getPrediction() === "A");
+
+  // Award prediction points once on mount (Iraq wins = "A")
+  useEffect(() => {
+    const result = awardPredictionPoints();
+    if (result.awarded) {
+      setTotalPoints(getTotalPoints());
+      setUserRank(getUserRank());
+      setLeaderboard(getLeaderboard());
+    }
+  }, []);
 
   return (
     <div className="space-y-4 px-4 pb-6">
@@ -34,10 +58,14 @@ const PostGame = () => {
         <h3 className="text-wc-text font-bold text-sm mb-3">إحصائياتك</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "النقاط المكتسبة", value: "+85", icon: "🏆" },
-            { label: "دقة التوقعات", value: "75%", icon: "🎯" },
-            { label: "نتيجة التوقع", value: "صحيح ✅", icon: "📊" },
-            { label: "تغيير الترتيب", value: "↑ 3", icon: "📈" },
+            { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
+            { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
+            {
+              label: "توقع النتيجة",
+              value: predictionCorrect ? "صحيح ✅" : getPrediction() ? "خطأ ❌" : "—",
+              icon: "📊",
+            },
+            { label: "ترتيبك العالمي", value: `#${userRank}`, icon: "📈" },
           ].map((stat, i) => (
             <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
               <span className="text-lg">{stat.icon}</span>
@@ -52,7 +80,7 @@ const PostGame = () => {
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <h3 className="text-wc-text font-bold text-sm mb-3">تصنيف كأس العالم</h3>
         <div className="space-y-1.5">
-          {mockLeaderboard.slice(0, 5).map((user) => (
+          {leaderboard.slice(0, 5).map((user) => (
             <div
               key={user.rank}
               className={`flex items-center gap-3 py-1.5 px-2 rounded-lg ${user.isCurrentUser ? "bg-wc-accent/15" : ""}`}
@@ -66,7 +94,7 @@ const PostGame = () => {
               <span className={`text-wc-text text-xs flex-1 ${user.isCurrentUser ? "font-bold" : ""}`}>
                 {user.username} {user.isCurrentUser && <span className="text-wc-accent">(أنت)</span>}
               </span>
-              <span className="text-xs font-mono text-wc-accent">{user.points}</span>
+              <span className="text-xs font-mono text-wc-accent">{user.points.toLocaleString("ar-EG")}</span>
             </div>
           ))}
         </div>

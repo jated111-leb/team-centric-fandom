@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Share2 } from "lucide-react";
 import { mockMatchFacts, worldcupQuizzes } from "@/lib/worldcupMockData";
+import { addPoints, recordQuizAnswer, savePrediction, getPrediction, getTotalPoints } from "@/lib/pointsStore";
 import todLogo from "@/assets/tod-logo.png";
 
 interface PreGameProps {
@@ -11,7 +12,7 @@ interface PreGameProps {
 const preQuizzes = worldcupQuizzes.filter((q) => q.phase === "pre");
 
 const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
-  const [prediction, setPrediction] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState<string | null>(() => getPrediction());
   const [votes, setVotes] = useState({ A: 42, draw: 18, B: 40 });
 
   // Quiz state
@@ -129,7 +130,11 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
           ).map((opt) => (
             <button
               key={opt.key}
-              onClick={() => setPrediction(opt.key)}
+              onClick={() => {
+                if (prediction) return; // locked after first pick
+                setPrediction(opt.key);
+                savePrediction(opt.key);
+              }}
               className={`flex-1 py-2.5 rounded-full text-xs font-bold transition-all ${
                 prediction === opt.key
                   ? "bg-wc-accent text-wc-accent-foreground"
@@ -183,6 +188,9 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
                   if (preQuizAnswered) return;
                   setPreQuizSelected(i);
                   setPreQuizAnswered(true);
+                  const correct = i === currentQuiz.correctIndex;
+                  recordQuizAnswer(correct);
+                  if (correct) addPoints(currentQuiz.points, "pre-trivia");
                 }}
                 disabled={preQuizAnswered}
                 className={`py-2.5 rounded-full text-xs font-medium transition-all ${cls}`}

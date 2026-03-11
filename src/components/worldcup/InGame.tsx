@@ -2,12 +2,20 @@ import { useState, useRef, useEffect } from "react";
 import { Send, UserPlus, Trophy, X } from "lucide-react";
 import {
   mockLiveChatMessages,
-  mockLeaderboard,
   mockReactions as initialReactions,
   worldcupQuizzes,
   mockFriendsList,
   type Quiz,
 } from "@/lib/worldcupMockData";
+import {
+  getTotalPoints,
+  getUserRank,
+  getLeaderboard,
+  addPoints,
+  recordQuizAnswer,
+  setUsername as storeSetUsername,
+  getPlayerData,
+} from "@/lib/pointsStore";
 
 type EventType = "goal" | "yellow_card" | "halftime" | "var";
 
@@ -129,10 +137,11 @@ const InGame = () => {
   const [quizAnswered, setQuizAnswered] = useState(false);
   const [quizSelected, setQuizSelected] = useState<number | null>(null);
   const [showFriendSheet, setShowFriendSheet] = useState(false);
-  const [userPoints, setUserPoints] = useState(850);
-  const [userRank, setUserRank] = useState(5);
+  const [userPoints, setUserPoints] = useState(() => getTotalPoints());
+  const [userRank, setUserRank] = useState(() => getUserRank());
+  const [leaderboard, setLeaderboard] = useState(() => getLeaderboard());
   const [usedQuizIds, setUsedQuizIds] = useState<Set<string>>(new Set());
-  const [chatUsername, setChatUsername] = useState<string | null>(null);
+  const [chatUsername, setChatUsername] = useState<string | null>(() => getPlayerData().username);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -252,9 +261,16 @@ const InGame = () => {
     if (quizAnswered) return;
     setQuizSelected(idx);
     setQuizAnswered(true);
-    if (activeQuiz && idx === activeQuiz.correctIndex) {
-      setUserPoints((prev) => prev + activeQuiz.points);
-      if (userRank > 1) setUserRank((prev) => prev - 1);
+    if (activeQuiz) {
+      const correct = idx === activeQuiz.correctIndex;
+      recordQuizAnswer(correct);
+      if (correct) {
+        const newTotal = addPoints(activeQuiz.points, "in-game-quiz");
+        setUserPoints(newTotal);
+        const newRank = getUserRank();
+        setUserRank(newRank);
+        setLeaderboard(getLeaderboard());
+      }
     }
   };
 
@@ -282,6 +298,8 @@ const InGame = () => {
     const trimmed = nameInput.trim();
     if (!trimmed) return;
     setChatUsername(trimmed);
+    storeSetUsername(trimmed);
+    setLeaderboard(getLeaderboard()); // re-render leaderboard with real name
     setShowNamePrompt(false);
     setNameInput("");
   };
@@ -365,7 +383,7 @@ const InGame = () => {
             </button>
           </div>
           <div className="px-3 py-2 space-y-1">
-            {mockLeaderboard.slice(0, 7).map((user) => (
+            {leaderboard.slice(0, 7).map((user) => (
               <div
                 key={user.rank}
                 className={`flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs ${
@@ -390,9 +408,7 @@ const InGame = () => {
                     <span className="text-wc-accent text-[9px]">(أنت)</span>
                   )}
                 </span>
-                <span className="font-mono text-wc-accent">
-                  {user.isCurrentUser ? userPoints : user.points}
-                </span>
+                <span className="font-mono text-wc-accent">{user.points}</span>
               </div>
             ))}
           </div>
