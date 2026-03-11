@@ -30,7 +30,7 @@ export const mockMatchFacts = {
   stats: [
     { label: "مباريات سابقة", value: "35" },
     { label: "أهداف العراق", value: "38" },
-    { label: "أهداف السعودية", value: "42" },
+    { label: "أهداف ألمانيا", value: "42" },
   ],
 };
 
