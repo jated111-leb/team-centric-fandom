@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Share2, Users, MessageCircle, Crown } from "lucide-react";
-import { mockLineups, mockMatchFacts, mockChatMessages } from "@/lib/worldcupMockData";
+import { mockMatchFacts, mockChatMessages } from "@/lib/worldcupMockData";
 
 interface PreGameProps {
   todActivated: boolean;
@@ -48,27 +48,6 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         )}
       </div>
 
-      {/* Lineups */}
-      <div className="rounded-2xl p-4" style={{ background: "#161B22" }}>
-        <h3 className="text-white font-bold text-sm mb-3">التشكيلة</h3>
-        <div className="grid grid-cols-2 gap-4" style={{ direction: "rtl" }}>
-          {(["teamA", "teamB"] as const).map((team) => (
-            <div key={team}>
-              <div className="text-center mb-2">
-                <span className="text-lg">{mockLineups[team].flag}</span>
-                <p className="text-white text-xs font-bold">{mockLineups[team].name}</p>
-                <p className="text-[10px]" style={{ color: "#8B949E" }}>{mockLineups[team].formation}</p>
-              </div>
-              <div className="space-y-1">
-                {mockLineups[team].players.map((p, i) => (
-                  <p key={i} className="text-[11px] text-right" style={{ color: "#8B949E" }}>{p}</p>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Match Facts */}
       <div className="rounded-2xl p-4" style={{ background: "#161B22" }}>
         <h3 className="text-white font-bold text-sm mb-3">إحصائيات المواجهة</h3>
@@ -83,7 +62,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
           </div>
           <div className="text-center">
             <p className="text-white font-bold text-lg">{mockMatchFacts.headToHead.teamBWins}</p>
-            <p className="text-[10px]" style={{ color: "#8B949E" }}>فوز السعودية</p>
+            <p className="text-[10px]" style={{ color: "#8B949E" }}>فوز ألمانيا</p>
           </div>
         </div>
         <div className="flex justify-center gap-3">
@@ -113,7 +92,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
           {[
             { key: "A", label: "🇮🇶 العراق" },
             { key: "draw", label: "تعادل" },
-            { key: "B", label: "🇸🇦 السعودية" },
+            { key: "B", label: "🇩🇪 ألمانيا" },
           ].map((opt) => (
             <button
               key={opt.key}

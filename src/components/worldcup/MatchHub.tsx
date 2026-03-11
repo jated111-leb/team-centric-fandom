@@ -9,6 +9,7 @@ type Phase = "pre" | "live" | "post";
 
 interface MatchHubProps {
   onBack: () => void;
+  onNavigateToSubscription?: () => void;
 }
 
 const MatchHub = ({ onBack }: MatchHubProps) => {
@@ -53,8 +54,8 @@ const MatchHub = ({ onBack }: MatchHubProps) => {
         {/* Teams */}
         <div className="flex items-center justify-center gap-4">
           <div className="text-center">
-            <span className="text-3xl">🇸🇦</span>
-            <p className="text-white text-xs font-bold mt-1">السعودية</p>
+            <span className="text-3xl">🇩🇪</span>
+            <p className="text-white text-xs font-bold mt-1">ألمانيا</p>
           </div>
           <div className="text-center px-4">
             {phase === "pre" ? (
