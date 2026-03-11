@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Share2, Users, MessageCircle } from "lucide-react";
-import { mockMatchFacts, mockChatMessages } from "@/lib/worldcupMockData";
+import { useState, useEffect } from "react";
+import { Share2, MessageCircle } from "lucide-react";
+import { mockMatchFacts, mockChatMessages, worldcupQuizzes } from "@/lib/worldcupMockData";
 import todLogo from "@/assets/tod-logo.png";
 
 interface PreGameProps {
@@ -8,31 +8,74 @@ interface PreGameProps {
   onActivateTod: () => void;
 }
 
+const preQuizzes = worldcupQuizzes.filter((q) => q.phase === "pre");
+
 const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
   const [prediction, setPrediction] = useState<string | null>(null);
-  const votes = { A: 42, draw: 18, B: 40 };
+  const [votes, setVotes] = useState({ A: 42, draw: 18, B: 40 });
 
-  const getVotePercent = (key: string) => {
-    const total = votes.A + votes.draw + votes.B;
-    const val = key === "A" ? votes.A : key === "draw" ? votes.draw : votes.B;
-    return Math.round((val / total) * 100);
+  // Quiz state
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [preQuizSelected, setPreQuizSelected] = useState<number | null>(null);
+  const [preQuizAnswered, setPreQuizAnswered] = useState(false);
+
+  const currentQuiz = preQuizzes[quizIndex % preQuizzes.length];
+
+  // Simulate live vote trickle
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const rand = Math.random();
+      setVotes((prev) => {
+        if (rand < 0.5) return { ...prev, A: prev.A + 1 };
+        if (rand < 0.72) return { ...prev, draw: prev.draw + 1 };
+        return { ...prev, B: prev.B + 1 };
+      });
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const total = votes.A + votes.draw + votes.B;
+  const getVotePercent = (key: "A" | "draw" | "B") =>
+    Math.round((votes[key] / total) * 100);
+
+  const handleNextQuiz = () => {
+    setQuizIndex((i) => i + 1);
+    setPreQuizSelected(null);
+    setPreQuizAnswered(false);
   };
 
   return (
     <div className="space-y-4 px-4 pb-6">
-      {/* TOD Activation */}
+      {/* ── Hub Framing Banner ──────────────────────────────────────────── */}
+      <div className="rounded-xl px-4 py-3 flex items-start gap-3 bg-wc-elevated border border-wc-border">
+        <span className="text-lg flex-shrink-0">🏠</span>
+        <p className="text-xs leading-relaxed text-wc-muted">
+          <span className="text-wc-text font-bold">1001 هو مركز تجربتك.</span>{" "}
+          المباراة تُبث على TOD — لكن تجربة المشجع العراقي تبدأ وتنتهي هنا.
+        </p>
+      </div>
+
+      {/* ── TOD Activation (pinned-comment style) ──────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <div className="flex items-center gap-3 mb-3" style={{ direction: "ltr" }}>
-          <img src={todLogo} alt="TOD" className="h-6 w-auto" />
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[10px] px-2 py-0.5 rounded font-bold text-wc-accent-foreground bg-wc-accent">
+            📌 مثبّت
+          </span>
+          <div className="flex items-center gap-1.5" style={{ direction: "ltr" }}>
+            <img src={todLogo} alt="TOD" className="h-5 w-auto" />
+          </div>
           <span className="text-wc-text text-sm font-medium">هذه المباراة تُبث مباشرة على</span>
         </div>
         {!todActivated ? (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <p className="text-xs text-wc-muted">✅ اشتراكك في 1001 يشمل TOD</p>
             <p className="text-xs text-wc-muted">📲 اضغط أدناه لتفعيل حسابك في TOD</p>
-            <p className="text-xs text-wc-muted">📺 افتح تطبيق TOD لمشاهدة المباراة</p>
-            <button onClick={onActivateTod} className="w-full mt-2 py-2.5 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent">
-              فعّل TOD
+            <p className="text-xs text-wc-muted">📺 افتح تطبيق TOD عند بداية المباراة</p>
+            <button
+              onClick={onActivateTod}
+              className="w-full mt-2 py-2.5 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent"
+            >
+              فعّل TOD الآن
             </button>
           </div>
         ) : (
@@ -49,16 +92,22 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         )}
       </div>
 
-
-      {/* Prediction */}
+      {/* ── Prediction (with live vote trickle) ─────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">من سيفوز؟</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-wc-text font-bold text-sm">من سيفوز؟</h3>
+          {prediction && (
+            <span className="text-[10px] text-wc-muted">{total.toLocaleString()} صوت</span>
+          )}
+        </div>
         <div className="flex gap-2">
-          {[
-            { key: "A", label: "🇮🇶 العراق" },
-            { key: "draw", label: "تعادل" },
-            { key: "B", label: "🇩🇪 ألمانيا" },
-          ].map((opt) => (
+          {(
+            [
+              { key: "A" as const, label: "🇮🇶 العراق" },
+              { key: "draw" as const, label: "تعادل" },
+              { key: "B" as const, label: "🇩🇪 ألمانيا" },
+            ] as const
+          ).map((opt) => (
             <button
               key={opt.key}
               onClick={() => setPrediction(opt.key)}
@@ -69,26 +118,91 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
               }`}
             >
               <div>{opt.label}</div>
-              {prediction && <div className="text-[10px] mt-0.5">{getVotePercent(opt.key)}%</div>}
+              {prediction && (
+                <div className="text-[10px] mt-0.5 opacity-80">
+                  {getVotePercent(opt.key)}%
+                </div>
+              )}
             </button>
           ))}
         </div>
+        {prediction && (
+          <p className="text-[10px] text-center mt-2 text-wc-muted">
+            {prediction === "A"
+              ? `${getVotePercent("A")}٪ من المشجعين العراقيين يتفقون معك 🇮🇶`
+              : prediction === "B"
+              ? `${getVotePercent("B")}٪ يتوقعون فوز ألمانيا`
+              : `${getVotePercent("draw")}٪ يتوقعون التعادل`}
+          </p>
+        )}
       </div>
 
-      {/* Fan Chat Preview */}
+      {/* ── Pre-Match Trivia Quiz ────────────────────────────────────────── */}
+      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-wc-text font-bold text-sm">🧠 اختبار المعرفة</h3>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-wc-elevated text-wc-muted border border-wc-border">
+            +{currentQuiz.points} نقطة
+          </span>
+        </div>
+        <p className="text-wc-text text-xs mb-3 leading-relaxed">{currentQuiz.question}</p>
+        <div className="grid grid-cols-2 gap-2">
+          {currentQuiz.options.map((opt, i) => {
+            let cls = "bg-wc-elevated text-wc-muted";
+            if (preQuizAnswered) {
+              if (i === currentQuiz.correctIndex)
+                cls = "bg-wc-accent text-wc-accent-foreground";
+              else if (i === preQuizSelected)
+                cls = "bg-wc-danger text-wc-accent-foreground";
+            } else if (i === preQuizSelected) {
+              cls = "bg-wc-accent text-wc-accent-foreground";
+            }
+            return (
+              <button
+                key={i}
+                onClick={() => {
+                  if (preQuizAnswered) return;
+                  setPreQuizSelected(i);
+                  setPreQuizAnswered(true);
+                }}
+                disabled={preQuizAnswered}
+                className={`py-2.5 rounded-full text-xs font-medium transition-all ${cls}`}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+        {preQuizAnswered && (
+          <div className="mt-2 flex items-center justify-between">
+            <p
+              className={`text-xs font-bold ${
+                preQuizSelected === currentQuiz.correctIndex
+                  ? "text-wc-accent"
+                  : "text-wc-danger"
+              }`}
+            >
+              {preQuizSelected === currentQuiz.correctIndex
+                ? `🎉 إجابة صحيحة! +${currentQuiz.points} نقطة`
+                : `❌ الإجابة: ${currentQuiz.options[currentQuiz.correctIndex]}`}
+            </p>
+            <button onClick={handleNextQuiz} className="text-[10px] text-wc-accent underline">
+              السؤال التالي ›
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Fan Chat Preview ─────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <h3 className="text-wc-text font-bold text-sm mb-3">دردشة المشجعين</h3>
         <div className="space-y-2 mb-3">
           {mockChatMessages.map((msg) => (
-            <div key={msg.id} className="flex items-start gap-2" style={{ direction: "rtl" }}>
-              <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] text-wc-text font-bold bg-wc-elevated">
-                {msg.username[0]}
-              </div>
-              <div className="rounded-xl px-3 py-2 bg-wc-elevated">
-                <span className="text-[10px] font-bold text-wc-accent">{msg.username}</span>
-                <p className="text-wc-text text-xs">{msg.message}</p>
-              </div>
-              <span className="text-[9px] mt-2 text-wc-muted">{msg.timestamp}</span>
+            <div key={msg.id} className="flex items-baseline gap-2" style={{ direction: "rtl" }}>
+              <span className="text-[10px] font-bold text-sky-400 flex-shrink-0">
+                {msg.username}
+              </span>
+              <p className="text-wc-text text-xs">{msg.message}</p>
             </div>
           ))}
         </div>
@@ -98,31 +212,12 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         </button>
       </div>
 
-      {/* Watch Party */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <div className="flex items-center gap-2 mb-2">
-          <Users size={16} className="text-wc-accent" />
-          <h3 className="text-wc-text font-bold text-sm">حفلة مشاهدة</h3>
-        </div>
-        <p className="text-xs mb-3 text-wc-muted">ادعُ أصدقاءك للمشاهدة معاً</p>
-        <div className="flex items-center gap-2 mb-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-wc-text bg-wc-elevated border-2 border-wc-accent">
-              +
-            </div>
-          ))}
-        </div>
-        <button className="w-full py-2.5 rounded-full font-bold text-wc-accent-foreground text-xs bg-wc-accent">
-          إنشاء حفلة مشاهدة
-        </button>
-      </div>
-
-      {/* Invite */}
+      {/* ── Invite a Friend ──────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 flex items-center gap-3 bg-wc-surface border border-wc-border">
-        <Share2 size={20} className="text-wc-accent" />
+        <Share2 size={20} className="text-wc-accent flex-shrink-0" />
         <div className="flex-1">
-          <p className="text-wc-text text-sm font-bold">شارك مع صديق</p>
-          <p className="text-[10px] text-wc-muted">ادعُ أصدقاءك لتجربة 1001</p>
+          <p className="text-wc-text text-sm font-bold">ادعُ صديقاً</p>
+          <p className="text-[10px] text-wc-muted">شاركه الرابط وينضم للدردشة</p>
         </div>
         <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">
           شارك
