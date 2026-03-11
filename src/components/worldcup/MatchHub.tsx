@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowRight, Cast, Share2 } from "lucide-react";
+import { ArrowRight, Share2 } from "lucide-react";
 import PhaseIndicator from "./PhaseIndicator";
 import PreGame from "./PreGame";
 import InGame from "./InGame";
