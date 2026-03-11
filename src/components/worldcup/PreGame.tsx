@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Share2, MessageCircle } from "lucide-react";
-import { mockMatchFacts, mockChatMessages, worldcupQuizzes } from "@/lib/worldcupMockData";
+import { Share2 } from "lucide-react";
+import { mockMatchFacts, worldcupQuizzes } from "@/lib/worldcupMockData";
+import { addPoints, recordQuizAnswer, savePrediction, getPrediction, getTotalPoints } from "@/lib/pointsStore";
 import todLogo from "@/assets/tod-logo.png";
 
 interface PreGameProps {
@@ -11,7 +12,7 @@ interface PreGameProps {
 const preQuizzes = worldcupQuizzes.filter((q) => q.phase === "pre");
 
 const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
-  const [prediction, setPrediction] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState<string | null>(() => getPrediction());
   const [votes, setVotes] = useState({ A: 42, draw: 18, B: 40 });
 
   // Quiz state
@@ -43,6 +44,25 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
     setPreQuizSelected(null);
     setPreQuizAnswered(false);
   };
+
+  // Hype meter state
+  const [hypeCount, setHypeCount] = useState(4237);
+  const [hasTapped, setHasTapped] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHypeCount((prev) => prev + Math.floor(Math.random() * 5) + 1);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const hypeFill = Math.min((hypeCount / 10000) * 100, 100);
+  const hypeTier =
+    hypeCount < 2000
+      ? { label: "الجمهور يتحرك...", barClass: "bg-wc-accent" }
+      : hypeCount < 5000
+      ? { label: "الملعب يشتعل! 🔥", barClass: "bg-wc-warning" }
+      : { label: "العراق كله معاك! 💥", barClass: "bg-wc-danger" };
 
   return (
     <div className="space-y-4 px-4 pb-6">
@@ -110,7 +130,11 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
           ).map((opt) => (
             <button
               key={opt.key}
-              onClick={() => setPrediction(opt.key)}
+              onClick={() => {
+                if (prediction) return; // locked after first pick
+                setPrediction(opt.key);
+                savePrediction(opt.key);
+              }}
               className={`flex-1 py-2.5 rounded-full text-xs font-bold transition-all ${
                 prediction === opt.key
                   ? "bg-wc-accent text-wc-accent-foreground"
@@ -164,6 +188,9 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
                   if (preQuizAnswered) return;
                   setPreQuizSelected(i);
                   setPreQuizAnswered(true);
+                  const correct = i === currentQuiz.correctIndex;
+                  recordQuizAnswer(correct);
+                  if (correct) addPoints(currentQuiz.points, "pre-trivia");
                 }}
                 disabled={preQuizAnswered}
                 className={`py-2.5 rounded-full text-xs font-medium transition-all ${cls}`}
@@ -193,23 +220,41 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         )}
       </div>
 
-      {/* ── Fan Chat Preview ─────────────────────────────────────────────── */}
+      {/* ── Crowd Hype Meter ─────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">دردشة المشجعين</h3>
-        <div className="space-y-2 mb-3">
-          {mockChatMessages.map((msg) => (
-            <div key={msg.id} className="flex items-baseline gap-2" style={{ direction: "rtl" }}>
-              <span className="text-[10px] font-bold text-sky-400 flex-shrink-0">
-                {msg.username}
-              </span>
-              <p className="text-wc-text text-xs">{msg.message}</p>
-            </div>
-          ))}
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-wc-text font-bold text-sm">حرارة الجمهور 🔥</h3>
+          <span className="text-[10px] text-wc-muted font-mono">
+            {hypeCount.toLocaleString("ar-EG")} مشجع
+          </span>
         </div>
-        <button className="w-full py-2 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">
-          <MessageCircle size={14} className="inline ml-1" />
-          انضم لدردشة المشجعين العراقيين
-        </button>
+
+        {/* Fill bar */}
+        <div className="h-2.5 rounded-full mb-1 overflow-hidden bg-wc-elevated">
+          <div
+            className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`}
+            style={{ width: `${hypeFill}%` }}
+          />
+        </div>
+        <p className="text-[10px] text-wc-muted text-center mb-4">{hypeTier.label}</p>
+
+        {/* Tap button */}
+        {!hasTapped ? (
+          <button
+            onClick={() => {
+              setHasTapped(true);
+              setHypeCount((prev) => prev + 1);
+            }}
+            className="w-full py-3 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent active:scale-95 transition-transform"
+          >
+            أشعل الحماس 🔥
+          </button>
+        ) : (
+          <div className="w-full py-3 rounded-full text-center text-xs font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
+            أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع عراقي ✅
+          </div>
+        )}
       </div>
 
       {/* ── Invite a Friend ──────────────────────────────────────────────── */}

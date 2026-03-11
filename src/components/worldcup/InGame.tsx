@@ -2,12 +2,20 @@ import { useState, useRef, useEffect } from "react";
 import { Send, UserPlus, Trophy, X } from "lucide-react";
 import {
   mockLiveChatMessages,
-  mockLeaderboard,
   mockReactions as initialReactions,
   worldcupQuizzes,
   mockFriendsList,
   type Quiz,
 } from "@/lib/worldcupMockData";
+import {
+  getTotalPoints,
+  getUserRank,
+  getLeaderboard,
+  addPoints,
+  recordQuizAnswer,
+  setUsername as storeSetUsername,
+  getPlayerData,
+} from "@/lib/pointsStore";
 
 type EventType = "goal" | "yellow_card" | "halftime" | "var";
 
@@ -129,9 +137,14 @@ const InGame = () => {
   const [quizAnswered, setQuizAnswered] = useState(false);
   const [quizSelected, setQuizSelected] = useState<number | null>(null);
   const [showFriendSheet, setShowFriendSheet] = useState(false);
-  const [userPoints, setUserPoints] = useState(850);
-  const [userRank, setUserRank] = useState(5);
+  const [userPoints, setUserPoints] = useState(() => getTotalPoints());
+  const [userRank, setUserRank] = useState(() => getUserRank());
+  const [leaderboard, setLeaderboard] = useState(() => getLeaderboard());
   const [usedQuizIds, setUsedQuizIds] = useState<Set<string>>(new Set());
+  const [chatUsername, setChatUsername] = useState<string | null>(() => getPlayerData().username);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const chatRef = useRef<HTMLDivElement>(null);
 
@@ -248,25 +261,47 @@ const InGame = () => {
     if (quizAnswered) return;
     setQuizSelected(idx);
     setQuizAnswered(true);
-    if (activeQuiz && idx === activeQuiz.correctIndex) {
-      setUserPoints((prev) => prev + activeQuiz.points);
-      if (userRank > 1) setUserRank((prev) => prev - 1);
+    if (activeQuiz) {
+      const correct = idx === activeQuiz.correctIndex;
+      recordQuizAnswer(correct);
+      if (correct) {
+        const newTotal = addPoints(activeQuiz.points, "in-game-quiz");
+        setUserPoints(newTotal);
+        const newRank = getUserRank();
+        setUserRank(newRank);
+        setLeaderboard(getLeaderboard());
+      }
     }
   };
 
   const sendMessage = () => {
+    if (!chatUsername) {
+      setShowNamePrompt(true);
+      setTimeout(() => nameInputRef.current?.focus(), 50);
+      return;
+    }
     if (!newMsg.trim()) return;
     setMessages((prev) => [
       ...prev,
       {
         id: Date.now().toString(),
-        username: "أنت",
+        username: chatUsername,
         message: newMsg.trim(),
         timestamp: "الآن",
         isUser: true,
       },
     ]);
     setNewMsg("");
+  };
+
+  const confirmName = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    setChatUsername(trimmed);
+    storeSetUsername(trimmed);
+    setLeaderboard(getLeaderboard()); // re-render leaderboard with real name
+    setShowNamePrompt(false);
+    setNameInput("");
   };
 
   const handleInviteFriend = (friendName: string) => {
@@ -348,7 +383,7 @@ const InGame = () => {
             </button>
           </div>
           <div className="px-3 py-2 space-y-1">
-            {mockLeaderboard.slice(0, 7).map((user) => (
+            {leaderboard.slice(0, 7).map((user) => (
               <div
                 key={user.rank}
                 className={`flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs ${
@@ -373,9 +408,7 @@ const InGame = () => {
                     <span className="text-wc-accent text-[9px]">(أنت)</span>
                   )}
                 </span>
-                <span className="font-mono text-wc-accent">
-                  {user.isCurrentUser ? userPoints : user.points}
-                </span>
+                <span className="font-mono text-wc-accent">{user.points}</span>
               </div>
             ))}
           </div>
@@ -531,8 +564,14 @@ const InGame = () => {
           <input
             value={newMsg}
             onChange={(e) => setNewMsg(e.target.value)}
+            onFocus={() => {
+              if (!chatUsername) {
+                setShowNamePrompt(true);
+                setTimeout(() => nameInputRef.current?.focus(), 50);
+              }
+            }}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            placeholder="اكتب رسالة..."
+            placeholder={chatUsername ? "اكتب رسالة..." : "اختر اسمك أولاً..."}
             className="flex-1 text-xs text-wc-text px-3 py-2 rounded-full border-0 outline-none bg-wc-elevated placeholder:text-wc-muted"
           />
           <button
@@ -542,6 +581,40 @@ const InGame = () => {
             <Send size={14} className="text-wc-accent-foreground" />
           </button>
         </div>
+
+        {/* Name Prompt Overlay */}
+        {showNamePrompt && (
+          <div className="absolute inset-0 z-30 rounded-2xl bg-wc-bg/97 flex flex-col items-center justify-center p-6 gap-4">
+            <div className="text-center">
+              <p className="text-2xl mb-2">🎙️</p>
+              <h3 className="text-wc-text font-bold text-base mb-1">ما اسمك في الدردشة؟</h3>
+              <p className="text-[11px] text-wc-muted">سيظهر اسمك لبقية المشجعين</p>
+            </div>
+            <input
+              ref={nameInputRef}
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmName()}
+              placeholder="مثال: أبو علي، نمر الرافدين..."
+              maxLength={20}
+              className="w-full text-sm text-wc-text px-4 py-3 rounded-full border border-wc-border outline-none text-center bg-wc-elevated placeholder:text-wc-muted"
+              style={{ direction: "rtl" }}
+            />
+            <button
+              onClick={confirmName}
+              disabled={!nameInput.trim()}
+              className="w-full py-3 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent disabled:opacity-40"
+            >
+              انضم للدردشة
+            </button>
+            <button
+              onClick={() => setShowNamePrompt(false)}
+              className="text-[11px] text-wc-muted underline"
+            >
+              إلغاء
+            </button>
+          </div>
+        )}
 
         {/* Friend Invite Sheet */}
         {showFriendSheet && (
