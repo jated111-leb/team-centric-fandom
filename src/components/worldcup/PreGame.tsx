@@ -66,14 +66,6 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
 
   return (
     <div className="space-y-4 px-4 pb-6">
-      {/* ── Hub Framing Banner ──────────────────────────────────────────── */}
-      <div className="rounded-xl px-4 py-3 flex items-start gap-3 bg-wc-elevated border border-wc-border">
-        <span className="text-lg flex-shrink-0">🏠</span>
-        <p className="text-xs leading-relaxed text-wc-muted">
-          <span className="text-wc-text font-bold">1001 هو مركز تجربتك.</span>{" "}
-          المباراة تُبث على TOD — لكن تجربة المشجع العراقي تبدأ وتنتهي هنا.
-        </p>
-      </div>
 
       {/* ── TOD Activation (pinned-comment style) ──────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
