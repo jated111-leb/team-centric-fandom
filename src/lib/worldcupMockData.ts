@@ -109,3 +109,204 @@ export const mockPartnerLogos = [
   { id: "5", name: "shahid", selected: false },
   { id: "6", name: "beIN", selected: false },
 ];
+
+export interface Quiz {
+  id: string;
+  phase: "pre" | "live";
+  question: string;
+  options: string[];
+  correctIndex: number;
+  points: number;
+  triggerEvent?: "goal" | "yellow_card" | "halftime" | "var";
+}
+
+export const worldcupQuizzes: Quiz[] = [
+  // ── PRE-GAME TRIVIA ─────────────────────────────────────────────────────────
+  {
+    id: "pre-1",
+    phase: "pre",
+    question: "من هي الدول المستضيفة لكأس العالم 2026؟",
+    options: ["أمريكا فقط", "أمريكا والمكسيك وكندا", "كندا والمكسيك فقط", "أمريكا والبرازيل"],
+    correctIndex: 1,
+    points: 10,
+  },
+  {
+    id: "pre-2",
+    phase: "pre",
+    question: "كم فريقاً سيشارك في كأس العالم 2026؟",
+    options: ["32 فريقاً", "40 فريقاً", "48 فريقاً", "64 فريقاً"],
+    correctIndex: 2,
+    points: 10,
+  },
+  {
+    id: "pre-3",
+    phase: "pre",
+    question: "في أي ملعب سيُقام نهائي كأس العالم 2026؟",
+    options: ["ملعب أزتيكا", "ملعب SoFi", "ملعب ميتلايف", "ملعب روز بول"],
+    correctIndex: 2,
+    points: 15,
+  },
+  {
+    id: "pre-4",
+    phase: "pre",
+    question: "كم مباراة ستُلعب في نسخة 2026 إجمالاً؟",
+    options: ["64 مباراة", "80 مباراة", "96 مباراة", "104 مباريات"],
+    correctIndex: 3,
+    points: 20,
+  },
+  {
+    id: "pre-5",
+    phase: "pre",
+    question: "في أي عام شارك العراق في كأس العالم لأول وآخر مرة قبل 2026؟",
+    options: ["1974", "1982", "1986", "1990"],
+    correctIndex: 2,
+    points: 15,
+  },
+  {
+    id: "pre-6",
+    phase: "pre",
+    question: "في أي عام فاز المنتخب العراقي ببطولة كأس آسيا؟",
+    options: ["1996", "2000", "2004", "2007"],
+    correctIndex: 3,
+    points: 10,
+  },
+  {
+    id: "pre-7",
+    phase: "pre",
+    question: "أي منتخب فاز بأكبر عدد من كؤوس العالم؟",
+    options: ["ألمانيا", "إيطاليا", "البرازيل", "الأرجنتين"],
+    correctIndex: 2,
+    points: 10,
+  },
+  {
+    id: "pre-8",
+    phase: "pre",
+    question: "كم مجموعة ستكون في كأس العالم 2026؟",
+    options: ["8 مجموعات", "10 مجموعات", "12 مجموعة", "16 مجموعة"],
+    correctIndex: 2,
+    points: 15,
+  },
+  {
+    id: "pre-9",
+    phase: "pre",
+    question: "من هو الهداف التاريخي لكأس العالم من حيث عدد الأهداف؟",
+    options: ["رونالدو", "ميسي", "مولر", "كلوزه"],
+    correctIndex: 3,
+    points: 20,
+  },
+  {
+    id: "pre-10",
+    phase: "pre",
+    question: "ما هي نتيجة أكبر فوز في تاريخ كأس العالم؟",
+    options: ["7-0", "8-1", "9-0", "10-1"],
+    correctIndex: 3,
+    points: 20,
+  },
+  // ── IN-GAME LIVE QUIZZES ────────────────────────────────────────────────────
+  {
+    id: "live-1",
+    phase: "live",
+    question: "من سجّل هذا الهدف؟ ⚽",
+    options: ["أيمن حسين", "علاء عباس", "محند علي", "سعد عبد الأمير"],
+    correctIndex: 0,
+    points: 20,
+    triggerEvent: "goal",
+  },
+  {
+    id: "live-2",
+    phase: "live",
+    question: "من أعطى التمريرة الحاسمة للهدف؟",
+    options: ["ضرغام إسماعيل", "إبراهيم بايش", "علاء عباس", "أمجد عطوان"],
+    correctIndex: 2,
+    points: 15,
+    triggerEvent: "goal",
+  },
+  {
+    id: "live-3",
+    phase: "live",
+    question: "من سيكون رجل المباراة بهذا الأداء؟",
+    options: ["أيمن حسين", "جلال حسن", "علاء عباس", "ريبين سولاقا"],
+    correctIndex: 0,
+    points: 25,
+    triggerEvent: "goal",
+  },
+  {
+    id: "live-4",
+    phase: "live",
+    question: "كم بطاقة صفراء تؤدي إلى الإيقاف في كأس العالم؟",
+    options: ["1 بطاقة", "2 بطاقة", "3 بطاقات", "4 بطاقات"],
+    correctIndex: 1,
+    points: 15,
+    triggerEvent: "yellow_card",
+  },
+  {
+    id: "live-5",
+    phase: "live",
+    question: "ماذا يحدث عند حصول اللاعب على بطاقتين صفراوتين؟",
+    options: ["غرامة مالية", "طرد من الملعب", "حرمان من مباراة واحدة", "تحذير فقط"],
+    correctIndex: 1,
+    points: 10,
+    triggerEvent: "yellow_card",
+  },
+  {
+    id: "live-6",
+    phase: "live",
+    question: "كم دقيقة يستمر كل شوط إضافي في كأس العالم؟",
+    options: ["10 دقائق", "15 دقيقة", "20 دقيقة", "30 دقيقة"],
+    correctIndex: 1,
+    points: 20,
+    triggerEvent: "halftime",
+  },
+  {
+    id: "live-7",
+    phase: "live",
+    question: "من كان أفضل لاعب في الشوط الأول؟",
+    options: ["أيمن حسين", "علاء عباس", "أمجد عطوان", "محند علي"],
+    correctIndex: 0,
+    points: 10,
+    triggerEvent: "halftime",
+  },
+  {
+    id: "live-8",
+    phase: "live",
+    question: "ماذا تعني اختصار VAR؟",
+    options: ["تقنية مراجعة الفيديو", "مساعد حكم الفيديو", "مراجعة الأداء بالفيديو", "نظام مساعدة بالفيديو"],
+    correctIndex: 1,
+    points: 15,
+    triggerEvent: "var",
+  },
+  {
+    id: "live-9",
+    phase: "live",
+    question: "في أي كأس عالم استُخدم VAR لأول مرة رسمياً؟",
+    options: ["2010", "2014", "2018", "2022"],
+    correctIndex: 2,
+    points: 20,
+    triggerEvent: "var",
+  },
+  {
+    id: "live-10",
+    phase: "live",
+    question: "ما هو القرار المتوقع بعد مراجعة VAR؟",
+    options: ["هدف صحيح ✅", "تسلل ❌", "ضربة جزاء ⚽", "ركلة حرة مباشرة"],
+    correctIndex: 0,
+    points: 15,
+    triggerEvent: "var",
+  },
+];
+
+export const mockRelatedContent = [
+  { id: "1", title: "رحلة العراق نحو كأس العالم 2026", type: "وثائقي", duration: "45 د", premium: false },
+  { id: "2", title: "أبطال الرافدين — قصص اللاعبين", type: "وثائقي", duration: "38 د", premium: true },
+  { id: "3", title: "أفضل مباريات ألمانيا في كأس العالم", type: "مقاطع مختارة", duration: "22 د", premium: false },
+  { id: "4", title: "تحليل تكتيكي: نقاط قوة العراق", type: "تحليل", duration: "18 د", premium: false },
+  { id: "5", title: "ملاعب كأس العالم 2026 — جولة افتراضية", type: "وثائقي", duration: "30 د", premium: true },
+];
+
+export const mockFriendsList = [
+  { id: "1", username: "أبو علي", online: true },
+  { id: "2", username: "محمد الكاظمي", online: true },
+  { id: "3", username: "أحمد بصرة", online: false },
+  { id: "4", username: "فاطمة الزهراء", online: true },
+  { id: "5", username: "سامر العراقي", online: false },
+];
