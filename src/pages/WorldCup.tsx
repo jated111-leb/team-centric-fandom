@@ -5,15 +5,14 @@ import HomeFeed from "@/components/worldcup/HomeFeed";
 import MatchHub from "@/components/worldcup/MatchHub";
 import SubscriptionScreen from "@/components/worldcup/SubscriptionScreen";
 
-type Screen = "home" | "match" | "subscription";
+type Screen = "match" | "subscription";
 
 const WorldCup = () => {
-  const [screen, setScreen] = useState<Screen>("home");
+  const [screen, setScreen] = useState<Screen>("match");
   const [activeTab, setActiveTab] = useState("home");
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    if (tab === "home") setScreen("home");
   };
 
   return (
@@ -25,17 +24,11 @@ const WorldCup = () => {
       >
         <StatusBar />
 
-        {screen === "home" && (
-          <HomeFeed
-            onNavigateToMatch={() => setScreen("match")}
-            onNavigateToSubscription={() => setScreen("subscription")}
-          />
-        )}
         {screen === "match" && (
-          <MatchHub onBack={() => setScreen("home")} />
+          <MatchHub onBack={() => setScreen("match")} onNavigateToSubscription={() => setScreen("subscription")} />
         )}
         {screen === "subscription" && (
-          <SubscriptionScreen onBack={() => setScreen("home")} />
+          <SubscriptionScreen onBack={() => setScreen("match")} />
         )}
 
         {screen !== "subscription" && (

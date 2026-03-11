@@ -51,7 +51,7 @@ export const mockLiveChatMessages = [
 
 export const mockMatchEvents = [
   { minute: "12'", type: "goal" as const, team: "A", player: "أيمن حسين", icon: "⚽" },
-  { minute: "34'", type: "yellow" as const, team: "B", player: "محمد كنو", icon: "🟨" },
+  { minute: "34'", type: "yellow" as const, team: "B", player: "موسيالا", icon: "🟨" },
   { minute: "45+2'", type: "goal" as const, team: "B", player: "هافيرتز", icon: "⚽" },
   { minute: "56'", type: "sub" as const, team: "A", player: "محند علي ⇄ أمجد عطوان", icon: "🔄" },
   { minute: "68'", type: "goal" as const, team: "A", player: "أيمن حسين", icon: "⚽" },

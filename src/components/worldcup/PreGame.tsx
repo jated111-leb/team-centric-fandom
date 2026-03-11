@@ -92,7 +92,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
           {[
             { key: "A", label: "🇮🇶 العراق" },
             { key: "draw", label: "تعادل" },
-            { key: "B", label: "🇸🇦 السعودية" },
+            { key: "B", label: "🇩🇪 ألمانيا" },
           ].map((opt) => (
             <button
               key={opt.key}
