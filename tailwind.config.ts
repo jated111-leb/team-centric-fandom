@@ -113,14 +113,24 @@ export default {
   		},
   		fontFamily: {
   			sans: [
+  				'Inter Display',
   				'Inter',
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif',
-  				'Apple Color Emoji',
-  				'Segoe UI Emoji',
-  				'Segoe UI Symbol',
-  				'Noto Color Emoji'
+  			],
+  			display: [
+  				'Inter Display',
+  				'ui-sans-serif',
+  				'system-ui',
+  				'sans-serif',
+  			],
+  			arabic: [
+  				'Readex Pro',
+  				'Inter Display',
+  				'ui-sans-serif',
+  				'system-ui',
+  				'sans-serif',
   			],
   			serif: [
   				'ui-serif',
