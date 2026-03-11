@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Share2, Users, MessageCircle, Crown } from "lucide-react";
-import { mockLineups, mockMatchFacts, mockChatMessages } from "@/lib/worldcupMockData";
+import { mockMatchFacts, mockChatMessages } from "@/lib/worldcupMockData";
 
 interface PreGameProps {
   todActivated: boolean;
