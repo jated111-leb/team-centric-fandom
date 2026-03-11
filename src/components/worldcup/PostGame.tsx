@@ -9,13 +9,24 @@ const PostGame = () => {
   return (
     <div className="space-y-4 px-4 pb-6">
       {/* Man of the Match */}
-      <div className="rounded-2xl p-4 text-center border border-wc-border" style={{ background: "var(--wc-gradient-card)" }}>
-        <p className="text-xs mb-1 text-wc-warning">⭐ رجل المباراة</p>
-        <div className="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl bg-wc-elevated border-2 border-wc-warning">
-          ⚽
+      <div className="rounded-2xl p-5 text-center border border-wc-border" style={{ background: "var(--wc-gradient-card)" }}>
+        <p className="text-xs mb-2 text-wc-accent font-bold">🏆 نتيجة المباراة</p>
+        <div className="flex items-center justify-center gap-6 mb-3">
+          <div className="text-center">
+            <span className="text-3xl">🇮🇶</span>
+            <p className="text-wc-text text-xs font-bold mt-1">العراق</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-wc-text font-bold text-3xl">2</span>
+            <span className="text-wc-muted text-sm">-</span>
+            <span className="text-wc-text font-bold text-3xl">1</span>
+          </div>
+          <div className="text-center">
+            <span className="text-3xl">🇩🇪</span>
+            <p className="text-wc-text text-xs font-bold mt-1">ألمانيا</p>
+          </div>
         </div>
-        <h3 className="text-wc-text font-bold text-base">أيمن حسين</h3>
-        <p className="text-xs text-wc-muted">هدفان · 3 تسديدات · تمريرة حاسمة</p>
+        <span className="text-sm font-bold text-wc-accent">🎉 فوز العراق!</span>
       </div>
 
       {/* Your Match Stats */}
