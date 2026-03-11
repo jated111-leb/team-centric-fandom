@@ -132,6 +132,10 @@ const InGame = () => {
   const [userPoints, setUserPoints] = useState(850);
   const [userRank, setUserRank] = useState(5);
   const [usedQuizIds, setUsedQuizIds] = useState<Set<string>>(new Set());
+  const [chatUsername, setChatUsername] = useState<string | null>(null);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const chatRef = useRef<HTMLDivElement>(null);
 
@@ -255,18 +259,31 @@ const InGame = () => {
   };
 
   const sendMessage = () => {
+    if (!chatUsername) {
+      setShowNamePrompt(true);
+      setTimeout(() => nameInputRef.current?.focus(), 50);
+      return;
+    }
     if (!newMsg.trim()) return;
     setMessages((prev) => [
       ...prev,
       {
         id: Date.now().toString(),
-        username: "أنت",
+        username: chatUsername,
         message: newMsg.trim(),
         timestamp: "الآن",
         isUser: true,
       },
     ]);
     setNewMsg("");
+  };
+
+  const confirmName = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    setChatUsername(trimmed);
+    setShowNamePrompt(false);
+    setNameInput("");
   };
 
   const handleInviteFriend = (friendName: string) => {
@@ -531,8 +548,14 @@ const InGame = () => {
           <input
             value={newMsg}
             onChange={(e) => setNewMsg(e.target.value)}
+            onFocus={() => {
+              if (!chatUsername) {
+                setShowNamePrompt(true);
+                setTimeout(() => nameInputRef.current?.focus(), 50);
+              }
+            }}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            placeholder="اكتب رسالة..."
+            placeholder={chatUsername ? "اكتب رسالة..." : "اختر اسمك أولاً..."}
             className="flex-1 text-xs text-wc-text px-3 py-2 rounded-full border-0 outline-none bg-wc-elevated placeholder:text-wc-muted"
           />
           <button
@@ -542,6 +565,40 @@ const InGame = () => {
             <Send size={14} className="text-wc-accent-foreground" />
           </button>
         </div>
+
+        {/* Name Prompt Overlay */}
+        {showNamePrompt && (
+          <div className="absolute inset-0 z-30 rounded-2xl bg-wc-bg/97 flex flex-col items-center justify-center p-6 gap-4">
+            <div className="text-center">
+              <p className="text-2xl mb-2">🎙️</p>
+              <h3 className="text-wc-text font-bold text-base mb-1">ما اسمك في الدردشة؟</h3>
+              <p className="text-[11px] text-wc-muted">سيظهر اسمك لبقية المشجعين</p>
+            </div>
+            <input
+              ref={nameInputRef}
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmName()}
+              placeholder="مثال: أبو علي، نمر الرافدين..."
+              maxLength={20}
+              className="w-full text-sm text-wc-text px-4 py-3 rounded-full border border-wc-border outline-none text-center bg-wc-elevated placeholder:text-wc-muted"
+              style={{ direction: "rtl" }}
+            />
+            <button
+              onClick={confirmName}
+              disabled={!nameInput.trim()}
+              className="w-full py-3 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent disabled:opacity-40"
+            >
+              انضم للدردشة
+            </button>
+            <button
+              onClick={() => setShowNamePrompt(false)}
+              className="text-[11px] text-wc-muted underline"
+            >
+              إلغاء
+            </button>
+          </div>
+        )}
 
         {/* Friend Invite Sheet */}
         {showFriendSheet && (
