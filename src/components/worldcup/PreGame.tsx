@@ -70,9 +70,6 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
       {/* ── TOD Activation (pinned-comment style) ──────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-[10px] px-2 py-0.5 rounded font-bold text-wc-accent-foreground bg-wc-accent">
-            📌 مثبّت
-          </span>
           <div className="flex items-center gap-1.5" style={{ direction: "ltr" }}>
             <img src={todLogo} alt="TOD" className="h-5 w-auto" />
           </div>
