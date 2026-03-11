@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Star, Bell, Share2, ArrowUp, ChevronLeft } from "lucide-react";
+import { Star, Bell, Share2 } from "lucide-react";
 import { mockLeaderboard, mockHighlights } from "@/lib/worldcupMockData";
 
 const PostGame = () => {
@@ -9,18 +9,18 @@ const PostGame = () => {
   return (
     <div className="space-y-4 px-4 pb-6">
       {/* Man of the Match */}
-      <div className="rounded-2xl p-4 text-center" style={{ background: "linear-gradient(135deg, #161B22 0%, #0D2818 100%)" }}>
-        <p className="text-xs mb-1" style={{ color: "#F39C12" }}>⭐ رجل المباراة</p>
-        <div className="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl" style={{ background: "#1C2128", border: "2px solid #F39C12" }}>
+      <div className="rounded-2xl p-4 text-center border border-wc-border" style={{ background: "var(--wc-gradient-card)" }}>
+        <p className="text-xs mb-1 text-wc-warning">⭐ رجل المباراة</p>
+        <div className="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl bg-wc-elevated border-2 border-wc-warning">
           ⚽
         </div>
-        <h3 className="text-white font-bold text-base">أيمن حسين</h3>
-        <p className="text-xs" style={{ color: "#8B949E" }}>هدفان · 3 تسديدات · تمريرة حاسمة</p>
+        <h3 className="text-wc-text font-bold text-base">أيمن حسين</h3>
+        <p className="text-xs text-wc-muted">هدفان · 3 تسديدات · تمريرة حاسمة</p>
       </div>
 
       {/* Your Match Stats */}
-      <div className="rounded-2xl p-4" style={{ background: "#161B22" }}>
-        <h3 className="text-white font-bold text-sm mb-3">إحصائياتك</h3>
+      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+        <h3 className="text-wc-text font-bold text-sm mb-3">إحصائياتك</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: "النقاط المكتسبة", value: "+85", icon: "🏆" },
@@ -28,55 +28,54 @@ const PostGame = () => {
             { label: "نتيجة التوقع", value: "صحيح ✅", icon: "📊" },
             { label: "تغيير الترتيب", value: "↑ 3", icon: "📈" },
           ].map((stat, i) => (
-            <div key={i} className="rounded-xl p-3 text-center" style={{ background: "#1C2128" }}>
+            <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
               <span className="text-lg">{stat.icon}</span>
-              <p className="text-white font-bold text-sm mt-1">{stat.value}</p>
-              <p className="text-[10px]" style={{ color: "#8B949E" }}>{stat.label}</p>
+              <p className="text-wc-text font-bold text-sm mt-1">{stat.value}</p>
+              <p className="text-[10px] text-wc-muted">{stat.label}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* Season Leaderboard */}
-      <div className="rounded-2xl p-4" style={{ background: "#161B22" }}>
-        <h3 className="text-white font-bold text-sm mb-3">تصنيف كأس العالم</h3>
+      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+        <h3 className="text-wc-text font-bold text-sm mb-3">تصنيف كأس العالم</h3>
         <div className="space-y-1.5">
           {mockLeaderboard.slice(0, 5).map((user) => (
             <div
               key={user.rank}
-              className="flex items-center gap-3 py-1.5 px-2 rounded-lg"
-              style={{ background: user.isCurrentUser ? "rgba(46,204,113,0.15)" : "transparent" }}
+              className={`flex items-center gap-3 py-1.5 px-2 rounded-lg ${user.isCurrentUser ? "bg-wc-accent/15" : ""}`}
             >
-              <span className="text-xs font-bold w-5" style={{ color: user.rank <= 3 ? "#F39C12" : "#8B949E" }}>
+              <span className={`text-xs font-bold w-5 ${user.rank <= 3 ? "text-wc-warning" : "text-wc-muted"}`}>
                 {user.rank}
               </span>
-              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] text-white font-bold" style={{ background: "#1C2128" }}>
+              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] text-wc-text font-bold bg-wc-elevated">
                 {user.username[0]}
               </div>
-              <span className="text-white text-xs flex-1" style={{ fontWeight: user.isCurrentUser ? 700 : 400 }}>
-                {user.username} {user.isCurrentUser && <span style={{ color: "#2ECC71" }}>(أنت)</span>}
+              <span className={`text-wc-text text-xs flex-1 ${user.isCurrentUser ? "font-bold" : ""}`}>
+                {user.username} {user.isCurrentUser && <span className="text-wc-accent">(أنت)</span>}
               </span>
-              <span className="text-xs font-mono" style={{ color: "#2ECC71" }}>{user.points}</span>
+              <span className="text-xs font-mono text-wc-accent">{user.points}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Highlights */}
-      <div className="rounded-2xl p-4" style={{ background: "#161B22" }}>
-        <h3 className="text-white font-bold text-sm mb-3">أبرز اللحظات</h3>
+      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+        <h3 className="text-wc-text font-bold text-sm mb-3">أبرز اللحظات</h3>
         <div className="grid grid-cols-2 gap-2">
           {mockHighlights.map((h) => (
-            <div key={h.id} className="rounded-xl overflow-hidden relative" style={{ background: "#1C2128" }}>
-              <div className="h-20 flex items-center justify-center text-2xl" style={{ background: "linear-gradient(135deg, #1C2128, #0D2818)" }}>
+            <div key={h.id} className="rounded-xl overflow-hidden relative bg-wc-elevated border border-wc-border">
+              <div className="h-20 flex items-center justify-center text-2xl" style={{ background: "var(--wc-gradient-card)" }}>
                 🎬
               </div>
-              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-bold text-white" style={{ background: "#E74C3C" }}>
+              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-bold text-wc-accent-foreground bg-wc-danger">
                 TOD
               </div>
               <div className="p-2">
-                <p className="text-white text-[10px] font-medium leading-tight">{h.title}</p>
-                <p className="text-[9px] mt-0.5" style={{ color: "#8B949E" }}>{h.minute}</p>
+                <p className="text-wc-text text-[10px] font-medium leading-tight">{h.title}</p>
+                <p className="text-[9px] mt-0.5 text-wc-muted">{h.minute}</p>
               </div>
             </div>
           ))}
@@ -84,20 +83,20 @@ const PostGame = () => {
       </div>
 
       {/* Next Match Reminder */}
-      <div className="rounded-2xl p-4" style={{ background: "#161B22" }}>
-        <h3 className="text-white font-bold text-sm mb-2">المباراة القادمة</h3>
+      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+        <h3 className="text-wc-text font-bold text-sm mb-2">المباراة القادمة</h3>
         <div className="flex items-center justify-between">
           <div className="text-right">
-            <p className="text-white text-xs">🇮🇶 العراق vs الأردن 🇯🇴</p>
-            <p className="text-[10px] mt-0.5" style={{ color: "#8B949E" }}>الجمعة 20 يونيو · 9:00 م</p>
+            <p className="text-wc-text text-xs">🇮🇶 العراق vs الأردن 🇯🇴</p>
+            <p className="text-[10px] mt-0.5 text-wc-muted">الجمعة 20 يونيو · 9:00 م</p>
           </div>
           <button
             onClick={() => setReminded(!reminded)}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all"
-            style={{
-              background: reminded ? "#2ECC71" : "#1C2128",
-              color: reminded ? "#fff" : "#2ECC71",
-            }}
+            className={`flex items-center gap-1 px-3 py-2 rounded-full text-xs font-bold transition-all ${
+              reminded
+                ? "bg-wc-accent text-wc-accent-foreground"
+                : "bg-wc-elevated text-wc-accent"
+            }`}
           >
             <Bell size={14} />
             {reminded ? "تم التذكير" : "ذكّرني"}
@@ -106,28 +105,28 @@ const PostGame = () => {
       </div>
 
       {/* Invite */}
-      <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#161B22" }}>
-        <Share2 size={20} color="#2ECC71" />
+      <div className="rounded-2xl p-4 flex items-center gap-3 bg-wc-surface border border-wc-border">
+        <Share2 size={20} className="text-wc-accent" />
         <div className="flex-1">
-          <p className="text-white text-sm font-bold">ادعُ صديقاً للمباراة القادمة</p>
-          <p className="text-[10px]" style={{ color: "#8B949E" }}>شارك التجربة مع أصدقائك</p>
+          <p className="text-wc-text text-sm font-bold">ادعُ صديقاً للمباراة القادمة</p>
+          <p className="text-[10px] text-wc-muted">شارك التجربة مع أصدقائك</p>
         </div>
-        <button className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ color: "#2ECC71", border: "1px solid #2ECC71" }}>
+        <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">
           شارك
         </button>
       </div>
 
       {/* Rate Experience */}
-      <div className="rounded-2xl p-4 text-center" style={{ background: "#161B22" }}>
-        <h3 className="text-white font-bold text-sm mb-2">قيّم التجربة</h3>
+      <div className="rounded-2xl p-4 text-center bg-wc-surface border border-wc-border">
+        <h3 className="text-wc-text font-bold text-sm mb-2">قيّم التجربة</h3>
         <div className="flex justify-center gap-2 mb-2">
           {[1, 2, 3, 4, 5].map((s) => (
             <button key={s} onClick={() => setRating(s)}>
-              <Star size={24} color={s <= rating ? "#F39C12" : "#1C2128"} fill={s <= rating ? "#F39C12" : "none"} />
+              <Star size={24} className={s <= rating ? "text-wc-warning" : "text-wc-elevated"} fill={s <= rating ? "currentColor" : "none"} />
             </button>
           ))}
         </div>
-        {rating > 0 && <p className="text-xs" style={{ color: "#2ECC71" }}>شكراً لتقييمك! ⭐</p>}
+        {rating > 0 && <p className="text-xs text-wc-accent">شكراً لتقييمك! ⭐</p>}
       </div>
     </div>
   );

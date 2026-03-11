@@ -16,11 +16,11 @@ const WorldCup = () => {
   };
 
   return (
-    <div className="flex justify-center min-h-screen" style={{ background: "#000" }}>
+    <div className="flex justify-center min-h-screen bg-black">
       <div
-        className="relative flex flex-col w-full max-w-[390px] min-h-screen overflow-hidden"
+        className="relative flex flex-col w-full max-w-[390px] min-h-screen overflow-hidden bg-wc-bg"
         dir="rtl"
-        style={{ background: "#0D1117", fontFamily: "'Inter', sans-serif" }}
+        style={{ fontFamily: "'Inter', sans-serif" }}
       >
         <StatusBar />
 

@@ -14,19 +14,17 @@ const tabs = [
 ];
 
 const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => (
-  <div className="flex items-center justify-around py-2 border-t" style={{ background: "#161B22", borderColor: "#1C2128" }}>
+  <div className="flex items-center justify-around py-2 border-t border-wc-border bg-wc-surface">
     {tabs.map((tab) => {
       const isActive = activeTab === tab.id;
       return (
         <button
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
-          className="flex flex-col items-center gap-0.5 min-w-[56px] py-1"
+          className={`flex flex-col items-center gap-0.5 min-w-[56px] py-1 ${isActive ? "text-wc-accent" : "text-wc-muted"}`}
         >
-          <tab.icon size={22} color={isActive ? "#2ECC71" : "#8B949E"} />
-          <span className="text-[10px]" style={{ color: isActive ? "#2ECC71" : "#8B949E" }}>
-            {tab.label}
-          </span>
+          <tab.icon size={22} />
+          <span className="text-[10px]">{tab.label}</span>
         </button>
       );
     })}
