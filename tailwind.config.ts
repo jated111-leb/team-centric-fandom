@@ -65,8 +65,12 @@ export default {
   				'accent-foreground': 'hsl(var(--wc-accent-foreground))',
   				text: 'hsl(var(--wc-text))',
   				muted: 'hsl(var(--wc-text-muted))',
+  				secondary: 'hsl(var(--wc-text-secondary))',
   				danger: 'hsl(var(--wc-danger))',
   				warning: 'hsl(var(--wc-warning))',
+  				info: 'hsl(var(--wc-info))',
+  				success: 'hsl(var(--wc-success))',
+  				evergreen: 'hsl(var(--wc-evergreen))',
   				border: 'hsl(var(--wc-border))',
   			},
   			sidebar: {
@@ -109,14 +113,24 @@ export default {
   		},
   		fontFamily: {
   			sans: [
+  				'Inter Display',
   				'Inter',
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif',
-  				'Apple Color Emoji',
-  				'Segoe UI Emoji',
-  				'Segoe UI Symbol',
-  				'Noto Color Emoji'
+  			],
+  			display: [
+  				'Inter Display',
+  				'ui-sans-serif',
+  				'system-ui',
+  				'sans-serif',
+  			],
+  			arabic: [
+  				'Readex Pro',
+  				'Inter Display',
+  				'ui-sans-serif',
+  				'system-ui',
+  				'sans-serif',
   			],
   			serif: [
   				'ui-serif',
