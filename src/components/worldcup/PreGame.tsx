@@ -221,23 +221,23 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
       </div>
 
       {/* ── Crowd Hype Meter ─────────────────────────────────────────────── */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+      <div className="rounded-2xl p-5 bg-wc-surface border border-wc-border">
         {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-wc-text font-bold text-sm">حرارة الجمهور 🔥</h3>
-          <span className="text-[10px] text-wc-muted font-mono">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-wc-text font-bold text-base">🔥 حرارة الجمهور</h3>
+          <span className="text-sm text-wc-secondary font-medium">
             {hypeCount.toLocaleString("ar-EG")} مشجع
           </span>
         </div>
 
         {/* Fill bar */}
-        <div className="h-2.5 rounded-full mb-1 overflow-hidden bg-wc-elevated">
+        <div className="h-3.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
           <div
             className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`}
             style={{ width: `${hypeFill}%` }}
           />
         </div>
-        <p className="text-[10px] text-wc-muted text-center mb-4">{hypeTier.label}</p>
+        <p className="text-sm text-wc-muted text-center mb-5 font-medium">{hypeTier.label}</p>
 
         {/* Tap button */}
         {!hasTapped ? (
@@ -246,12 +246,12 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
               setHasTapped(true);
               setHypeCount((prev) => prev + 1);
             }}
-            className="w-full py-3 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent active:scale-95 transition-transform"
+            className="w-full py-3.5 rounded-full font-bold text-wc-accent-foreground text-base bg-wc-accent active:scale-95 transition-transform"
           >
             أشعل الحماس 🔥
           </button>
         ) : (
-          <div className="w-full py-3 rounded-full text-center text-xs font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
+          <div className="w-full py-3.5 rounded-full text-center text-sm font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
             أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع عراقي ✅
           </div>
         )}
