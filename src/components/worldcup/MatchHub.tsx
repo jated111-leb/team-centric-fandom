@@ -9,6 +9,7 @@ type Phase = "pre" | "live" | "post";
 
 interface MatchHubProps {
   onBack: () => void;
+  onNavigateToSubscription?: () => void;
 }
 
 const MatchHub = ({ onBack }: MatchHubProps) => {
