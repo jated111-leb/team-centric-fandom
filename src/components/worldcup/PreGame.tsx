@@ -62,7 +62,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
           </div>
           <div className="text-center">
             <p className="text-white font-bold text-lg">{mockMatchFacts.headToHead.teamBWins}</p>
-            <p className="text-[10px]" style={{ color: "#8B949E" }}>فوز السعودية</p>
+            <p className="text-[10px]" style={{ color: "#8B949E" }}>فوز ألمانيا</p>
           </div>
         </div>
         <div className="flex justify-center gap-3">
