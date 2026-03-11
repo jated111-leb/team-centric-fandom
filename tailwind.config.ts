@@ -65,8 +65,12 @@ export default {
   				'accent-foreground': 'hsl(var(--wc-accent-foreground))',
   				text: 'hsl(var(--wc-text))',
   				muted: 'hsl(var(--wc-text-muted))',
+  				secondary: 'hsl(var(--wc-text-secondary))',
   				danger: 'hsl(var(--wc-danger))',
   				warning: 'hsl(var(--wc-warning))',
+  				info: 'hsl(var(--wc-info))',
+  				success: 'hsl(var(--wc-success))',
+  				evergreen: 'hsl(var(--wc-evergreen))',
   				border: 'hsl(var(--wc-border))',
   			},
   			sidebar: {
