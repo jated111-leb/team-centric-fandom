@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import NotificationLogs from "./pages/NotificationLogs";
 import Analytics from "./pages/Analytics";
 import Copilot from "./pages/Copilot";
+import WorldCup from "./pages/WorldCup";
 
 const queryClient = new QueryClient();
 
