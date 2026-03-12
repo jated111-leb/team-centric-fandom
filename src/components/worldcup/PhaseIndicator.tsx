@@ -19,10 +19,10 @@ const PhaseIndicator = ({ activePhase, onPhaseChange }: PhaseIndicatorProps) => 
         <button
           key={phase.id}
           onClick={() => onPhaseChange(phase.id)}
-          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+          className={`inline-flex h-9 px-3 items-center justify-center gap-1.5 text-xs font-medium transition-all ${
             isActive
-              ? "bg-wc-accent text-wc-accent-foreground"
-              : "bg-wc-elevated text-wc-muted"
+              ? "rounded-xl border-2 border-wc-accent bg-wc-accent text-wc-accent-foreground"
+              : "rounded-xl border-2 border-wc-border bg-wc-bg text-wc-muted"
           }`}
         >
           {phase.label}
