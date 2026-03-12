@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, UserPlus, Trophy, X } from "lucide-react";
+import MiniLeaderboard from "./MiniLeaderboard";
 import {
   mockLiveChatMessages,
   mockReactions as initialReactions,
