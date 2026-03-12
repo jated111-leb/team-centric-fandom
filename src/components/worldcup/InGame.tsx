@@ -495,7 +495,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
       {/* ── Live Chat (YouTube-style) ────────────────────────────────────── */}
       <div
         className="flex flex-col rounded-2xl overflow-hidden bg-wc-surface border border-wc-border relative"
-        style={{ minHeight: "360px" }}
+        style={{ height: "480px" }}
       >
         {/* Event Banner — slides in from top */}
         {activeEvent && (
@@ -578,7 +578,10 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
             </span>
           </div>
           <button
-            onClick={() => setShowFriendSheet(true)}
+            onClick={() => {
+              const msg = encodeURIComponent("العراق ضد ألمانيا 🇮🇶⚽🇩🇪 — المباراة مباشرة الآن! انضم للدردشة\nhttps://team-centric-fandom.lovable.app/world-cup");
+              window.open(`https://wa.me/?text=${msg}`, "_blank");
+            }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs text-wc-accent border border-wc-accent bg-wc-accent/10"
           >
             <UserPlus size={12} />
@@ -589,8 +592,8 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
         {/* Messages */}
         <div
           ref={chatRef}
-          className="flex-1 overflow-y-auto py-2 px-3 space-y-1"
-          style={{ maxHeight: "260px", direction: "rtl" }}
+          className="flex-1 min-h-0 overflow-y-auto py-2 px-3 space-y-1"
+          style={{ direction: "rtl" }}
         >
           {messages.map((msg) =>
             msg.isSystem ? (

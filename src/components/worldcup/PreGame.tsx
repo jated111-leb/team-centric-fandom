@@ -197,7 +197,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-wc-text">🔥 حرارة الجمهور</span>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+              <span className="text-xs font-bold text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
               <button onClick={() => setHypeExpanded(false)} className="p-0.5 rounded-full hover:bg-wc-elevated">
                 <ChevronUp size={12} className="text-wc-muted" />
               </button>
@@ -225,7 +225,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-wc-accent/10 border border-wc-accent/30 hover:bg-wc-accent/15 transition-all"
         >
           <span className="text-xs">🔥</span>
-          <span className="text-[10px] font-bold text-wc-accent">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+          <span className="text-xs font-bold text-wc-accent">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
           <ChevronDown size={10} className="text-wc-muted" />
         </button>
       )}
@@ -359,7 +359,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
               key={opt.key}
               onClick={() => { setPrediction(opt.key); savePrediction(opt.key); }}
               className={`flex-1 py-2.5 rounded-full text-xs font-bold transition-all ${
-                prediction === opt.key ? "bg-wc-accent text-wc-accent-foreground" : "bg-wc-elevated text-wc-muted"
+                prediction === opt.key ? "bg-wc-info text-white" : "bg-wc-elevated text-wc-muted"
               }`}
             >
               <div>{opt.label}</div>
@@ -372,7 +372,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
       </div>
 
       {/* ── Chat with Floating Widgets ──────────────────────────────── */}
-      <div className="flex flex-col rounded-2xl overflow-hidden bg-wc-surface border border-wc-border relative" style={{ height: "400px" }}>
+      <div className="flex flex-col rounded-2xl overflow-hidden bg-wc-surface border border-wc-border relative" style={{ height: "480px" }}>
         {/* Chat Header */}
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-wc-border flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -472,10 +472,10 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
             { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
             { label: "ترتيبك", value: `#${getUserRank()}`, icon: "📈" },
           ].map((stat, i) => (
-            <div key={i} className="rounded-xl p-2.5 text-center bg-wc-elevated border border-wc-border">
-              <span className="text-base">{stat.icon}</span>
-              <p className="text-wc-text font-bold text-sm mt-0.5">{stat.value}</p>
-              <p className="text-[9px] text-wc-muted">{stat.label}</p>
+            <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
+              <span className="text-lg">{stat.icon}</span>
+              <p className="text-wc-text font-bold text-lg mt-1">{stat.value}</p>
+              <p className="text-xs text-wc-muted mt-0.5">{stat.label}</p>
             </div>
           ))}
         </div>
