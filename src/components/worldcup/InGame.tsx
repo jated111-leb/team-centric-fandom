@@ -642,7 +642,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
 
         {/* Name Prompt Overlay */}
         {showNamePrompt && (
-          <div className="absolute inset-0 z-30 rounded-2xl bg-wc-bg/97 flex flex-col items-center justify-center p-6 gap-4">
+          <div className="absolute inset-0 z-30 rounded-2xl bg-wc-bg flex flex-col items-center justify-center p-6 gap-4">
             <div className="text-center">
               <p className="text-2xl mb-2">🎙️</p>
               <h3 className="text-wc-text font-bold text-base mb-1">ما اسمك في الدردشة؟</h3>

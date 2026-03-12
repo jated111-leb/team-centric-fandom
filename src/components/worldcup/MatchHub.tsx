@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowRight, Cast, Share2, Heart, Bell, BellOff } from "lucide-react";
+import { ArrowRight, Share2 } from "lucide-react";
 import PhaseIndicator from "./PhaseIndicator";
 import PreGame from "./PreGame";
 import InGame from "./InGame";
@@ -41,213 +41,109 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
 
   return (
     <div className="flex-1 overflow-y-auto bg-wc-bg">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3 text-wc-text">
+          <Share2 size={18} />
+          
+        </div>
+        <button onClick={onBack} className="text-wc-text">
+          <ArrowRight size={20} />
+        </button>
+      </div>
 
-      {/* ── Hero Section ──────────────────────────────────────────────────── */}
-      <div className="relative w-full" style={{ height: 260 }}>
+      {/* Match Hero — Cinematic Style */}
+      <div className="mx-4 rounded-2xl overflow-hidden" style={{ background: "var(--wc-gradient-hero)" }}>
+        {/* Team Visual Area */}
+        <div className="relative h-52 flex items-end justify-center">
+          {/* Background gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-wc-surface/90" />
+          
+          {/* Team flags — large dramatic display */}
+          <div className="relative z-10 flex items-end justify-center w-full px-6 pb-0">
+            {/* Team A (Right in RTL) */}
+            <div className="flex-1 flex justify-center">
+              <div className="relative">
+                <span className="text-8xl drop-shadow-2xl">🇮🇶</span>
+              </div>
+            </div>
+            
+            {/* VS / Score overlay */}
+            <div className="flex-shrink-0 px-2 pb-4 z-20">
+              {phase === "pre" ? (
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-wc-surface/80 border border-wc-border backdrop-blur-sm">
+                  <span className="text-wc-text font-bold text-sm">VS</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-wc-text font-bold text-4xl drop-shadow-lg">{scoreA}</span>
+                  <span className="text-wc-muted text-lg">-</span>
+                  <span className="text-wc-text font-bold text-4xl drop-shadow-lg">{scoreB}</span>
+                </div>
+              )}
+            </div>
 
-        {/* Background gradient — team colours bleeding in from each side */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(135deg, #1a3a1a 0%, #111 40%, #111 60%, #1a1a2e 100%)",
-          }}
-        />
-
-        {/* Left player silhouette (Iraq) */}
-        <div
-          className="absolute bottom-0 left-0 flex flex-col items-center justify-end"
-          style={{ width: "48%", height: "85%" }}
-        >
-          {/* Jersey silhouette */}
-          <div className="relative flex flex-col items-center">
-            {/* Head */}
-            <div
-              className="rounded-full mb-[-4px] z-10"
-              style={{
-                width: 52,
-                height: 52,
-                background: "linear-gradient(160deg, #c8a882 60%, #a0785a 100%)",
-                boxShadow: "0 0 24px rgba(0,180,80,0.25)",
-              }}
-            />
-            {/* Jersey */}
-            <div
-              style={{
-                width: 90,
-                height: 110,
-                background: "linear-gradient(180deg, #006233 0%, #004d28 100%)",
-                clipPath: "polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%)",
-                borderRadius: "6px 6px 0 0",
-              }}
-            />
-            {/* Collar accent */}
-            <div
-              className="absolute top-[48px] left-1/2 -translate-x-1/2"
-              style={{
-                width: 32,
-                height: 12,
-                background: "#fff",
-                clipPath: "polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)",
-                opacity: 0.6,
-              }}
-            />
+            {/* Team B (Left in RTL) */}
+            <div className="flex-1 flex justify-center">
+              <div className="relative">
+                <span className="text-8xl drop-shadow-2xl">🇩🇪</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Right player silhouette (Germany) */}
-        <div
-          className="absolute bottom-0 right-0 flex flex-col items-center justify-end"
-          style={{ width: "48%", height: "80%" }}
-        >
-          <div className="relative flex flex-col items-center">
-            {/* Head */}
-            <div
-              className="rounded-full mb-[-4px] z-10"
-              style={{
-                width: 46,
-                height: 46,
-                background: "linear-gradient(160deg, #d4b896 60%, #b08860 100%)",
-                boxShadow: "0 0 20px rgba(200,200,200,0.2)",
-              }}
-            />
-            {/* Jersey */}
-            <div
-              style={{
-                width: 82,
-                height: 100,
-                background: "linear-gradient(180deg, #f0f0f0 0%, #c8c8c8 100%)",
-                clipPath: "polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%)",
-                borderRadius: "6px 6px 0 0",
-              }}
-            />
-            {/* Collar accent */}
-            <div
-              className="absolute top-[44px] left-1/2 -translate-x-1/2"
-              style={{
-                width: 28,
-                height: 10,
-                background: "#000",
-                clipPath: "polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)",
-                opacity: 0.5,
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Gradient fade at bottom so text reads clearly */}
-        <div
-          className="absolute bottom-0 left-0 right-0"
-          style={{
-            height: 120,
-            background: "linear-gradient(to top, rgba(10,10,10,0.98) 0%, rgba(10,10,10,0.6) 60%, transparent 100%)",
-          }}
-        />
-
-        {/* Top nav icons — float above hero */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-3 z-20">
-          <Cast size={20} className="text-white drop-shadow" />
-          <button onClick={onBack}>
-            <ArrowRight size={20} className="text-white drop-shadow" />
-          </button>
-        </div>
-
-        {/* Live badge (only during live phase) */}
-        {phase === "live" && (
-          <div className="absolute top-10 left-4 flex items-center gap-1 px-2.5 py-1 rounded-full bg-wc-danger z-20">
-            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            <span className="text-[10px] font-bold text-white">مباشر</span>
-          </div>
-        )}
-
-        {/* Match title at bottom of hero */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-3 z-20">
-          {/* Score row (live/post only) */}
-          {phase !== "pre" && (
-            <div className="flex items-center justify-center gap-3 mb-1">
-              <span className="text-white font-bold text-3xl font-mono">{scoreB}</span>
-              <span className="text-wc-muted text-lg">-</span>
-              <span className="text-white font-bold text-3xl font-mono">{scoreA}</span>
+        {/* Team Names + Match Info */}
+        <div className="text-center px-5 pb-5 -mt-2">
+          <h2 className="text-wc-text font-bold text-xl tracking-wide">
+            العراق - ألمانيا
+          </h2>
+          
+          {phase === "live" && (
+            <div className="flex items-center justify-center gap-1.5 mt-2">
+              <span className="w-2 h-2 rounded-full animate-pulse bg-wc-danger" />
+              <span className="text-xs font-bold text-wc-danger">67' مباشر</span>
             </div>
           )}
-          <h1 className="text-white font-bold text-2xl text-right leading-tight">
-            العراق - ألمانيا
-          </h1>
-        </div>
-      </div>
-
-      {/* ── Action Row ────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 pt-4 pb-3">
-        {/* Share */}
-        <button className="flex items-center justify-center rounded-xl border border-wc-border bg-wc-surface"
-          style={{ width: 44, height: 44 }}>
-          <Share2 size={16} className="text-wc-text" />
-        </button>
-
-        {/* Like */}
-        <button
-          onClick={() => setLiked((v) => !v)}
-          className={`flex items-center justify-center rounded-xl border transition-colors ${
-            liked ? "bg-rose-500 border-rose-500" : "bg-wc-surface border-wc-border"
-          }`}
-          style={{ width: 44, height: 44 }}
-        >
-          <Heart size={16} className={liked ? "text-white fill-white" : "text-wc-text"} />
-        </button>
-
-        {/* Remind me — dominant CTA */}
-        <button
-          onClick={() => setReminded((v) => !v)}
-          className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm h-[44px] transition-all ${
-            reminded
-              ? "bg-[#22c55e] text-white border-0"
-              : "bg-wc-surface border border-wc-border text-wc-muted"
-          }`}
-        >
-          {reminded ? <Bell size={15} className="fill-white" /> : <Bell size={15} />}
-          <span>ذكّرني</span>
-        </button>
-      </div>
-
-      {/* ── Tag Pills ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 pb-4 flex-row-reverse">
-        {["كرة القدم", "تعليق عربي", "2026"].map((tag) => (
-          <span
-            key={tag}
-            className="px-3 py-1 rounded-full text-[11px] text-wc-muted bg-wc-elevated border border-wc-border"
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
-
-      {/* Divider */}
-      <div className="h-px mx-4 mb-4 bg-wc-border" />
-
-      {/* ── Countdown (pre-game only) ──────────────────────────────────────── */}
-      {phase === "pre" && (
-        <div className="px-4 pb-4 text-right">
-          <p className="text-xs text-wc-muted mb-1">الأربعاء 18 يونيو 2026 · 9:00 م بتوقيت بغداد</p>
-          <p className="text-[11px] text-wc-muted mb-3 leading-relaxed">
-            كأس العالم 2026: شاهد مباراة العراق ضد ألمانيا تبث مباشرة من أمريكا.
-          </p>
-          <div className="flex items-center justify-end gap-1">
-            <p className="text-[11px] text-wc-muted ml-2">تبدأ المباراة خلال</p>
-            <span className="text-wc-text font-mono font-bold text-xl">
-              {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
+          {phase === "post" && (
+            <span className="text-xs px-3 py-1 rounded-full mt-2 inline-block bg-wc-elevated text-wc-muted">
+              نهاية المباراة
             </span>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Live "Watch on TOD" strip */}
-      {phase === "live" && (
-        <div className="px-4 pb-4">
-          <button className="w-full py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 bg-wc-danger">
-            شاهد على TOD
-          </button>
+          <p className="text-[11px] mt-3 text-wc-secondary">
+            الأربعاء 18 يونيو 2026 · 9:00 م بتوقيت بغداد
+          </p>
+
+          {phase === "pre" && (
+            <div className="mt-4">
+              <p className="text-[11px] mb-2 text-wc-muted">تبدأ المباراة خلال</p>
+              <div className="flex items-center justify-center gap-2">
+                {[
+                  { val: countdown.h, label: "ساعة" },
+                  { val: countdown.m, label: "دقيقة" },
+                  { val: countdown.s, label: "ثانية" },
+                ].map((unit, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="flex flex-col items-center">
+                      <span className="text-wc-text font-mono text-2xl font-bold bg-wc-elevated/60 rounded-lg px-3 py-1.5 min-w-[3rem] text-center border border-wc-border/50">
+                        {String(unit.val).padStart(2, "0")}
+                      </span>
+                      <span className="text-[9px] text-wc-muted mt-1">{unit.label}</span>
+                    </div>
+                    {i < 2 && <span className="text-wc-accent font-bold text-xl animate-pulse -mt-4">:</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {phase === "live" && (
+            <button className="mt-4 px-6 py-2 rounded-full text-sm font-bold text-wc-accent-foreground inline-flex items-center gap-1.5 bg-wc-danger">
+              شاهد على TOD
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* ── Phase Tabs + Engagement Layer ─────────────────────────────────── */}
       <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />

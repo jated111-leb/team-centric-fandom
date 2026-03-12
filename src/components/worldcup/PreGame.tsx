@@ -66,21 +66,10 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
 
   return (
     <div className="space-y-4 px-4 pb-6">
-      {/* ── Hub Framing Banner ──────────────────────────────────────────── */}
-      <div className="rounded-xl px-4 py-3 flex items-start gap-3 bg-wc-elevated border border-wc-border">
-        <span className="text-lg flex-shrink-0">🏠</span>
-        <p className="text-xs leading-relaxed text-wc-muted">
-          <span className="text-wc-text font-bold">1001 هو مركز تجربتك.</span>{" "}
-          المباراة تُبث على TOD — لكن تجربة المشجع العراقي تبدأ وتنتهي هنا.
-        </p>
-      </div>
 
       {/* ── TOD Activation (pinned-comment style) ──────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-[10px] px-2 py-0.5 rounded font-bold text-wc-accent-foreground bg-wc-accent">
-            📌 مثبّت
-          </span>
           <div className="flex items-center gap-1.5" style={{ direction: "ltr" }}>
             <img src={todLogo} alt="TOD" className="h-5 w-auto" />
           </div>
@@ -112,6 +101,38 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         )}
       </div>
 
+      {/* ── Crowd Hype Meter ─────────────────────────────────────────────── */}
+      <div className="rounded-2xl p-5 bg-wc-surface border border-wc-border">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-wc-text font-bold text-base">🔥 حرارة الجمهور</h3>
+          <span className="text-sm text-wc-secondary font-medium">
+            {hypeCount.toLocaleString("ar-EG")} مشجع
+          </span>
+        </div>
+        <div className="h-3.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
+          <div
+            className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`}
+            style={{ width: `${hypeFill}%` }}
+          />
+        </div>
+        <p className="text-sm text-wc-muted text-center mb-5 font-medium">{hypeTier.label}</p>
+        {!hasTapped ? (
+          <button
+            onClick={() => {
+              setHasTapped(true);
+              setHypeCount((prev) => prev + 1);
+            }}
+            className="w-full py-3.5 rounded-full font-bold text-wc-accent-foreground text-base bg-wc-accent active:scale-95 transition-transform"
+          >
+            أشعل الحماس 🔥
+          </button>
+        ) : (
+          <div className="w-full py-3.5 rounded-full text-center text-sm font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
+            أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع عراقي ✅
+          </div>
+        )}
+      </div>
+
       {/* ── Prediction (with live vote trickle) ─────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center justify-between mb-3">
@@ -131,7 +152,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
             <button
               key={opt.key}
               onClick={() => {
-                if (prediction) return; // locked after first pick
+                if (prediction) return;
                 setPrediction(opt.key);
                 savePrediction(opt.key);
               }}
@@ -216,43 +237,6 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
             <button onClick={handleNextQuiz} className="text-[10px] text-wc-accent underline">
               السؤال التالي ›
             </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Crowd Hype Meter ─────────────────────────────────────────────── */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-wc-text font-bold text-sm">حرارة الجمهور 🔥</h3>
-          <span className="text-[10px] text-wc-muted font-mono">
-            {hypeCount.toLocaleString("ar-EG")} مشجع
-          </span>
-        </div>
-
-        {/* Fill bar */}
-        <div className="h-2.5 rounded-full mb-1 overflow-hidden bg-wc-elevated">
-          <div
-            className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`}
-            style={{ width: `${hypeFill}%` }}
-          />
-        </div>
-        <p className="text-[10px] text-wc-muted text-center mb-4">{hypeTier.label}</p>
-
-        {/* Tap button */}
-        {!hasTapped ? (
-          <button
-            onClick={() => {
-              setHasTapped(true);
-              setHypeCount((prev) => prev + 1);
-            }}
-            className="w-full py-3 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent active:scale-95 transition-transform"
-          >
-            أشعل الحماس 🔥
-          </button>
-        ) : (
-          <div className="w-full py-3 rounded-full text-center text-xs font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
-            أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع عراقي ✅
           </div>
         )}
       </div>
