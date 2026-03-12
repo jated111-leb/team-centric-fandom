@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Send, UserPlus, Trophy, X } from "lucide-react";
 import MiniLeaderboard from "./MiniLeaderboard";
 import {
