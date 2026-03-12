@@ -495,7 +495,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
       {/* ── Live Chat (YouTube-style) ────────────────────────────────────── */}
       <div
         className="flex flex-col rounded-2xl overflow-hidden bg-wc-surface border border-wc-border relative"
-        style={{ minHeight: "360px" }}
+        style={{ height: "480px" }}
       >
         {/* Event Banner — slides in from top */}
         {activeEvent && (
