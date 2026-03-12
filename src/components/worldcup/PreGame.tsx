@@ -320,27 +320,6 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
   return (
     <div className="space-y-4 px-4 pb-6">
 
-      {/* ── User Stats ──────────────────────────────────────────────── */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">📊 إحصائياتك</h3>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
-            { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
-            { label: "ترتيبك", value: `#${getUserRank()}`, icon: "📈" },
-          ].map((stat, i) => (
-            <div key={i} className="rounded-xl p-2.5 text-center bg-wc-elevated border border-wc-border">
-              <span className="text-base">{stat.icon}</span>
-              <p className="text-wc-text font-bold text-sm mt-0.5">{stat.value}</p>
-              <p className="text-[9px] text-wc-muted">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Mini Leaderboard ────────────────────────────────────────── */}
-      <MiniLeaderboard refreshKey={leaderboardKey} />
-
       {/* ── TOD Activation ──────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center gap-2 mb-3">
@@ -516,8 +495,29 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
           <p className="text-wc-text text-sm font-bold">ادعُ صديقاً</p>
           <p className="text-[10px] text-wc-muted">شاركه الرابط وينضم للدردشة</p>
         </div>
-        <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">شارك</button>
+      <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">شارك</button>
       </div>
+
+      {/* ── User Stats ──────────────────────────────────────────────── */}
+      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+        <h3 className="text-wc-text font-bold text-sm mb-3">📊 إحصائياتك</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
+            { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
+            { label: "ترتيبك", value: `#${getUserRank()}`, icon: "📈" },
+          ].map((stat, i) => (
+            <div key={i} className="rounded-xl p-2.5 text-center bg-wc-elevated border border-wc-border">
+              <span className="text-base">{stat.icon}</span>
+              <p className="text-wc-text font-bold text-sm mt-0.5">{stat.value}</p>
+              <p className="text-[9px] text-wc-muted">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Mini Leaderboard ────────────────────────────────────────── */}
+      <MiniLeaderboard refreshKey={leaderboardKey} />
     </div>
   );
 };
