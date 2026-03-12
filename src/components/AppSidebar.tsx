@@ -144,9 +144,7 @@ export function AppSidebar() {
         
         <div className="px-2 py-3 border-t border-sidebar-border">
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-start'}`}>
-            <span className="text-2xl font-bold text-primary tracking-tight">
-              {collapsed ? '10' : '1001'}
-            </span>
+            <img src="/1001-logo.svg" alt="1001" className={collapsed ? 'h-5' : 'h-6'} />
           </div>
         </div>
       </SidebarFooter>
