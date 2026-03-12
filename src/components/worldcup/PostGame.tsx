@@ -95,13 +95,8 @@ const PostGame = () => {
           {[
             { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
             { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
-            {
-              label: "توقع النتيجة",
-              value: predictionCorrect ? "صحيح ✅" : getPrediction() ? "خطأ ❌" : "—",
-              icon: "📊",
-            },
           ].map((stat, i) => (
-            <div key={i} className={`rounded-xl p-3 text-center bg-wc-elevated border border-wc-border ${i === 2 ? "col-span-2" : ""}`}>
+            <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
               <span className="text-lg">{stat.icon}</span>
               <p className="text-wc-text font-bold text-lg mt-1">{stat.value}</p>
               <p className="text-xs text-wc-muted mt-0.5">{stat.label}</p>
