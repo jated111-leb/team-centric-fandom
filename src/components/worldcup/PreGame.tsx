@@ -389,11 +389,9 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
               }`}
             >
               <div>{opt.label}</div>
-              {prediction && (
-                <div className="text-[10px] mt-0.5 opacity-80">
-                  {getVotePercent(opt.key)}% · {votes[opt.key].toLocaleString("ar-EG")} صوت
-                </div>
-              )}
+              <div className="text-[10px] mt-0.5 opacity-80">
+                {getVotePercent(opt.key)}% · {votes[opt.key].toLocaleString("ar-EG")}
+              </div>
             </button>
           ))}
         </div>
