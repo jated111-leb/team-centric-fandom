@@ -12,6 +12,7 @@ import {
   getTotalPoints,
   getUserRank,
   getLeaderboard,
+  getQuizAccuracy,
   addPoints,
   recordQuizAnswer,
   setUsername as storeSetUsername,
@@ -386,8 +387,6 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
 
   return (
     <div className="flex flex-col px-4 pb-4 gap-3">
-      {/* ── Mini Leaderboard ─────────────────────────────────────────── */}
-      <MiniLeaderboard refreshKey={userPoints} />
       <div className="rounded-2xl p-3 bg-wc-surface border border-wc-border">
         <p className="text-[10px] text-wc-muted mb-2 text-center">
           محاكاة حدث في المباراة
@@ -712,6 +711,26 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
           </div>
         )}
       </div>
+
+      {/* ── User Stats ──────────────────────────────────────────────── */}
+      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+        <h3 className="text-wc-text font-bold text-sm mb-3">📊 إحصائياتك</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "مجموع النقاط", value: userPoints.toLocaleString("ar-EG"), icon: "🏆" },
+            { label: "دقة الأجوبة", value: getQuizAccuracy() > 0 ? `${getQuizAccuracy()}%` : "—", icon: "🎯" },
+          ].map((stat, i) => (
+            <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
+              <span className="text-lg">{stat.icon}</span>
+              <p className="text-wc-text font-bold text-lg mt-1">{stat.value}</p>
+              <p className="text-xs text-wc-muted mt-0.5">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Mini Leaderboard ────────────────────────────────────────── */}
+      <MiniLeaderboard refreshKey={userPoints} />
 
       <style>{`
         @keyframes slideDown {
