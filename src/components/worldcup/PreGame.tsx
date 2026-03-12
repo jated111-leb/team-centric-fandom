@@ -359,7 +359,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
               key={opt.key}
               onClick={() => { setPrediction(opt.key); savePrediction(opt.key); }}
               className={`flex-1 py-2.5 rounded-full text-xs font-bold transition-all ${
-                prediction === opt.key ? "bg-wc-accent text-wc-accent-foreground" : "bg-wc-elevated text-wc-muted"
+                prediction === opt.key ? "bg-wc-info text-white" : "bg-wc-elevated text-wc-muted"
               }`}
             >
               <div>{opt.label}</div>
