@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowRight, Share2 } from "lucide-react";
+import { ArrowRight, Cast, Share2, Heart, Bell } from "lucide-react";
 import PhaseIndicator from "./PhaseIndicator";
 import PreGame from "./PreGame";
 import InGame from "./InGame";
@@ -41,114 +41,239 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
 
   return (
     <div className="flex-1 overflow-y-auto bg-wc-bg">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3 text-wc-text">
-          <Share2 size={18} />
-          
+
+      {/* ── Full-bleed Hero ───────────────────────────────────────────────── */}
+      {/* No horizontal margin — goes edge to edge like the TOD screenshot   */}
+      <div className="relative w-full" style={{ height: 300 }}>
+
+        {/* Sky background — dark, cinematic */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(175deg, #0d1f12 0%, #0a0f1a 55%, #080d10 100%)",
+          }}
+        />
+
+        {/* Subtle team-colour glows emanating from each side */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse 55% 70% at 15% 80%, rgba(0,100,40,0.35) 0%, transparent 70%), " +
+              "radial-gradient(ellipse 55% 70% at 85% 80%, rgba(220,220,220,0.08) 0%, transparent 70%)",
+          }}
+        />
+
+        {/* Iraq flag — positioned left, large, slight inward tilt */}
+        <div
+          className="absolute select-none"
+          style={{
+            left: "4%",
+            bottom: "72px",
+            fontSize: 110,
+            lineHeight: 1,
+            transform: "rotate(8deg) scaleX(-1)",
+            filter: "drop-shadow(0 12px 32px rgba(0,140,60,0.5))",
+          }}
+        >
+          🇮🇶
         </div>
-        <button onClick={onBack} className="text-wc-text">
-          <ArrowRight size={20} />
+
+        {/* Germany flag — positioned right, slightly smaller, inward tilt */}
+        <div
+          className="absolute select-none"
+          style={{
+            right: "4%",
+            bottom: "80px",
+            fontSize: 96,
+            lineHeight: 1,
+            transform: "rotate(-8deg)",
+            filter: "drop-shadow(0 12px 28px rgba(180,160,0,0.35))",
+          }}
+        >
+          🇩🇪
+        </div>
+
+        {/* VS / Score pill — centred vertically in flag zone */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2"
+          style={{ bottom: 100 }}
+        >
+          {phase === "pre" ? (
+            <div
+              className="flex items-center justify-center rounded-full border border-white/20"
+              style={{
+                width: 48,
+                height: 48,
+                background: "rgba(255,255,255,0.10)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <span className="text-white font-bold text-sm">VS</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-white font-bold text-4xl font-mono drop-shadow-lg">{scoreA}</span>
+              <span className="text-white/50 text-2xl">-</span>
+              <span className="text-white font-bold text-4xl font-mono drop-shadow-lg">{scoreB}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Live dot */}
+        {phase === "live" && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+            style={{ bottom: 60, background: "rgba(220,40,40,0.9)" }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            <span className="text-[10px] text-white font-bold">67' مباشر</span>
+          </div>
+        )}
+
+        {/* Dark gradient rise from bottom — title sits on top of this */}
+        <div
+          className="absolute bottom-0 left-0 right-0 pointer-events-none"
+          style={{
+            height: 130,
+            background:
+              "linear-gradient(to top, rgba(8,8,12,1) 0%, rgba(8,8,12,0.85) 50%, transparent 100%)",
+          }}
+        />
+
+        {/* Match title — inside the hero, on top of gradient */}
+        <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 z-10 text-right">
+          <h1 className="text-white font-bold leading-tight" style={{ fontSize: 26 }}>
+            العراق - ألمانيا
+          </h1>
+          {phase === "post" && (
+            <span className="text-xs text-white/50 mt-1 inline-block">نهاية المباراة</span>
+          )}
+        </div>
+
+        {/* Floating nav icons */}
+        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-4 z-20">
+          <button onClick={onBack}>
+            <ArrowRight size={22} className="text-white drop-shadow-lg" />
+          </button>
+          <Cast size={20} className="text-white/80 drop-shadow-lg" />
+        </div>
+      </div>
+      {/* ── End Hero ─────────────────────────────────────────────────────── */}
+
+      {/* ── Action Row ────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
+        {/* Share */}
+        <button
+          className="flex items-center justify-center rounded-xl bg-wc-surface border border-wc-border shrink-0"
+          style={{ width: 46, height: 46 }}
+        >
+          <Share2 size={17} className="text-wc-text" />
+        </button>
+
+        {/* Heart */}
+        <button
+          onClick={() => setLiked((v) => !v)}
+          className={`flex items-center justify-center rounded-xl border shrink-0 transition-colors ${
+            liked ? "bg-rose-500 border-rose-500" : "bg-wc-surface border-wc-border"
+          }`}
+          style={{ width: 46, height: 46 }}
+        >
+          <Heart size={17} className={liked ? "text-white fill-white" : "text-wc-text"} />
+        </button>
+
+        {/* ذكرني — prominent pill CTA, toggles green when active */}
+        <button
+          onClick={() => setReminded((v) => !v)}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition-all ${
+            reminded
+              ? "text-white border-0"
+              : "bg-wc-surface border border-wc-border text-wc-muted"
+          }`}
+          style={{
+            height: 46,
+            background: reminded ? "#22c55e" : undefined,
+          }}
+        >
+          <Bell size={15} className={reminded ? "fill-white text-white" : ""} />
+          <span>ذكّرني</span>
         </button>
       </div>
 
-      {/* Match Hero — Cinematic Style */}
-      <div className="mx-4 rounded-2xl overflow-hidden" style={{ background: "var(--wc-gradient-hero)" }}>
-        {/* Team Visual Area */}
-        <div className="relative h-52 flex items-end justify-center">
-          {/* Background gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-wc-surface/90" />
-          
-          {/* Team flags — large dramatic display */}
-          <div className="relative z-10 flex items-end justify-center w-full px-6 pb-0">
-            {/* Team A (Right in RTL) */}
-            <div className="flex-1 flex justify-center">
-              <div className="relative">
-                <span className="text-8xl drop-shadow-2xl">🇮🇶</span>
-              </div>
-            </div>
-            
-            {/* VS / Score overlay */}
-            <div className="flex-shrink-0 px-2 pb-4 z-20">
-              {phase === "pre" ? (
-                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-wc-surface/80 border border-wc-border backdrop-blur-sm">
-                  <span className="text-wc-text font-bold text-sm">VS</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-wc-text font-bold text-4xl drop-shadow-lg">{scoreA}</span>
-                  <span className="text-wc-muted text-lg">-</span>
-                  <span className="text-wc-text font-bold text-4xl drop-shadow-lg">{scoreB}</span>
-                </div>
-              )}
-            </div>
+      {/* ── Tag Pills ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-4 pb-1 flex-row-reverse">
+        {["كرة القدم", "تعليق عربي", "2026"].map((tag) => (
+          <span
+            key={tag}
+            className="px-3 py-1 rounded-full text-[11px] text-wc-muted bg-wc-elevated border border-wc-border whitespace-nowrap"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
 
-            {/* Team B (Left in RTL) */}
-            <div className="flex-1 flex justify-center">
-              <div className="relative">
-                <span className="text-8xl drop-shadow-2xl">🇩🇪</span>
-              </div>
+      {/* ── Date + countdown (pre-game) ───────────────────────────────────── */}
+      {phase === "pre" && (
+        <div className="px-4 pt-4 pb-2 text-right">
+          <p className="text-xs text-wc-muted font-medium">
+            الأربعاء 18 يونيو 2026 · 9:00 م بتوقيت بغداد
+          </p>
+          <p className="text-[11px] text-wc-muted mt-1 leading-relaxed">
+            كأس العالم 2026: شاهد مباراة العراق ضد ألمانيا تبث مباشرة من أمريكا.
+          </p>
+
+          {/* Countdown */}
+          <div className="mt-4 mb-1">
+            <p className="text-[11px] text-wc-muted mb-2 text-center">تبدأ المباراة خلال</p>
+            <div className="flex items-end justify-center gap-2">
+              {[
+                { val: countdown.h, label: "ساعة" },
+                { val: countdown.m, label: "دقيقة" },
+                { val: countdown.s, label: "ثانية" },
+              ].map((unit, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className="flex flex-col items-center">
+                    <span
+                      className="text-wc-text font-mono font-bold rounded-xl text-center border border-wc-border/60"
+                      style={{
+                        fontSize: 28,
+                        minWidth: "3.2rem",
+                        padding: "6px 10px",
+                        background: "rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      {String(unit.val).padStart(2, "0")}
+                    </span>
+                    <span className="text-[10px] text-wc-muted mt-1">{unit.label}</span>
+                  </div>
+                  {i < 2 && (
+                    <span className="text-wc-accent font-bold text-2xl animate-pulse mb-5">:</span>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
+      )}
 
-        {/* Team Names + Match Info */}
-        <div className="text-center px-5 pb-5 -mt-2">
-          <h2 className="text-wc-text font-bold text-xl tracking-wide">
-            العراق - ألمانيا
-          </h2>
-          
-          {phase === "live" && (
-            <div className="flex items-center justify-center gap-1.5 mt-2">
-              <span className="w-2 h-2 rounded-full animate-pulse bg-wc-danger" />
-              <span className="text-xs font-bold text-wc-danger">67' مباشر</span>
-            </div>
-          )}
-          {phase === "post" && (
-            <span className="text-xs px-3 py-1 rounded-full mt-2 inline-block bg-wc-elevated text-wc-muted">
-              نهاية المباراة
-            </span>
-          )}
-
-          <p className="text-[11px] mt-3 text-wc-secondary">
-            الأربعاء 18 يونيو 2026 · 9:00 م بتوقيت بغداد
-          </p>
-
-          {phase === "pre" && (
-            <div className="mt-4">
-              <p className="text-[11px] mb-2 text-wc-muted">تبدأ المباراة خلال</p>
-              <div className="flex items-center justify-center gap-2">
-                {[
-                  { val: countdown.h, label: "ساعة" },
-                  { val: countdown.m, label: "دقيقة" },
-                  { val: countdown.s, label: "ثانية" },
-                ].map((unit, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="flex flex-col items-center">
-                      <span className="text-wc-text font-mono text-2xl font-bold bg-wc-elevated/60 rounded-lg px-3 py-1.5 min-w-[3rem] text-center border border-wc-border/50">
-                        {String(unit.val).padStart(2, "0")}
-                      </span>
-                      <span className="text-[9px] text-wc-muted mt-1">{unit.label}</span>
-                    </div>
-                    {i < 2 && <span className="text-wc-accent font-bold text-xl animate-pulse -mt-4">:</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {phase === "live" && (
-            <button className="mt-4 px-6 py-2 rounded-full text-sm font-bold text-wc-accent-foreground inline-flex items-center gap-1.5 bg-wc-danger">
-              شاهد على TOD
-            </button>
-          )}
+      {/* Live: Watch on TOD strip */}
+      {phase === "live" && (
+        <div className="px-4 pt-3 pb-2">
+          <button className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 bg-wc-danger">
+            شاهد على TOD
+          </button>
         </div>
-      </div>
+      )}
+
+      {/* ── Divider ───────────────────────────────────────────────────────── */}
+      <div className="h-px mx-4 my-3 bg-wc-border" />
 
       {/* ── Phase Tabs + Engagement Layer ─────────────────────────────────── */}
       <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
 
-      {phase === "pre" && <PreGame todActivated={todActivated} onActivateTod={() => setTodActivated(true)} />}
+      {phase === "pre" && (
+        <PreGame todActivated={todActivated} onActivateTod={() => setTodActivated(true)} />
+      )}
       {phase === "live" && (
         <InGame
           userId={userProfile?.id ?? null}
