@@ -4,10 +4,9 @@ import PhaseIndicator from "./PhaseIndicator";
 import PreGame from "./PreGame";
 import InGame from "./InGame";
 import PostGame from "./PostGame";
+import type { UserProfile } from "@/pages/WorldCup";
 
 type Phase = "pre" | "live" | "post";
-
-import type { UserProfile } from "@/pages/WorldCup";
 
 interface MatchHubProps {
   onBack: () => void;
@@ -19,6 +18,8 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
   const [phase, setPhase] = useState<Phase>("pre");
   const [todActivated, setTodActivated] = useState(false);
   const [countdown, setCountdown] = useState({ h: 2, m: 34, s: 15 });
+  const [reminded, setReminded] = useState(false);
+  const [liked, setLiked] = useState(false);
 
   useEffect(() => {
     if (phase !== "pre") return;
@@ -144,10 +145,16 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
         </div>
       </div>
 
+      {/* ── Phase Tabs + Engagement Layer ─────────────────────────────────── */}
       <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
 
       {phase === "pre" && <PreGame todActivated={todActivated} onActivateTod={() => setTodActivated(true)} />}
-      {phase === "live" && <InGame userId={userProfile?.id ?? null} username={userProfile?.username ?? userProfile?.display_name ?? null} />}
+      {phase === "live" && (
+        <InGame
+          userId={userProfile?.id ?? null}
+          username={userProfile?.username ?? userProfile?.display_name ?? null}
+        />
+      )}
       {phase === "post" && <PostGame />}
     </div>
   );
