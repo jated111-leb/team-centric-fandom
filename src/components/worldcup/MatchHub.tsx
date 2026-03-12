@@ -255,11 +255,11 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
         </div>
       )}
 
-      {/* Live: Watch on TOD strip */}
+      {/* Live: Watch on TOD strip — replaces ذكرني */}
       {phase === "live" && (
         <div className="px-4 pt-3 pb-2">
-          <button className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 bg-wc-danger">
-            شاهد على TOD
+          <button className="w-full py-3 rounded-xl text-sm font-bold text-wc-accent-foreground flex items-center justify-center gap-2 bg-wc-accent">
+            شاهد على TOD 📺
           </button>
         </div>
       )}
