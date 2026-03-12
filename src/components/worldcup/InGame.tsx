@@ -341,7 +341,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
         const newRank = getUserRank();
         setUserRank(newRank);
         setLeaderboard(getLeaderboard());
-        if (userId) syncPointsToDb(userId).then(() => {});
+        if (userId) syncPointsToDb(userId).catch(() => {});
       }
     }
   };
@@ -373,7 +373,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
       (supabase as any)
         .from("chat_messages")
         .insert({ user_id: userId, match_id: MATCH_ID, message: text })
-        .then(() => {});
+        .catch(() => {});
     }
   };
 
