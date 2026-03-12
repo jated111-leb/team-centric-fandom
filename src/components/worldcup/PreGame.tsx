@@ -372,7 +372,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
       </div>
 
       {/* ── Chat with Floating Widgets ──────────────────────────────── */}
-      <div className="flex flex-col rounded-2xl overflow-hidden bg-wc-surface border border-wc-border relative" style={{ height: "400px" }}>
+      <div className="flex flex-col rounded-2xl overflow-hidden bg-wc-surface border border-wc-border relative" style={{ height: "480px" }}>
         {/* Chat Header */}
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-wc-border flex-shrink-0">
           <div className="flex items-center gap-2">
