@@ -48,63 +48,97 @@ const MatchHub = ({ onBack, onNavigateToSubscription }: MatchHubProps) => {
         </button>
       </div>
 
-      {/* Match Hero */}
-      <div className="mx-4 rounded-2xl p-5 text-center" style={{ background: "var(--wc-gradient-hero)" }}>
-        <div className="flex items-center justify-center gap-4">
-          <div className="text-center">
-            <span className="text-3xl">🇩🇪</span>
-            <p className="text-wc-text text-xs font-bold mt-1">ألمانيا</p>
-          </div>
-          <div className="text-center px-4">
-            {phase === "pre" ? (
-              <p className="text-wc-text font-bold text-sm">VS</p>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-wc-text font-bold text-3xl">{scoreB}</span>
-                <span className="text-xs text-wc-muted">-</span>
-                <span className="text-wc-text font-bold text-3xl">{scoreA}</span>
+      {/* Match Hero — Cinematic Style */}
+      <div className="mx-4 rounded-2xl overflow-hidden" style={{ background: "var(--wc-gradient-hero)" }}>
+        {/* Team Visual Area */}
+        <div className="relative h-52 flex items-end justify-center">
+          {/* Background gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-wc-surface/90" />
+          
+          {/* Team flags — large dramatic display */}
+          <div className="relative z-10 flex items-end justify-center w-full px-6 pb-0">
+            {/* Team A (Right in RTL) */}
+            <div className="flex-1 flex justify-center">
+              <div className="relative">
+                <span className="text-8xl drop-shadow-2xl">🇮🇶</span>
               </div>
-            )}
-            {phase === "live" && (
-              <div className="flex items-center justify-center gap-1 mt-1">
-                <span className="w-2 h-2 rounded-full animate-pulse bg-wc-danger" />
-                <span className="text-[10px] font-bold text-wc-danger">67' مباشر</span>
+            </div>
+            
+            {/* VS / Score overlay */}
+            <div className="flex-shrink-0 px-2 pb-4 z-20">
+              {phase === "pre" ? (
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-wc-surface/80 border border-wc-border backdrop-blur-sm">
+                  <span className="text-wc-text font-bold text-sm">VS</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-wc-text font-bold text-4xl drop-shadow-lg">{scoreA}</span>
+                  <span className="text-wc-muted text-lg">-</span>
+                  <span className="text-wc-text font-bold text-4xl drop-shadow-lg">{scoreB}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Team B (Left in RTL) */}
+            <div className="flex-1 flex justify-center">
+              <div className="relative">
+                <span className="text-8xl drop-shadow-2xl">🇩🇪</span>
               </div>
-            )}
-            {phase === "post" && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full mt-1 inline-block bg-wc-elevated text-wc-muted">
-                نهاية المباراة
-              </span>
-            )}
-          </div>
-          <div className="text-center">
-            <span className="text-3xl">🇮🇶</span>
-            <p className="text-wc-text text-xs font-bold mt-1">العراق</p>
+            </div>
           </div>
         </div>
 
-        <p className="text-[10px] mt-2 text-wc-muted">
-          الأربعاء 18 يونيو 2026 · 9:00 م بتوقيت بغداد
-        </p>
-
-        {phase === "pre" && (
-          <div className="mt-3">
-            <p className="text-[10px] mb-1 text-wc-muted">تبدأ المباراة خلال</p>
-            <div className="flex items-center justify-center gap-1 text-wc-text font-mono text-2xl font-bold">
-              <span>{String(countdown.h).padStart(2, "0")}</span>
-              <span className="animate-pulse">:</span>
-              <span>{String(countdown.m).padStart(2, "0")}</span>
-              <span className="animate-pulse">:</span>
-              <span>{String(countdown.s).padStart(2, "0")}</span>
+        {/* Team Names + Match Info */}
+        <div className="text-center px-5 pb-5 -mt-2">
+          <h2 className="text-wc-text font-bold text-xl tracking-wide">
+            العراق - ألمانيا
+          </h2>
+          
+          {phase === "live" && (
+            <div className="flex items-center justify-center gap-1.5 mt-2">
+              <span className="w-2 h-2 rounded-full animate-pulse bg-wc-danger" />
+              <span className="text-xs font-bold text-wc-danger">67' مباشر</span>
             </div>
-          </div>
-        )}
+          )}
+          {phase === "post" && (
+            <span className="text-xs px-3 py-1 rounded-full mt-2 inline-block bg-wc-elevated text-wc-muted">
+              نهاية المباراة
+            </span>
+          )}
 
-        {phase === "live" && (
-          <button className="mt-3 px-4 py-1.5 rounded-full text-xs font-bold text-wc-accent-foreground inline-flex items-center gap-1 bg-wc-danger">
-            شاهد على TOD
-          </button>
-        )}
+          <p className="text-[11px] mt-3 text-wc-secondary">
+            الأربعاء 18 يونيو 2026 · 9:00 م بتوقيت بغداد
+          </p>
+
+          {phase === "pre" && (
+            <div className="mt-4">
+              <p className="text-[11px] mb-2 text-wc-muted">تبدأ المباراة خلال</p>
+              <div className="flex items-center justify-center gap-2">
+                {[
+                  { val: countdown.h, label: "ساعة" },
+                  { val: countdown.m, label: "دقيقة" },
+                  { val: countdown.s, label: "ثانية" },
+                ].map((unit, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="flex flex-col items-center">
+                      <span className="text-wc-text font-mono text-2xl font-bold bg-wc-elevated/60 rounded-lg px-3 py-1.5 min-w-[3rem] text-center border border-wc-border/50">
+                        {String(unit.val).padStart(2, "0")}
+                      </span>
+                      <span className="text-[9px] text-wc-muted mt-1">{unit.label}</span>
+                    </div>
+                    {i < 2 && <span className="text-wc-accent font-bold text-xl animate-pulse -mt-4">:</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {phase === "live" && (
+            <button className="mt-4 px-6 py-2 rounded-full text-sm font-bold text-wc-accent-foreground inline-flex items-center gap-1.5 bg-wc-danger">
+              شاهد على TOD
+            </button>
+          )}
+        </div>
       </div>
 
       <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
