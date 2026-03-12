@@ -397,7 +397,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
         {renderPinnedHype()}
 
         {/* Messages Feed */}
-        <div ref={chatRef} className="overflow-y-auto py-2 px-3 space-y-1" style={{ maxHeight: "280px", direction: "rtl" }}>
+        <div ref={chatRef} className="flex-1 min-h-0 overflow-y-auto py-2 px-3 space-y-1" style={{ direction: "rtl" }}>
           {messages.map((msg) => {
             if (msg.isSystem) {
               return (
