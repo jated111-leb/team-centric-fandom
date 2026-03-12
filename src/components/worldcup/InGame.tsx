@@ -12,6 +12,7 @@ import {
   getTotalPoints,
   getUserRank,
   getLeaderboard,
+  getQuizAccuracy,
   addPoints,
   recordQuizAnswer,
   setUsername as storeSetUsername,
