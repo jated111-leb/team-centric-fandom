@@ -197,7 +197,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-wc-text">🔥 حرارة الجمهور</span>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+              <span className="text-xs font-bold text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
               <button onClick={() => setHypeExpanded(false)} className="p-0.5 rounded-full hover:bg-wc-elevated">
                 <ChevronUp size={12} className="text-wc-muted" />
               </button>
