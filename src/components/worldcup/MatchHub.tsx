@@ -182,22 +182,24 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
           <Heart size={17} className={liked ? "text-white fill-white" : "text-wc-text"} />
         </button>
 
-        {/* ذكرني — prominent pill CTA, toggles green when active */}
-        <button
-          onClick={() => setReminded((v) => !v)}
-          className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition-all ${
-            reminded
-              ? "text-white border-0"
-              : "bg-wc-surface border border-wc-border text-wc-muted"
-          }`}
-          style={{
-            height: 46,
-            background: reminded ? "#22c55e" : undefined,
-          }}
-        >
-          <Bell size={15} className={reminded ? "fill-white text-white" : ""} />
-          <span>ذكّرني</span>
-        </button>
+        {/* ذكرني — only in pre-game */}
+        {phase === "pre" && (
+          <button
+            onClick={() => setReminded((v) => !v)}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition-all ${
+              reminded
+                ? "text-white border-0"
+                : "bg-wc-surface border border-wc-border text-wc-muted"
+            }`}
+            style={{
+              height: 46,
+              background: reminded ? "#22c55e" : undefined,
+            }}
+          >
+            <Bell size={15} className={reminded ? "fill-white text-white" : ""} />
+            <span>ذكّرني</span>
+          </button>
+        )}
       </div>
 
       {/* ── Tag Pills ─────────────────────────────────────────────────────── */}
