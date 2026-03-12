@@ -150,12 +150,11 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
     }
   }, [hasTapped]);
 
-  // Auto-collapse quiz after answering
+  // Auto-collapse quiz after answering — keep collapsed pill visible as "answered"
   useEffect(() => {
     if (preQuizAnswered) {
       const t = setTimeout(() => {
         setQuizExpanded(false);
-        setHasNewQuiz(false);
       }, 2000);
       return () => clearTimeout(t);
     }
