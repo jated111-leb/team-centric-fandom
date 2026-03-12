@@ -111,15 +111,16 @@ export default {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out'
   		},
-  		fontFamily: {
+		fontFamily: {
   			sans: [
+  				'Readex Pro',
   				'Inter Display',
-  				'Inter',
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif',
   			],
   			display: [
+  				'Readex Pro',
   				'Inter Display',
   				'ui-sans-serif',
   				'system-ui',
