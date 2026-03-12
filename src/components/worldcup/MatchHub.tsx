@@ -188,18 +188,10 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
         {/* ذكرني — only in pre-game */}
         {phase === "pre" && (
           <button
-            onClick={() => setReminded((v) => !v)}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition-all ${
-              reminded
-                ? "text-white border-0"
-                : "bg-wc-surface border border-wc-border text-wc-muted"
-            }`}
-            style={{
-              height: 46,
-              background: reminded ? "#22c55e" : undefined,
-            }}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm text-white"
+            style={{ height: 46, background: "#22c55e" }}
           >
-            <Bell size={15} className={reminded ? "fill-white text-white" : ""} />
+            <Bell size={15} className="fill-white text-white" />
             <span>ذكّرني</span>
           </button>
         )}
