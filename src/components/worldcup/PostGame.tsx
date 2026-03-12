@@ -82,10 +82,6 @@ const PostGame = () => {
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between text-[11px] text-wc-muted">
-            <span>أكثر إيموجي: {chatStats.mostUsedEmoji}</span>
-            <span>المدة: {chatStats.duration}</span>
-          </div>
           <div className="mt-2 text-center">
             <span className="text-[10px] text-wc-muted">🏅 الأكثر نشاطاً: <span className="text-wc-accent font-bold">{chatStats.mostActiveUser}</span></span>
           </div>
