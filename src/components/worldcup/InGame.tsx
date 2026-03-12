@@ -753,6 +753,9 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
           </button>
         </div>
 
+        {/* Pinned Hype Meter */}
+        {renderPinnedHype()}
+
         {/* Messages */}
         <div
           ref={chatRef}
