@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Share2, UserPlus, X, ChevronDown, ChevronUp } from "lucide-react";
-import { mockLiveChatMessages, mockFriendsList, worldcupQuizzes } from "@/lib/worldcupMockData";
+import { Send, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
+import { mockLiveChatMessages, worldcupQuizzes } from "@/lib/worldcupMockData";
 import {
   addPoints,
   recordQuizAnswer,
@@ -80,7 +80,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
   );
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [nameInput, setNameInput] = useState("");
-  const [showFriendSheet, setShowFriendSheet] = useState(false);
+  
   const nameInputRef = useRef<HTMLInputElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
 
@@ -186,19 +186,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
     setNameInput("");
   };
 
-  const handleInviteFriend = (friendName: string) => {
-    setShowFriendSheet(false);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `invite-${Date.now()}`,
-        username: "النظام",
-        message: `📩 تمت دعوة ${friendName} للانضمام إلى الدردشة`,
-        timestamp: "الآن",
-        isSystem: true,
-      },
-    ]);
-  };
 
   const totalPoints = getTotalPoints();
   const accuracy = getQuizAccuracy();
@@ -220,7 +207,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           <div className="h-2.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
             <div className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`} style={{ width: `${hypeFill}%` }} />
           </div>
-          <p className="text-[10px] text-wc-muted text-center mb-2">{hypeTier.label}</p>
           {!hasTapped ? (
             <button
               onClick={() => { setHasTapped(true); setHypeCount((prev) => prev + 1); }}
@@ -391,7 +377,10 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
             </span>
           </div>
           <button
-            onClick={() => setShowFriendSheet(true)}
+            onClick={() => {
+              const msg = encodeURIComponent("العراق ضد ألمانيا 🇮🇶⚽🇩🇪 — انضم للدردشة وشجّع معانا!\nhttps://team-centric-fandom.lovable.app/world-cup");
+              window.open(`https://wa.me/?text=${msg}`, "_blank");
+            }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs text-wc-accent border border-wc-accent bg-wc-accent/10"
           >
             <UserPlus size={12} />
@@ -466,41 +455,8 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           </div>
         )}
 
-        {/* Friend Invite Sheet */}
-        {showFriendSheet && (
-          <div className="absolute inset-0 z-30 rounded-2xl bg-wc-bg flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-wc-border">
-              <span className="text-wc-text font-bold text-sm">دعوة صديق للدردشة</span>
-              <button onClick={() => setShowFriendSheet(false)}><X size={16} className="text-wc-muted" /></button>
-            </div>
-            <div className="flex-1 p-3 space-y-2 overflow-y-auto">
-              {mockFriendsList.map((friend) => (
-                <button
-                  key={friend.id}
-                  onClick={() => handleInviteFriend(friend.username)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all bg-wc-elevated active:scale-[0.98]"
-                >
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-wc-surface text-wc-text border border-wc-border">
-                    {friend.username[0]}
-                  </div>
-                  <span className="flex-1 text-wc-text text-sm text-right">{friend.username}</span>
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${friend.online ? "bg-wc-accent" : "bg-wc-muted"}`} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ── Invite a Friend ──────────────────────────────────────────── */}
-      <div className="rounded-2xl p-4 flex items-center gap-3 bg-wc-surface border border-wc-border">
-        <Share2 size={20} className="text-wc-accent flex-shrink-0" />
-        <div className="flex-1">
-          <p className="text-wc-text text-sm font-bold">ادعُ صديقاً</p>
-          <p className="text-[10px] text-wc-muted">شاركه الرابط وينضم للدردشة</p>
-        </div>
-      <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">شارك</button>
-      </div>
 
       {/* ── User Stats ──────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
