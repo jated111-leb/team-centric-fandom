@@ -142,23 +142,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
     setHasNewQuiz(true);
   };
 
-  // Auto-collapse hype after tapping
-  useEffect(() => {
-    if (hasTapped) {
-      const t = setTimeout(() => setHypeExpanded(false), 1500);
-      return () => clearTimeout(t);
-    }
-  }, [hasTapped]);
-
-  // Auto-collapse quiz after answering — keep collapsed pill visible as "answered"
-  useEffect(() => {
-    if (preQuizAnswered) {
-      const t = setTimeout(() => {
-        setQuizExpanded(false);
-      }, 2000);
-      return () => clearTimeout(t);
-    }
-  }, [preQuizAnswered]);
+  // Hype and quiz stay expanded — no auto-collapse
 
   const sendMessage = () => {
     if (!chatUsername) {
