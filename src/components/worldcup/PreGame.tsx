@@ -186,19 +186,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
     setNameInput("");
   };
 
-  const handleInviteFriend = (friendName: string) => {
-    setShowFriendSheet(false);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `invite-${Date.now()}`,
-        username: "النظام",
-        message: `📩 تمت دعوة ${friendName} للانضمام إلى الدردشة`,
-        timestamp: "الآن",
-        isSystem: true,
-      },
-    ]);
-  };
 
   const totalPoints = getTotalPoints();
   const accuracy = getQuizAccuracy();
