@@ -275,6 +275,7 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
         <PreGame
           todActivated={todActivated}
           onActivateTod={() => setTodActivated(true)}
+          onNavigateToSubscription={onNavigateToSubscription}
           userId={userProfile?.id ?? null}
           username={userProfile?.username ?? userProfile?.display_name ?? null}
         />
