@@ -786,6 +786,9 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
           )}
         </div>
 
+        {/* Pinned Quiz */}
+        {renderPinnedQuiz()}
+
         {/* Input Bar */}
         <div
           className="flex items-center gap-2 p-2 border-t border-wc-border flex-shrink-0"
