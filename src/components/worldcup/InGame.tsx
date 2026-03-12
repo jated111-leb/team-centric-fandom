@@ -718,7 +718,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
         <div className="grid grid-cols-2 gap-2">
           {[
             { label: "مجموع النقاط", value: userPoints.toLocaleString("ar-EG"), icon: "🏆" },
-            { label: "دقة الأجوبة", value: "—", icon: "🎯" },
+            { label: "دقة الأجوبة", value: getQuizAccuracy() > 0 ? `${getQuizAccuracy()}%` : "—", icon: "🎯" },
           ].map((stat, i) => (
             <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
               <span className="text-lg">{stat.icon}</span>
