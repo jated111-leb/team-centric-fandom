@@ -153,13 +153,27 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
   const [userRank, setUserRank] = useState(() => getUserRank());
   const [leaderboard, setLeaderboard] = useState(() => getLeaderboard());
   const [usedQuizIds, setUsedQuizIds] = useState<Set<string>>(new Set());
-  // Prefer the profile username; fall back to localStorage
   const [chatUsername, setChatUsername] = useState<string | null>(
     () => username ?? getPlayerData().username
   );
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Hype meter state
+  const [hypeCount, setHypeCount] = useState(6842);
+  const [hasTapped, setHasTapped] = useState(false);
+  const [hypeExpanded, setHypeExpanded] = useState(true);
+
+  // Pinned quiz state
+  const pinnedQuizzes = worldcupQuizzes.filter((q) => q.phase === "live");
+  const [pinnedQuizIndex, setPinnedQuizIndex] = useState(0);
+  const [pinnedQuizSelected, setPinnedQuizSelected] = useState<number | null>(null);
+  const [pinnedQuizAnswered, setPinnedQuizAnswered] = useState(false);
+  const [quizExpanded, setQuizExpanded] = useState(true);
+  const [hasNewQuiz, setHasNewQuiz] = useState(true);
+
+  const currentPinnedQuiz = pinnedQuizzes[pinnedQuizIndex % pinnedQuizzes.length];
 
   const chatRef = useRef<HTMLDivElement>(null);
 
