@@ -203,6 +203,16 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
             <span>ذكّرني</span>
           </button>
         )}
+
+        {/* شاهد على TOD — only in live */}
+        {phase === "live" && (
+          <button
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm text-wc-accent-foreground bg-wc-accent"
+            style={{ height: 46 }}
+          >
+            <span>شاهد على TOD 📺</span>
+          </button>
+        )}
       </div>
 
       {/* ── Tag Pills ─────────────────────────────────────────────────────── */}
@@ -258,14 +268,6 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
         </div>
       )}
 
-      {/* Live: Watch on TOD strip — replaces ذكرني */}
-      {phase === "live" && (
-        <div className="px-4 pt-3 pb-2">
-          <button className="w-full py-3 rounded-xl text-sm font-bold text-wc-accent-foreground flex items-center justify-center gap-2 bg-wc-accent">
-            شاهد على TOD 📺
-          </button>
-        </div>
-      )}
 
       {/* ── Divider ───────────────────────────────────────────────────────── */}
       <div className="h-px mx-4 my-3 bg-wc-border" />
