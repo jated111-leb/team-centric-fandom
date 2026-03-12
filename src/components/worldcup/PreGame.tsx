@@ -291,12 +291,18 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
       ) : (
         <button
           onClick={() => setQuizExpanded(true)}
-          className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-wc-warning/10 border border-wc-warning/30 hover:bg-wc-warning/15 transition-all"
+          className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
+            preQuizAnswered
+              ? "bg-wc-elevated border border-wc-border"
+              : "bg-wc-warning/10 border border-wc-warning/30 hover:bg-wc-warning/15"
+          } transition-all`}
         >
           <span className="text-xs">🧠</span>
-          <span className="text-[10px] font-bold text-wc-warning">سؤال جديد!</span>
+          <span className={`text-[10px] font-bold ${preQuizAnswered ? "text-wc-muted" : "text-wc-warning"}`}>
+            {preQuizAnswered ? "تم الإجابة ✅" : "سؤال جديد!"}
+          </span>
           <ChevronUp size={10} className="text-wc-muted" />
-          {hasNewQuiz && (
+          {!preQuizAnswered && hasNewQuiz && (
             <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-wc-danger animate-pulse" />
           )}
         </button>
