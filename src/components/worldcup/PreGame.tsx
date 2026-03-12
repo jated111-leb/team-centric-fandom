@@ -80,7 +80,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
   );
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [nameInput, setNameInput] = useState("");
-  const [showFriendSheet, setShowFriendSheet] = useState(false);
+  
   const nameInputRef = useRef<HTMLInputElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
 
