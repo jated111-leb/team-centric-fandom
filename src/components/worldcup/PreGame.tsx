@@ -421,30 +421,29 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
         {/* Pinned Hype Meter */}
         {renderPinnedHype()}
 
-        {/* Messages Feed + Floating Quiz */}
-        <div className="relative flex-1">
-          {renderFloatingQuiz()}
-
-          <div ref={chatRef} className="overflow-y-auto py-2 px-3 space-y-1 pb-16" style={{ height: "320px", direction: "rtl" }}>
-            {messages.map((msg) => {
-              if (msg.isSystem) {
-                return (
-                  <div key={msg.id} className="flex justify-center py-0.5">
-                    <span className="text-[10px] px-3 py-1 rounded-full bg-wc-elevated text-wc-muted">{msg.message}</span>
-                  </div>
-                );
-              }
+        {/* Messages Feed */}
+        <div ref={chatRef} className="flex-1 overflow-y-auto py-2 px-3 space-y-1" style={{ height: "280px", direction: "rtl" }}>
+          {messages.map((msg) => {
+            if (msg.isSystem) {
               return (
-                <div key={msg.id} className="flex items-baseline gap-1.5">
-                  <span className={`text-[10px] font-bold flex-shrink-0 ${msg.isUser ? "text-wc-accent" : getUsernameColor(msg.username)}`}>
-                    {msg.username}
-                  </span>
-                  <span className="text-wc-text text-[11px] leading-snug break-words min-w-0">{msg.message}</span>
+                <div key={msg.id} className="flex justify-center py-0.5">
+                  <span className="text-[10px] px-3 py-1 rounded-full bg-wc-elevated text-wc-muted">{msg.message}</span>
                 </div>
               );
-            })}
-          </div>
+            }
+            return (
+              <div key={msg.id} className="flex items-baseline gap-1.5">
+                <span className={`text-[10px] font-bold flex-shrink-0 ${msg.isUser ? "text-wc-accent" : getUsernameColor(msg.username)}`}>
+                  {msg.username}
+                </span>
+                <span className="text-wc-text text-[11px] leading-snug break-words min-w-0">{msg.message}</span>
+              </div>
+            );
+          })}
         </div>
+
+        {/* Pinned Quiz */}
+        {renderPinnedQuiz()}
 
         {/* Input Bar */}
         <div className="flex items-center gap-2 p-2 border-t border-wc-border flex-shrink-0" style={{ direction: "rtl" }}>
