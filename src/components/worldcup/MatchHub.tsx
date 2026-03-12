@@ -42,6 +42,9 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
   return (
     <div className="flex-1 overflow-y-auto bg-wc-bg">
 
+      {/* ── Phase Tabs (prototype visualization) ──────────────────── */}
+      <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
+
       {/* ── Full-bleed Hero ───────────────────────────────────────────────── */}
       {/* No horizontal margin — goes edge to edge like the TOD screenshot   */}
       <div className="relative w-full" style={{ height: 300 }}>
