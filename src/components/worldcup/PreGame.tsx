@@ -53,7 +53,7 @@ interface ChatMessage {
   isUser?: boolean;
 }
 
-const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps) => {
+const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId, username }: PreGameProps) => {
   const [prediction, setPrediction] = useState<string | null>(() => getPrediction());
   const [votes, setVotes] = useState({ A: 42, draw: 18, B: 40 });
   const [leaderboardKey, setLeaderboardKey] = useState(0);
