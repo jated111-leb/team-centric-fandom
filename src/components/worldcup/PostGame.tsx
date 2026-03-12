@@ -108,33 +108,6 @@ const PostGame = () => {
       {/* Mini Leaderboard */}
       <MiniLeaderboard refreshKey={leaderboardKey} />
 
-      {/* Related Content */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-wc-text font-bold text-sm">استمر في المشاهدة</h3>
-          <span className="text-[10px] text-wc-accent">عرض الكل ›</span>
-        </div>
-        <div className="space-y-3">
-          {mockRelatedContent.map((item) => (
-            <div key={item.id} className="flex gap-3 items-center">
-              <div
-                className="w-24 h-14 rounded-xl flex items-center justify-center flex-shrink-0 relative border border-wc-border"
-                style={{ background: "var(--wc-gradient-card)" }}
-              >
-                <span className="text-2xl">🎬</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-wc-text text-xs font-medium leading-snug line-clamp-2">{item.title}</p>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className="text-[10px] text-wc-muted">{item.type}</span>
-                  <span className="text-[10px] text-wc-muted">·</span>
-                  <span className="text-[10px] text-wc-muted">{item.duration}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Next Match Reminder */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
