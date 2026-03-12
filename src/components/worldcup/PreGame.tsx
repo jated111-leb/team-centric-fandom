@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Share2, UserPlus, X } from "lucide-react";
+import { Send, Share2, UserPlus, X, ChevronDown, ChevronUp } from "lucide-react";
 import { mockLiveChatMessages, mockFriendsList, worldcupQuizzes } from "@/lib/worldcupMockData";
 import {
   addPoints,
@@ -24,7 +24,6 @@ interface PreGameProps {
 
 const preQuizzes = worldcupQuizzes.filter((q) => q.phase === "pre");
 
-// Pre-game chat auto messages
 const PRE_CHAT_MESSAGES = [
   { username: "فارس بغداد", message: "يلا يلا العراق 🇮🇶" },
   { username: "ملك المدرجات", message: "جاهزين للمباراة 💪" },
@@ -34,7 +33,6 @@ const PRE_CHAT_MESSAGES = [
   { username: "قمر بغداد", message: "اليوم يومنا إن شاء الله 🏆" },
 ];
 
-// Username colors (same as InGame)
 const USERNAME_COLORS = [
   "text-sky-400", "text-pink-400", "text-amber-400", "text-emerald-400",
   "text-violet-400", "text-orange-400", "text-cyan-400", "text-rose-400",
@@ -52,7 +50,6 @@ interface ChatMessage {
   timestamp: string;
   isSystem?: boolean;
   isUser?: boolean;
-  isWidget?: "quiz" | "hype";
 }
 
 const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps) => {
@@ -67,27 +64,15 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
 
   const currentQuiz = preQuizzes[quizIndex % preQuizzes.length];
 
-  // Chat state
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const initial: ChatMessage[] = mockLiveChatMessages.slice(0, 4).map((m) => ({ ...m }));
-    // Insert hype widget after 2 messages
-    initial.splice(2, 0, {
-      id: "widget-hype",
-      username: "",
-      message: "",
-      timestamp: "",
-      isWidget: "hype",
-    });
-    // Insert quiz widget at end
-    initial.push({
-      id: "widget-quiz",
-      username: "",
-      message: "",
-      timestamp: "",
-      isWidget: "quiz",
-    });
-    return initial;
-  });
+  // Floating widget state
+  const [hypeExpanded, setHypeExpanded] = useState(true);
+  const [quizExpanded, setQuizExpanded] = useState(true);
+  const [hasNewQuiz, setHasNewQuiz] = useState(true);
+
+  // Chat state (no widget messages)
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    mockLiveChatMessages.slice(0, 4).map((m) => ({ ...m }))
+  );
   const [newMsg, setNewMsg] = useState("");
   const [chatUsername, setChatUsername] = useState<string | null>(
     () => username ?? getPlayerData().username
@@ -152,7 +137,28 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
     setQuizIndex((i) => i + 1);
     setPreQuizSelected(null);
     setPreQuizAnswered(false);
+    setQuizExpanded(true);
+    setHasNewQuiz(true);
   };
+
+  // Auto-collapse hype after tapping
+  useEffect(() => {
+    if (hasTapped) {
+      const t = setTimeout(() => setHypeExpanded(false), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [hasTapped]);
+
+  // Auto-collapse quiz after answering
+  useEffect(() => {
+    if (preQuizAnswered) {
+      const t = setTimeout(() => {
+        setQuizExpanded(false);
+        setHasNewQuiz(false);
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [preQuizAnswered]);
 
   const sendMessage = () => {
     if (!chatUsername) {
@@ -196,85 +202,129 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
   const totalPoints = getTotalPoints();
   const accuracy = getQuizAccuracy();
 
-  // ── Inline widget renderers ──
-  const renderHypeWidget = () => (
-    <div className="rounded-xl p-3 my-1 mx-1 border border-wc-accent/30 bg-wc-accent/5">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-wc-text">🔥 حرارة الجمهور</span>
-        <span className="text-[10px] text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+  // ── Floating Hype Widget ──
+  const renderFloatingHype = () => (
+    <div className="absolute top-2 left-2 right-2 z-20 pointer-events-none">
+      <div className="pointer-events-auto">
+        {hypeExpanded ? (
+          <div className="rounded-xl p-3 border border-wc-accent/30 backdrop-blur-md bg-wc-surface/90 shadow-lg shadow-wc-accent/10 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-wc-text">🔥 حرارة الجمهور</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+                <button onClick={() => setHypeExpanded(false)} className="p-0.5 rounded-full hover:bg-wc-elevated">
+                  <X size={12} className="text-wc-muted" />
+                </button>
+              </div>
+            </div>
+            <div className="h-2.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
+              <div className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`} style={{ width: `${hypeFill}%` }} />
+            </div>
+            <p className="text-[10px] text-wc-muted text-center mb-2">{hypeTier.label}</p>
+            {!hasTapped ? (
+              <button
+                onClick={() => { setHasTapped(true); setHypeCount((prev) => prev + 1); }}
+                className="w-full py-2 rounded-full font-bold text-wc-accent-foreground text-xs bg-wc-accent active:scale-95 transition-transform"
+              >
+                أشعل الحماس 🔥
+              </button>
+            ) : (
+              <div className="w-full py-2 rounded-full text-center text-[10px] font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
+                أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع ✅
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setHypeExpanded(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md bg-wc-surface/80 border border-wc-accent/30 shadow-md shadow-wc-accent/10 hover:bg-wc-surface/95 transition-all animate-in fade-in duration-200"
+          >
+            <span className="text-xs">🔥</span>
+            <span className="text-[10px] font-bold text-wc-accent">{hypeCount.toLocaleString("ar-EG")}</span>
+            <ChevronDown size={10} className="text-wc-muted" />
+          </button>
+        )}
       </div>
-      <div className="h-2.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
-        <div className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`} style={{ width: `${hypeFill}%` }} />
-      </div>
-      <p className="text-[10px] text-wc-muted text-center mb-2">{hypeTier.label}</p>
-      {!hasTapped ? (
-        <button
-          onClick={() => { setHasTapped(true); setHypeCount((prev) => prev + 1); }}
-          className="w-full py-2 rounded-full font-bold text-wc-accent-foreground text-xs bg-wc-accent active:scale-95 transition-transform"
-        >
-          أشعل الحماس 🔥
-        </button>
-      ) : (
-        <div className="w-full py-2 rounded-full text-center text-[10px] font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
-          أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع ✅
-        </div>
-      )}
     </div>
   );
 
-  const renderQuizWidget = () => (
-    <div className="rounded-xl p-3 my-1 mx-1 border border-wc-warning/30 bg-wc-warning/5">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-wc-text">🧠 اختبار المعرفة</span>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-wc-elevated text-wc-muted border border-wc-border">
-          +{currentQuiz.points} نقطة
-        </span>
+  // ── Floating Quiz Widget ──
+  const renderFloatingQuiz = () => (
+    <div className="absolute bottom-14 left-2 right-2 z-20 pointer-events-none">
+      <div className="pointer-events-auto">
+        {quizExpanded ? (
+          <div className="rounded-xl p-3 border border-wc-warning/30 backdrop-blur-md bg-wc-surface/90 shadow-lg shadow-wc-warning/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-wc-text">🧠 اختبار المعرفة</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-wc-elevated text-wc-muted border border-wc-border">
+                  +{currentQuiz.points} نقطة
+                </span>
+                <button onClick={() => { setQuizExpanded(false); setHasNewQuiz(false); }} className="p-0.5 rounded-full hover:bg-wc-elevated">
+                  <X size={12} className="text-wc-muted" />
+                </button>
+              </div>
+            </div>
+            <p className="text-wc-text text-[11px] mb-2 leading-relaxed">{currentQuiz.question}</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {currentQuiz.options.map((opt, i) => {
+                let cls = "bg-wc-elevated text-wc-muted";
+                if (preQuizAnswered) {
+                  if (i === currentQuiz.correctIndex) cls = "bg-wc-accent text-wc-accent-foreground";
+                  else if (i === preQuizSelected) cls = "bg-wc-danger text-wc-accent-foreground";
+                }
+                return (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (preQuizAnswered) return;
+                      setPreQuizSelected(i);
+                      setPreQuizAnswered(true);
+                      const correct = i === currentQuiz.correctIndex;
+                      recordQuizAnswer(correct);
+                      if (correct) addPoints(currentQuiz.points, "pre-trivia");
+                      setLeaderboardKey((k) => k + 1);
+                    }}
+                    disabled={preQuizAnswered}
+                    className={`py-2 rounded-full text-[10px] font-medium transition-all ${cls}`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+            {preQuizAnswered && (
+              <div className="mt-1.5 flex items-center justify-between">
+                <p className={`text-[10px] font-bold ${preQuizSelected === currentQuiz.correctIndex ? "text-wc-accent" : "text-wc-danger"}`}>
+                  {preQuizSelected === currentQuiz.correctIndex
+                    ? `🎉 صح! +${currentQuiz.points} نقطة`
+                    : `❌ الإجابة: ${currentQuiz.options[currentQuiz.correctIndex]}`}
+                </p>
+                <button onClick={handleNextQuiz} className="text-[9px] text-wc-accent underline">التالي ›</button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setQuizExpanded(true)}
+            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md bg-wc-surface/80 border border-wc-warning/30 shadow-md shadow-wc-warning/10 hover:bg-wc-surface/95 transition-all animate-in fade-in duration-200"
+          >
+            <span className="text-xs">🧠</span>
+            <span className="text-[10px] font-bold text-wc-warning">سؤال جديد!</span>
+            <ChevronUp size={10} className="text-wc-muted" />
+            {hasNewQuiz && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-wc-danger animate-pulse" />
+            )}
+          </button>
+        )}
       </div>
-      <p className="text-wc-text text-[11px] mb-2 leading-relaxed">{currentQuiz.question}</p>
-      <div className="grid grid-cols-2 gap-1.5">
-        {currentQuiz.options.map((opt, i) => {
-          let cls = "bg-wc-elevated text-wc-muted";
-          if (preQuizAnswered) {
-            if (i === currentQuiz.correctIndex) cls = "bg-wc-accent text-wc-accent-foreground";
-            else if (i === preQuizSelected) cls = "bg-wc-danger text-wc-accent-foreground";
-          }
-          return (
-            <button
-              key={i}
-              onClick={() => {
-                if (preQuizAnswered) return;
-                setPreQuizSelected(i);
-                setPreQuizAnswered(true);
-                const correct = i === currentQuiz.correctIndex;
-                recordQuizAnswer(correct);
-                if (correct) addPoints(currentQuiz.points, "pre-trivia");
-                setLeaderboardKey((k) => k + 1);
-              }}
-              disabled={preQuizAnswered}
-              className={`py-2 rounded-full text-[10px] font-medium transition-all ${cls}`}
-            >
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-      {preQuizAnswered && (
-        <div className="mt-1.5 flex items-center justify-between">
-          <p className={`text-[10px] font-bold ${preQuizSelected === currentQuiz.correctIndex ? "text-wc-accent" : "text-wc-danger"}`}>
-            {preQuizSelected === currentQuiz.correctIndex
-              ? `🎉 صح! +${currentQuiz.points} نقطة`
-              : `❌ الإجابة: ${currentQuiz.options[currentQuiz.correctIndex]}`}
-          </p>
-          <button onClick={handleNextQuiz} className="text-[9px] text-wc-accent underline">التالي ›</button>
-        </div>
-      )}
     </div>
   );
 
   return (
     <div className="space-y-4 px-4 pb-6">
 
-      {/* ── User Stats ("إحصائياتك") ────────────────────────────────── */}
+      {/* ── User Stats ──────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <h3 className="text-wc-text font-bold text-sm mb-3">📊 إحصائياتك</h3>
         <div className="grid grid-cols-3 gap-2">
@@ -349,7 +399,7 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
         </div>
       </div>
 
-      {/* ── Chat with interleaved Quiz + Hype ───────────────────────── */}
+      {/* ── Chat with Floating Widgets ──────────────────────────────── */}
       <div className="flex flex-col rounded-2xl overflow-hidden bg-wc-surface border border-wc-border relative" style={{ minHeight: "400px" }}>
         {/* Chat Header */}
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-wc-border flex-shrink-0">
@@ -368,27 +418,30 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
           </button>
         </div>
 
-        {/* Messages Feed */}
-        <div ref={chatRef} className="flex-1 overflow-y-auto py-2 px-3 space-y-1" style={{ maxHeight: "320px", direction: "rtl" }}>
-          {messages.map((msg) => {
-            if (msg.isWidget === "hype") return <div key={msg.id}>{renderHypeWidget()}</div>;
-            if (msg.isWidget === "quiz") return <div key={msg.id}>{renderQuizWidget()}</div>;
-            if (msg.isSystem) {
+        {/* Messages Feed + Floating Widgets */}
+        <div className="relative flex-1">
+          {renderFloatingHype()}
+          {renderFloatingQuiz()}
+
+          <div ref={chatRef} className="overflow-y-auto py-2 px-3 space-y-1 pt-12 pb-16" style={{ height: "320px", direction: "rtl" }}>
+            {messages.map((msg) => {
+              if (msg.isSystem) {
+                return (
+                  <div key={msg.id} className="flex justify-center py-0.5">
+                    <span className="text-[10px] px-3 py-1 rounded-full bg-wc-elevated text-wc-muted">{msg.message}</span>
+                  </div>
+                );
+              }
               return (
-                <div key={msg.id} className="flex justify-center py-0.5">
-                  <span className="text-[10px] px-3 py-1 rounded-full bg-wc-elevated text-wc-muted">{msg.message}</span>
+                <div key={msg.id} className="flex items-baseline gap-1.5">
+                  <span className={`text-[10px] font-bold flex-shrink-0 ${msg.isUser ? "text-wc-accent" : getUsernameColor(msg.username)}`}>
+                    {msg.username}
+                  </span>
+                  <span className="text-wc-text text-[11px] leading-snug break-words min-w-0">{msg.message}</span>
                 </div>
               );
-            }
-            return (
-              <div key={msg.id} className="flex items-baseline gap-1.5">
-                <span className={`text-[10px] font-bold flex-shrink-0 ${msg.isUser ? "text-wc-accent" : getUsernameColor(msg.username)}`}>
-                  {msg.username}
-                </span>
-                <span className="text-wc-text text-[11px] leading-snug break-words min-w-0">{msg.message}</span>
-              </div>
-            );
-          })}
+            })}
+          </div>
         </div>
 
         {/* Input Bar */}
