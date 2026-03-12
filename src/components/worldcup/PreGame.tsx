@@ -420,7 +420,7 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
         {renderPinnedHype()}
 
         {/* Messages Feed */}
-        <div ref={chatRef} className="flex-1 overflow-y-auto py-2 px-3 space-y-1" style={{ height: "280px", direction: "rtl" }}>
+        <div ref={chatRef} className="overflow-y-auto py-2 px-3 space-y-1" style={{ maxHeight: "280px", direction: "rtl" }}>
           {messages.map((msg) => {
             if (msg.isSystem) {
               return (
