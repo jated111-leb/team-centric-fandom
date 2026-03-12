@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Share2, UserPlus, X, ChevronDown, ChevronUp } from "lucide-react";
-import { mockLiveChatMessages, mockFriendsList, worldcupQuizzes } from "@/lib/worldcupMockData";
+import { Send, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
+import { mockLiveChatMessages, worldcupQuizzes } from "@/lib/worldcupMockData";
 import {
   addPoints,
   recordQuizAnswer,
