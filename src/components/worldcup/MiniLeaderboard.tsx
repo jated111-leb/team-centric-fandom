@@ -36,11 +36,7 @@ const MiniLeaderboard = ({ refreshKey = 0 }: MiniLeaderboardProps) => {
           <Trophy size={14} className="text-wc-warning" />
           <span className="text-wc-text text-sm font-bold">ترتيبك</span>
         </div>
-        <div className="flex items-center gap-1.5">
           <span className="text-xs font-bold text-wc-accent">#{userRank}</span>
-          <span className="text-[10px] text-wc-muted">·</span>
-          <span className="text-xs font-mono text-wc-warning">{totalPoints.toLocaleString("ar-EG")} نقطة</span>
-        </div>
       </div>
 
       {/* Rows */}
@@ -97,7 +93,7 @@ const MiniLeaderboard = ({ refreshKey = 0 }: MiniLeaderboardProps) => {
             <span
               className={`text-xs font-mono font-bold text-wc-warning`}
             >
-              {user.points.toLocaleString("ar-EG")} <span className="text-[10px]">نقطة</span>
+              {user.points.toLocaleString("ar-EG")}
             </span>
           </div>
         ))}

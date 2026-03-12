@@ -593,7 +593,6 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
         >
           <Trophy size={12} className="text-wc-warning" />
           <span className="text-xs font-bold text-wc-text">#{userRank}</span>
-          <span className="text-[10px] text-wc-accent font-mono">{userPoints} نقطة</span>
         </button>
       </div>
 
