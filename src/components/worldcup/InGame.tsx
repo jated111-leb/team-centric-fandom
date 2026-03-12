@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Send, UserPlus, Trophy, X } from "lucide-react";
 import MiniLeaderboard from "./MiniLeaderboard";
 import {
@@ -152,13 +153,27 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
   const [userRank, setUserRank] = useState(() => getUserRank());
   const [leaderboard, setLeaderboard] = useState(() => getLeaderboard());
   const [usedQuizIds, setUsedQuizIds] = useState<Set<string>>(new Set());
-  // Prefer the profile username; fall back to localStorage
   const [chatUsername, setChatUsername] = useState<string | null>(
     () => username ?? getPlayerData().username
   );
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Hype meter state
+  const [hypeCount, setHypeCount] = useState(6842);
+  const [hasTapped, setHasTapped] = useState(false);
+  const [hypeExpanded, setHypeExpanded] = useState(true);
+
+  // Pinned quiz state
+  const pinnedQuizzes = worldcupQuizzes.filter((q) => q.phase === "live");
+  const [pinnedQuizIndex, setPinnedQuizIndex] = useState(0);
+  const [pinnedQuizSelected, setPinnedQuizSelected] = useState<number | null>(null);
+  const [pinnedQuizAnswered, setPinnedQuizAnswered] = useState(false);
+  const [quizExpanded, setQuizExpanded] = useState(true);
+  const [hasNewQuiz, setHasNewQuiz] = useState(true);
+
+  const currentPinnedQuiz = pinnedQuizzes[pinnedQuizIndex % pinnedQuizzes.length];
 
   const chatRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +194,14 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
         { id: `auto-${Date.now()}`, ...msg, timestamp: "الآن" },
       ]);
     }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Hype auto-increment
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHypeCount((prev) => prev + Math.floor(Math.random() * 8) + 2);
+    }, 2500);
     return () => clearInterval(interval);
   }, []);
 
@@ -385,6 +408,148 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
     );
   };
 
+  const hypeFill = Math.min((hypeCount / 15000) * 100, 100);
+  const hypeTier =
+    hypeCount < 3000
+      ? { label: "الجمهور يتحرك...", barClass: "bg-wc-accent" }
+      : hypeCount < 8000
+      ? { label: "الملعب يشتعل! 🔥", barClass: "bg-wc-warning" }
+      : { label: "العراق كله معاك! 💥", barClass: "bg-wc-danger" };
+
+  const handleNextPinnedQuiz = () => {
+    setPinnedQuizIndex((i) => i + 1);
+    setPinnedQuizSelected(null);
+    setPinnedQuizAnswered(false);
+    setQuizExpanded(true);
+    setHasNewQuiz(true);
+  };
+
+  const renderPinnedHype = () => (
+    <div className="px-3 py-2 border-b border-wc-border flex-shrink-0">
+      {hypeExpanded ? (
+        <div className="rounded-xl p-3 border border-wc-accent/30 bg-wc-accent/5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-wc-text">🔥 حرارة الجمهور</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+              <button onClick={() => setHypeExpanded(false)} className="p-0.5 rounded-full hover:bg-wc-elevated">
+                <ChevronUp size={12} className="text-wc-muted" />
+              </button>
+            </div>
+          </div>
+          <div className="h-2.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
+            <div className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`} style={{ width: `${hypeFill}%` }} />
+          </div>
+          {!hasTapped ? (
+            <button
+              onClick={() => { setHasTapped(true); setHypeCount((prev) => prev + 1); }}
+              className="w-full py-2 rounded-full font-bold text-wc-accent-foreground text-xs bg-wc-accent active:scale-95 transition-transform"
+            >
+              أشعل الحماس 🔥
+            </button>
+          ) : (
+            <div className="w-full py-2 rounded-full text-center text-[10px] font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
+              أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع ✅
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={() => setHypeExpanded(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-wc-accent/10 border border-wc-accent/30 hover:bg-wc-accent/15 transition-all"
+        >
+          <span className="text-xs">🔥</span>
+          <span className="text-xs font-bold text-wc-accent">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+          <ChevronDown size={10} className="text-wc-muted" />
+        </button>
+      )}
+    </div>
+  );
+
+  const renderPinnedQuiz = () => {
+    if (!currentPinnedQuiz) return null;
+    return (
+      <div className="px-3 py-2 border-t border-wc-border flex-shrink-0">
+        {quizExpanded ? (
+          <div className="rounded-xl p-3 border border-wc-warning/30 bg-wc-warning/5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-wc-text">🧠 اختبار المعرفة</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-wc-elevated text-wc-muted border border-wc-border">
+                  +{currentPinnedQuiz.points} نقطة
+                </span>
+                <button onClick={() => { setQuizExpanded(false); setHasNewQuiz(false); }} className="p-0.5 rounded-full hover:bg-wc-elevated">
+                  <ChevronDown size={12} className="text-wc-muted" />
+                </button>
+              </div>
+            </div>
+            <p className="text-wc-text text-[11px] mb-2 leading-relaxed">{currentPinnedQuiz.question}</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {currentPinnedQuiz.options.map((opt, i) => {
+                let cls = "bg-wc-elevated text-wc-muted";
+                if (pinnedQuizAnswered) {
+                  if (i === currentPinnedQuiz.correctIndex) cls = "bg-wc-accent text-wc-accent-foreground";
+                  else if (i === pinnedQuizSelected) cls = "bg-wc-danger text-wc-accent-foreground";
+                }
+                return (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (pinnedQuizAnswered) return;
+                      setPinnedQuizSelected(i);
+                      setPinnedQuizAnswered(true);
+                      const correct = i === currentPinnedQuiz.correctIndex;
+                      recordQuizAnswer(correct);
+                      if (correct) {
+                        const newTotal = addPoints(currentPinnedQuiz.points, "in-game-trivia");
+                        setUserPoints(newTotal);
+                        setUserRank(getUserRank());
+                        setLeaderboard(getLeaderboard());
+                        if (userId) syncPointsToDb(userId).then(() => {});
+                      }
+                    }}
+                    disabled={pinnedQuizAnswered}
+                    className={`py-2 rounded-full text-[10px] font-medium transition-all ${cls}`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+            {pinnedQuizAnswered && (
+              <div className="mt-1.5 flex items-center justify-between">
+                <p className={`text-[10px] font-bold ${pinnedQuizSelected === currentPinnedQuiz.correctIndex ? "text-wc-accent" : "text-wc-danger"}`}>
+                  {pinnedQuizSelected === currentPinnedQuiz.correctIndex
+                    ? `🎉 صح! +${currentPinnedQuiz.points} نقطة`
+                    : `❌ الإجابة: ${currentPinnedQuiz.options[currentPinnedQuiz.correctIndex]}`}
+                </p>
+                <button onClick={handleNextPinnedQuiz} className="text-[9px] text-wc-accent underline">التالي ›</button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setQuizExpanded(true)}
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
+              pinnedQuizAnswered
+                ? "bg-wc-elevated border border-wc-border"
+                : "bg-wc-warning/10 border border-wc-warning/30 hover:bg-wc-warning/15"
+            } transition-all`}
+          >
+            <span className="text-xs">🧠</span>
+            <span className={`text-[10px] font-bold ${pinnedQuizAnswered ? "text-wc-muted" : "text-wc-warning"}`}>
+              {pinnedQuizAnswered ? "تم الإجابة ✅" : "سؤال جديد!"}
+            </span>
+            <ChevronUp size={10} className="text-wc-muted" />
+            {!pinnedQuizAnswered && hasNewQuiz && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-wc-danger animate-pulse" />
+            )}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col px-4 pb-4 gap-3">
       <div className="rounded-2xl p-3 bg-wc-surface border border-wc-border">
@@ -588,6 +753,9 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
           </button>
         </div>
 
+        {/* Pinned Hype Meter */}
+        {renderPinnedHype()}
+
         {/* Messages */}
         <div
           ref={chatRef}
@@ -617,6 +785,9 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
             )
           )}
         </div>
+
+        {/* Pinned Quiz */}
+        {renderPinnedQuiz()}
 
         {/* Input Bar */}
         <div
