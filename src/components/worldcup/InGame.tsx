@@ -589,8 +589,8 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
         {/* Messages */}
         <div
           ref={chatRef}
-          className="flex-1 overflow-y-auto py-2 px-3 space-y-1"
-          style={{ maxHeight: "260px", direction: "rtl" }}
+          className="flex-1 min-h-0 overflow-y-auto py-2 px-3 space-y-1"
+          style={{ direction: "rtl" }}
         >
           {messages.map((msg) =>
             msg.isSystem ? (
