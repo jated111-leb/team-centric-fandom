@@ -95,11 +95,9 @@ const MiniLeaderboard = ({ refreshKey = 0 }: MiniLeaderboardProps) => {
 
             {/* Points */}
             <span
-              className={`text-xs font-mono ${
-                user.isCurrentUser ? "text-wc-accent font-bold" : "text-wc-muted"
-              }`}
+              className={`text-xs font-mono font-bold text-wc-warning`}
             >
-              {user.points.toLocaleString("ar-EG")}
+              {user.points.toLocaleString("ar-EG")} <span className="text-[10px]">نقطة</span>
             </span>
           </div>
         ))}
