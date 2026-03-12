@@ -220,7 +220,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           <div className="h-2.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
             <div className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`} style={{ width: `${hypeFill}%` }} />
           </div>
-          <p className="text-[10px] text-wc-muted text-center mb-2">{hypeTier.label}</p>
           {!hasTapped ? (
             <button
               onClick={() => { setHasTapped(true); setHypeCount((prev) => prev + 1); }}
