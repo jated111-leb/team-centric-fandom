@@ -246,76 +246,74 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
     </div>
   );
 
-  // ── Floating Quiz Widget ──
-  const renderFloatingQuiz = () => (
-    <div className="absolute bottom-14 left-2 right-2 z-20 pointer-events-none">
-      <div className="pointer-events-auto">
-        {quizExpanded ? (
-          <div className="rounded-xl p-3 border border-wc-warning/30 backdrop-blur-md bg-wc-surface/90 shadow-lg shadow-wc-warning/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-wc-text">🧠 اختبار المعرفة</span>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-wc-elevated text-wc-muted border border-wc-border">
-                  +{currentQuiz.points} نقطة
-                </span>
-                <button onClick={() => { setQuizExpanded(false); setHasNewQuiz(false); }} className="p-0.5 rounded-full hover:bg-wc-elevated">
-                  <X size={12} className="text-wc-muted" />
-                </button>
-              </div>
+  // ── Pinned Quiz Widget (below chat) ──
+  const renderPinnedQuiz = () => (
+    <div className="px-3 py-2 border-t border-wc-border flex-shrink-0">
+      {quizExpanded ? (
+        <div className="rounded-xl p-3 border border-wc-warning/30 bg-wc-warning/5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-wc-text">🧠 اختبار المعرفة</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-wc-elevated text-wc-muted border border-wc-border">
+                +{currentQuiz.points} نقطة
+              </span>
+              <button onClick={() => { setQuizExpanded(false); setHasNewQuiz(false); }} className="p-0.5 rounded-full hover:bg-wc-elevated">
+                <ChevronDown size={12} className="text-wc-muted" />
+              </button>
             </div>
-            <p className="text-wc-text text-[11px] mb-2 leading-relaxed">{currentQuiz.question}</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {currentQuiz.options.map((opt, i) => {
-                let cls = "bg-wc-elevated text-wc-muted";
-                if (preQuizAnswered) {
-                  if (i === currentQuiz.correctIndex) cls = "bg-wc-accent text-wc-accent-foreground";
-                  else if (i === preQuizSelected) cls = "bg-wc-danger text-wc-accent-foreground";
-                }
-                return (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      if (preQuizAnswered) return;
-                      setPreQuizSelected(i);
-                      setPreQuizAnswered(true);
-                      const correct = i === currentQuiz.correctIndex;
-                      recordQuizAnswer(correct);
-                      if (correct) addPoints(currentQuiz.points, "pre-trivia");
-                      setLeaderboardKey((k) => k + 1);
-                    }}
-                    disabled={preQuizAnswered}
-                    className={`py-2 rounded-full text-[10px] font-medium transition-all ${cls}`}
-                  >
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
-            {preQuizAnswered && (
-              <div className="mt-1.5 flex items-center justify-between">
-                <p className={`text-[10px] font-bold ${preQuizSelected === currentQuiz.correctIndex ? "text-wc-accent" : "text-wc-danger"}`}>
-                  {preQuizSelected === currentQuiz.correctIndex
-                    ? `🎉 صح! +${currentQuiz.points} نقطة`
-                    : `❌ الإجابة: ${currentQuiz.options[currentQuiz.correctIndex]}`}
-                </p>
-                <button onClick={handleNextQuiz} className="text-[9px] text-wc-accent underline">التالي ›</button>
-              </div>
-            )}
           </div>
-        ) : (
-          <button
-            onClick={() => setQuizExpanded(true)}
-            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md bg-wc-surface/80 border border-wc-warning/30 shadow-md shadow-wc-warning/10 hover:bg-wc-surface/95 transition-all animate-in fade-in duration-200"
-          >
-            <span className="text-xs">🧠</span>
-            <span className="text-[10px] font-bold text-wc-warning">سؤال جديد!</span>
-            <ChevronUp size={10} className="text-wc-muted" />
-            {hasNewQuiz && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-wc-danger animate-pulse" />
-            )}
-          </button>
-        )}
-      </div>
+          <p className="text-wc-text text-[11px] mb-2 leading-relaxed">{currentQuiz.question}</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {currentQuiz.options.map((opt, i) => {
+              let cls = "bg-wc-elevated text-wc-muted";
+              if (preQuizAnswered) {
+                if (i === currentQuiz.correctIndex) cls = "bg-wc-accent text-wc-accent-foreground";
+                else if (i === preQuizSelected) cls = "bg-wc-danger text-wc-accent-foreground";
+              }
+              return (
+                <button
+                  key={i}
+                  onClick={() => {
+                    if (preQuizAnswered) return;
+                    setPreQuizSelected(i);
+                    setPreQuizAnswered(true);
+                    const correct = i === currentQuiz.correctIndex;
+                    recordQuizAnswer(correct);
+                    if (correct) addPoints(currentQuiz.points, "pre-trivia");
+                    setLeaderboardKey((k) => k + 1);
+                  }}
+                  disabled={preQuizAnswered}
+                  className={`py-2 rounded-full text-[10px] font-medium transition-all ${cls}`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          {preQuizAnswered && (
+            <div className="mt-1.5 flex items-center justify-between">
+              <p className={`text-[10px] font-bold ${preQuizSelected === currentQuiz.correctIndex ? "text-wc-accent" : "text-wc-danger"}`}>
+                {preQuizSelected === currentQuiz.correctIndex
+                  ? `🎉 صح! +${currentQuiz.points} نقطة`
+                  : `❌ الإجابة: ${currentQuiz.options[currentQuiz.correctIndex]}`}
+              </p>
+              <button onClick={handleNextQuiz} className="text-[9px] text-wc-accent underline">التالي ›</button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={() => setQuizExpanded(true)}
+          className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-wc-warning/10 border border-wc-warning/30 hover:bg-wc-warning/15 transition-all"
+        >
+          <span className="text-xs">🧠</span>
+          <span className="text-[10px] font-bold text-wc-warning">سؤال جديد!</span>
+          <ChevronUp size={10} className="text-wc-muted" />
+          {hasNewQuiz && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-wc-danger animate-pulse" />
+          )}
+        </button>
+      )}
     </div>
   );
 
