@@ -466,11 +466,10 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
       {/* ── User Stats ──────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <h3 className="text-wc-text font-bold text-sm mb-3">📊 إحصائياتك</h3>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {[
             { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
             { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
-            { label: "ترتيبك", value: `#${getUserRank()}`, icon: "📈" },
           ].map((stat, i) => (
             <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
               <span className="text-lg">{stat.icon}</span>
