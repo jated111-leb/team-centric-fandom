@@ -218,9 +218,6 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
           <p className="text-xs text-wc-muted font-medium">
             الأربعاء 18 يونيو 2026 · 9:00 م بتوقيت بغداد
           </p>
-          <p className="text-[11px] text-wc-muted mt-1 leading-relaxed">
-            كأس العالم 2026: شاهد مباراة العراق ضد ألمانيا تبث مباشرة من أمريكا.
-          </p>
 
           {/* Countdown */}
           <div className="mt-4 mb-1">
