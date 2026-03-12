@@ -197,6 +197,14 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
     return () => clearInterval(interval);
   }, []);
 
+  // Hype auto-increment
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHypeCount((prev) => prev + Math.floor(Math.random() * 8) + 2);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
   // Quiz countdown
   useEffect(() => {
     if (!activeQuiz || quizAnswered || quizTimer <= 0) return;
