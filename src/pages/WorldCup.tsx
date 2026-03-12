@@ -27,7 +27,7 @@ const WorldCup = () => {
     let ignore = false;
 
     const loadProfile = async (userId: string) => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("profiles")
         .select("id, username, display_name, is_subscribed, subscription_tier")
         .eq("id", userId)

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, UserPlus, Trophy, X } from "lucide-react";
+import MiniLeaderboard from "./MiniLeaderboard";
 import {
   mockLiveChatMessages,
   mockReactions as initialReactions,
@@ -345,7 +346,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
 
     // Persist to Supabase if authenticated
     if (userId) {
-      supabase
+      (supabase as any)
         .from("chat_messages")
         .insert({ user_id: userId, match_id: MATCH_ID, message: text })
         .then(() => {});
@@ -385,7 +386,8 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
 
   return (
     <div className="flex flex-col px-4 pb-4 gap-3">
-      {/* ── Event Trigger Strip ──────────────────────────────────────────── */}
+      {/* ── Mini Leaderboard ─────────────────────────────────────────── */}
+      <MiniLeaderboard refreshKey={userPoints} />
       <div className="rounded-2xl p-3 bg-wc-surface border border-wc-border">
         <p className="text-[10px] text-wc-muted mb-2 text-center">
           محاكاة حدث في المباراة

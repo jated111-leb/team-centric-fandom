@@ -1,24 +1,23 @@
 import { useState, useEffect } from "react";
-import { Star, Bell, Share2, Crown } from "lucide-react";
-import { mockHighlights, mockRelatedContent } from "@/lib/worldcupMockData";
+import { Star, Bell, Share2, MessageCircle } from "lucide-react";
+import { mockRelatedContent } from "@/lib/worldcupMockData";
 import {
   getTotalPoints,
   getUserRank,
-  getLeaderboard,
   getQuizAccuracy,
   getPrediction,
   awardPredictionPoints,
-  type LeaderboardEntry,
 } from "@/lib/pointsStore";
+import MiniLeaderboard from "./MiniLeaderboard";
 
 const PostGame = () => {
   const [rating, setRating] = useState(0);
   const [reminded, setReminded] = useState(false);
   const [totalPoints, setTotalPoints] = useState(getTotalPoints);
   const [userRank, setUserRank] = useState(getUserRank);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(getLeaderboard);
   const [accuracy] = useState(getQuizAccuracy);
   const [predictionCorrect] = useState(() => getPrediction() === "A");
+  const [leaderboardKey, setLeaderboardKey] = useState(0);
 
   // Award prediction points once on mount (Iraq wins = "A")
   useEffect(() => {
@@ -26,13 +25,23 @@ const PostGame = () => {
     if (result.awarded) {
       setTotalPoints(getTotalPoints());
       setUserRank(getUserRank());
-      setLeaderboard(getLeaderboard());
+      setLeaderboardKey((k) => k + 1);
     }
   }, []);
 
+  // Mock chat stats
+  const chatStats = {
+    totalMessages: 1247,
+    totalParticipants: 189,
+    peakConcurrent: 67,
+    mostUsedEmoji: "🇮🇶",
+    mostActiveUser: "أسد الرافدين",
+    duration: "١٠٤ دقيقة",
+  };
+
   return (
     <div className="space-y-4 px-4 pb-6">
-      {/* Man of the Match */}
+      {/* Match Result */}
       <div className="rounded-2xl p-5 text-center border border-wc-border" style={{ background: "var(--wc-gradient-card)" }}>
         <p className="text-xs mb-2 text-wc-accent font-bold">🏆 نتيجة المباراة</p>
         <div className="flex items-center justify-center gap-6 mb-3">
@@ -55,7 +64,7 @@ const PostGame = () => {
 
       {/* Your Match Stats */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">إحصائياتك</h3>
+        <h3 className="text-wc-text font-bold text-sm mb-3">📊 إحصائياتك</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
@@ -76,30 +85,38 @@ const PostGame = () => {
         </div>
       </div>
 
-      {/* Season Leaderboard */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">تصنيف كأس العالم</h3>
-        <div className="space-y-1.5">
-          {leaderboard.slice(0, 5).map((user) => (
-            <div
-              key={user.rank}
-              className={`flex items-center gap-3 py-1.5 px-2 rounded-lg ${user.isCurrentUser ? "bg-wc-accent/15" : ""}`}
-            >
-              <span className={`text-xs font-bold w-5 ${user.rank <= 3 ? "text-wc-warning" : "text-wc-muted"}`}>
-                {user.rank}
-              </span>
-              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] text-wc-text font-bold bg-wc-elevated">
-                {user.username[0]}
+      {/* Mini Leaderboard */}
+      <MiniLeaderboard refreshKey={leaderboardKey} />
+
+      {/* ── Chat Summary ("انتهت الدردشة") ──────────────────────────── */}
+      <div className="rounded-2xl overflow-hidden bg-wc-surface border border-wc-border">
+        <div className="flex items-center justify-center gap-2 px-4 py-3 border-b border-wc-border bg-wc-elevated">
+          <MessageCircle size={14} className="text-wc-muted" />
+          <span className="text-wc-text text-sm font-bold">انتهت الدردشة</span>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {[
+              { label: "رسالة", value: chatStats.totalMessages.toLocaleString("ar-EG"), icon: "💬" },
+              { label: "مشارك", value: chatStats.totalParticipants.toLocaleString("ar-EG"), icon: "👥" },
+              { label: "ذروة متصل", value: chatStats.peakConcurrent.toLocaleString("ar-EG"), icon: "📈" },
+            ].map((stat, i) => (
+              <div key={i} className="rounded-xl p-2.5 text-center bg-wc-elevated border border-wc-border">
+                <span className="text-base">{stat.icon}</span>
+                <p className="text-wc-text font-bold text-sm mt-0.5">{stat.value}</p>
+                <p className="text-[9px] text-wc-muted">{stat.label}</p>
               </div>
-              <span className={`text-wc-text text-xs flex-1 ${user.isCurrentUser ? "font-bold" : ""}`}>
-                {user.username} {user.isCurrentUser && <span className="text-wc-accent">(أنت)</span>}
-              </span>
-              <span className="text-xs font-mono text-wc-accent">{user.points.toLocaleString("ar-EG")}</span>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-wc-muted">
+            <span>أكثر إيموجي: {chatStats.mostUsedEmoji}</span>
+            <span>المدة: {chatStats.duration}</span>
+          </div>
+          <div className="mt-2 text-center">
+            <span className="text-[10px] text-wc-muted">🏅 الأكثر نشاطاً: <span className="text-wc-accent font-bold">{chatStats.mostActiveUser}</span></span>
+          </div>
         </div>
       </div>
-
 
       {/* Related Content */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
@@ -115,16 +132,9 @@ const PostGame = () => {
                 style={{ background: "var(--wc-gradient-card)" }}
               >
                 <span className="text-2xl">🎬</span>
-                {item.premium && (
-                  <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-wc-warning flex items-center justify-center">
-                    <Crown size={8} className="text-white" />
-                  </div>
-                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-wc-text text-xs font-medium leading-snug line-clamp-2">
-                  {item.title}
-                </p>
+                <p className="text-wc-text text-xs font-medium leading-snug line-clamp-2">{item.title}</p>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="text-[10px] text-wc-muted">{item.type}</span>
                   <span className="text-[10px] text-wc-muted">·</span>
@@ -147,9 +157,7 @@ const PostGame = () => {
           <button
             onClick={() => setReminded(!reminded)}
             className={`flex items-center gap-1 px-3 py-2 rounded-full text-xs font-bold transition-all ${
-              reminded
-                ? "bg-wc-accent text-wc-accent-foreground"
-                : "bg-wc-elevated text-wc-accent"
+              reminded ? "bg-wc-accent text-wc-accent-foreground" : "bg-wc-elevated text-wc-accent"
             }`}
           >
             <Bell size={14} />
@@ -165,9 +173,7 @@ const PostGame = () => {
           <p className="text-wc-text text-sm font-bold">ادعُ صديقاً للمباراة القادمة</p>
           <p className="text-[10px] text-wc-muted">شارك التجربة مع أصدقائك</p>
         </div>
-        <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">
-          شارك
-        </button>
+        <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">شارك</button>
       </div>
 
       {/* Rate Experience */}

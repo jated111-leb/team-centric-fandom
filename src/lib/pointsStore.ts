@@ -170,7 +170,7 @@ export async function syncPointsToDb(userId: string): Promise<void> {
   const data = load();
 
   // Upsert total points
-  await supabase
+  await (supabase as any)
     .from("user_points")
     .upsert(
       { user_id: userId, total_points: data.totalPoints, updated_at: new Date().toISOString() },
@@ -179,7 +179,7 @@ export async function syncPointsToDb(userId: string): Promise<void> {
 
   // Insert each history entry (duplicates ignored via unique constraint on user_id+timestamp+source)
   if (data.history.length > 0) {
-    await supabase.from("points_history").upsert(
+    await (supabase as any).from("points_history").upsert(
       data.history.map((h) => ({
         user_id: userId,
         amount: h.amount,
@@ -197,13 +197,13 @@ export async function syncPointsToDb(userId: string): Promise<void> {
  * Call this on app start when a session is detected.
  */
 export async function loadPointsFromDb(userId: string, username: string): Promise<void> {
-  const { data: pts } = await supabase
+  const { data: pts } = await (supabase as any)
     .from("user_points")
     .select("total_points")
     .eq("user_id", userId)
     .maybeSingle();
 
-  const { data: history } = await supabase
+  const { data: history } = await (supabase as any)
     .from("points_history")
     .select("amount, source, match_id, created_at")
     .eq("user_id", userId)

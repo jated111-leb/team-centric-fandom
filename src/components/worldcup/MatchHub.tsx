@@ -272,7 +272,12 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
       <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
 
       {phase === "pre" && (
-        <PreGame todActivated={todActivated} onActivateTod={() => setTodActivated(true)} />
+        <PreGame
+          todActivated={todActivated}
+          onActivateTod={() => setTodActivated(true)}
+          userId={userProfile?.id ?? null}
+          username={userProfile?.username ?? userProfile?.display_name ?? null}
+        />
       )}
       {phase === "live" && (
         <InGame
