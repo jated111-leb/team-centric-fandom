@@ -420,12 +420,14 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
           </button>
         </div>
 
-        {/* Messages Feed + Floating Widgets */}
+        {/* Pinned Hype Meter */}
+        {renderPinnedHype()}
+
+        {/* Messages Feed + Floating Quiz */}
         <div className="relative flex-1">
-          {renderFloatingHype()}
           {renderFloatingQuiz()}
 
-          <div ref={chatRef} className="overflow-y-auto py-2 px-3 space-y-1 pt-12 pb-16" style={{ height: "320px", direction: "rtl" }}>
+          <div ref={chatRef} className="overflow-y-auto py-2 px-3 space-y-1 pb-16" style={{ height: "320px", direction: "rtl" }}>
             {messages.map((msg) => {
               if (msg.isSystem) {
                 return (
