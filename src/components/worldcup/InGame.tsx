@@ -578,7 +578,10 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
             </span>
           </div>
           <button
-            onClick={() => setShowFriendSheet(true)}
+            onClick={() => {
+              const msg = encodeURIComponent("العراق ضد ألمانيا 🇮🇶⚽🇩🇪 — المباراة مباشرة الآن! انضم للدردشة\nhttps://team-centric-fandom.lovable.app/world-cup");
+              window.open(`https://wa.me/?text=${msg}`, "_blank");
+            }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs text-wc-accent border border-wc-accent bg-wc-accent/10"
           >
             <UserPlus size={12} />
