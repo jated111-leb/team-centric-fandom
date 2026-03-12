@@ -1,5 +1,8 @@
-// Points system — localStorage-based, no backend required
-// Persists across matches/sessions. Global leaderboard seeded with rival players.
+// Points system — localStorage-backed with Supabase sync.
+// localStorage is the source of truth for instant/offline use.
+// Call syncPointsToDb() after awarding points when a user is logged in.
+// Call loadPointsFromDb() on session start to hydrate from the DB.
+import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "wc1001_player";
 
@@ -152,4 +155,73 @@ export function awardPredictionPoints(): { awarded: boolean; points: number } {
 
 export function resetPoints(): void {
   localStorage.removeItem(STORAGE_KEY);
+}
+
+// ── Supabase sync helpers ──────────────────────────────────────────────────
+// These are no-ops if the user is not authenticated; they never throw.
+
+/**
+ * Push the current localStorage state to Supabase.
+ * - Upserts user_points with the current total.
+ * - Inserts any points_history entries newer than the last synced timestamp.
+ * Call this after addPoints() when a session is active.
+ */
+export async function syncPointsToDb(userId: string): Promise<void> {
+  const data = load();
+
+  // Upsert total points
+  await supabase
+    .from("user_points")
+    .upsert(
+      { user_id: userId, total_points: data.totalPoints, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
+
+  // Insert each history entry (duplicates ignored via unique constraint on user_id+timestamp+source)
+  if (data.history.length > 0) {
+    await supabase.from("points_history").upsert(
+      data.history.map((h) => ({
+        user_id: userId,
+        amount: h.amount,
+        source: h.source,
+        match_id: h.matchId,
+        created_at: new Date(h.timestamp).toISOString(),
+      })),
+      { ignoreDuplicates: true }
+    );
+  }
+}
+
+/**
+ * Fetch the user's points from Supabase and hydrate localStorage.
+ * Call this on app start when a session is detected.
+ */
+export async function loadPointsFromDb(userId: string, username: string): Promise<void> {
+  const { data: pts } = await supabase
+    .from("user_points")
+    .select("total_points")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const { data: history } = await supabase
+    .from("points_history")
+    .select("amount, source, match_id, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  const current = load();
+  const merged: PlayerData = {
+    username: username || current.username,
+    totalPoints: pts?.total_points ?? current.totalPoints,
+    history: (history ?? []).map((h) => ({
+      amount: h.amount,
+      source: h.source,
+      matchId: h.match_id ?? "",
+      timestamp: new Date(h.created_at).getTime(),
+    })),
+    prediction: current.prediction,
+    quizCorrect: current.quizCorrect,
+    quizTotal: current.quizTotal,
+  };
+  save(merged);
 }

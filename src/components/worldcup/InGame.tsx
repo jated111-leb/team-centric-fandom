@@ -15,7 +15,16 @@ import {
   recordQuizAnswer,
   setUsername as storeSetUsername,
   getPlayerData,
+  syncPointsToDb,
 } from "@/lib/pointsStore";
+import { supabase } from "@/integrations/supabase/client";
+
+const MATCH_ID = "wc-iraq-germany-2026";
+
+interface InGameProps {
+  userId?: string | null;
+  username?: string | null;
+}
 
 type EventType = "goal" | "yellow_card" | "halftime" | "var";
 
@@ -119,7 +128,7 @@ function getUsernameColor(username: string): string {
   return USERNAME_COLORS[Math.abs(hash) % USERNAME_COLORS.length];
 }
 
-const InGame = () => {
+const InGame = ({ userId = null, username = null }: InGameProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>(
     mockLiveChatMessages.map((m) => ({ ...m }))
   );
@@ -141,7 +150,10 @@ const InGame = () => {
   const [userRank, setUserRank] = useState(() => getUserRank());
   const [leaderboard, setLeaderboard] = useState(() => getLeaderboard());
   const [usedQuizIds, setUsedQuizIds] = useState<Set<string>>(new Set());
-  const [chatUsername, setChatUsername] = useState<string | null>(() => getPlayerData().username);
+  // Prefer the profile username; fall back to localStorage
+  const [chatUsername, setChatUsername] = useState<string | null>(
+    () => username ?? getPlayerData().username
+  );
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -198,6 +210,40 @@ const InGame = () => {
     const t = setTimeout(() => setActiveEvent(null), 3000);
     return () => clearTimeout(t);
   }, [activeEvent]);
+
+  // Supabase Realtime: subscribe to live chat_messages for this match
+  useEffect(() => {
+    const channel = supabase
+      .channel(`chat:${MATCH_ID}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+          filter: `match_id=eq.${MATCH_ID}`,
+        },
+        (payload) => {
+          const row = payload.new as { id: string; user_id: string | null; message: string; created_at: string };
+          // Ignore our own optimistic messages (already appended locally)
+          if (row.user_id === userId) return;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: row.id,
+              username: "مشجع",
+              message: row.message,
+              timestamp: "الآن",
+            },
+          ]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   const triggerEvent = (type: EventType) => {
     const cfg = EVENT_CONFIG[type];
@@ -270,6 +316,7 @@ const InGame = () => {
         const newRank = getUserRank();
         setUserRank(newRank);
         setLeaderboard(getLeaderboard());
+        if (userId) syncPointsToDb(userId).then(() => {});
       }
     }
   };
@@ -280,18 +327,29 @@ const InGame = () => {
       setTimeout(() => nameInputRef.current?.focus(), 50);
       return;
     }
-    if (!newMsg.trim()) return;
+    const text = newMsg.trim();
+    if (!text) return;
+
+    // Optimistic local append
     setMessages((prev) => [
       ...prev,
       {
         id: Date.now().toString(),
         username: chatUsername,
-        message: newMsg.trim(),
+        message: text,
         timestamp: "الآن",
         isUser: true,
       },
     ]);
     setNewMsg("");
+
+    // Persist to Supabase if authenticated
+    if (userId) {
+      supabase
+        .from("chat_messages")
+        .insert({ user_id: userId, match_id: MATCH_ID, message: text })
+        .then(() => {});
+    }
   };
 
   const confirmName = () => {
