@@ -267,8 +267,7 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
       {/* ── Divider ───────────────────────────────────────────────────────── */}
       <div className="h-px mx-4 my-3 bg-wc-border" />
 
-      {/* ── Phase Tabs + Engagement Layer ─────────────────────────────────── */}
-      <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
+      {/* ── Phase Engagement Layer ─────────────────────────────────── */}
 
       {phase === "pre" && (
         <PreGame
