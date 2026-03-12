@@ -203,6 +203,16 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
             <span>ذكّرني</span>
           </button>
         )}
+
+        {/* شاهد على TOD — only in live */}
+        {phase === "live" && (
+          <button
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm text-wc-accent-foreground bg-wc-accent"
+            style={{ height: 46 }}
+          >
+            <span>شاهد على TOD 📺</span>
+          </button>
+        )}
       </div>
 
       {/* ── Tag Pills ─────────────────────────────────────────────────────── */}
