@@ -455,30 +455,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           </div>
         )}
 
-        {/* Friend Invite Sheet */}
-        {showFriendSheet && (
-          <div className="absolute inset-0 z-30 rounded-2xl bg-wc-bg flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-wc-border">
-              <span className="text-wc-text font-bold text-sm">دعوة صديق للدردشة</span>
-              <button onClick={() => setShowFriendSheet(false)}><X size={16} className="text-wc-muted" /></button>
-            </div>
-            <div className="flex-1 p-3 space-y-2 overflow-y-auto">
-              {mockFriendsList.map((friend) => (
-                <button
-                  key={friend.id}
-                  onClick={() => handleInviteFriend(friend.username)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all bg-wc-elevated active:scale-[0.98]"
-                >
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-wc-surface text-wc-text border border-wc-border">
-                    {friend.username[0]}
-                  </div>
-                  <span className="flex-1 text-wc-text text-sm text-right">{friend.username}</span>
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${friend.online ? "bg-wc-accent" : "bg-wc-muted"}`} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
 
