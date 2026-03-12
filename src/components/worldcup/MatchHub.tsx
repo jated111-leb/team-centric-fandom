@@ -7,12 +7,15 @@ import PostGame from "./PostGame";
 
 type Phase = "pre" | "live" | "post";
 
+import type { UserProfile } from "@/pages/WorldCup";
+
 interface MatchHubProps {
   onBack: () => void;
   onNavigateToSubscription?: () => void;
+  userProfile?: UserProfile | null;
 }
 
-const MatchHub = ({ onBack, onNavigateToSubscription }: MatchHubProps) => {
+const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubProps) => {
   const [phase, setPhase] = useState<Phase>("pre");
   const [todActivated, setTodActivated] = useState(false);
   const [countdown, setCountdown] = useState({ h: 2, m: 34, s: 15 });
@@ -144,7 +147,7 @@ const MatchHub = ({ onBack, onNavigateToSubscription }: MatchHubProps) => {
       <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
 
       {phase === "pre" && <PreGame todActivated={todActivated} onActivateTod={() => setTodActivated(true)} />}
-      {phase === "live" && <InGame />}
+      {phase === "live" && <InGame userId={userProfile?.id ?? null} username={userProfile?.username ?? userProfile?.display_name ?? null} />}
       {phase === "post" && <PostGame />}
     </div>
   );

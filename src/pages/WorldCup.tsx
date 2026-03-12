@@ -1,18 +1,73 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import StatusBar from "@/components/worldcup/StatusBar";
 import BottomTabBar from "@/components/worldcup/BottomTabBar";
 import HomeFeed from "@/components/worldcup/HomeFeed";
 import MatchHub from "@/components/worldcup/MatchHub";
 import SubscriptionScreen from "@/components/worldcup/SubscriptionScreen";
+import { supabase } from "@/integrations/supabase/client";
+import { loadPointsFromDb, setUsername as storeSetUsername } from "@/lib/pointsStore";
 
 type Screen = "match" | "subscription";
+
+export interface UserProfile {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  is_subscribed: boolean;
+  subscription_tier: string | null;
+}
 
 const WorldCup = () => {
   const [screen, setScreen] = useState<Screen>("match");
   const [activeTab, setActiveTab] = useState("home");
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  // On mount: check for an active Supabase session and load the user's profile
+  useEffect(() => {
+    let ignore = false;
+
+    const loadProfile = async (userId: string) => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, is_subscribed, subscription_tier")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (ignore) return;
+
+      if (data) {
+        setUserProfile(data as UserProfile);
+        // Sync username into localStorage so pointsStore leaderboard picks it up
+        const name = data.username ?? data.display_name ?? null;
+        if (name) storeSetUsername(name);
+        await loadPointsFromDb(userId, name ?? "");
+      } else {
+        // Profile row not yet created (race with trigger) — set minimal profile
+        setUserProfile({ id: userId, username: null, display_name: null, is_subscribed: false, subscription_tier: null });
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) loadProfile(session.user.id);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) loadProfile(session.user.id);
+      else if (!ignore) setUserProfile(null);
+    });
+
+    return () => {
+      ignore = true;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
+  };
+
+  const handleProfileUpdate = (updates: Partial<UserProfile>) => {
+    setUserProfile((prev) => prev ? { ...prev, ...updates } : prev);
   };
 
   return (
@@ -24,10 +79,18 @@ const WorldCup = () => {
         <StatusBar />
 
         {screen === "match" && (
-          <MatchHub onBack={() => setScreen("match")} onNavigateToSubscription={() => setScreen("subscription")} />
+          <MatchHub
+            onBack={() => setScreen("match")}
+            onNavigateToSubscription={() => setScreen("subscription")}
+            userProfile={userProfile}
+          />
         )}
         {screen === "subscription" && (
-          <SubscriptionScreen onBack={() => setScreen("match")} />
+          <SubscriptionScreen
+            onBack={() => setScreen("match")}
+            userProfile={userProfile}
+            onSubscribed={() => handleProfileUpdate({ is_subscribed: true, subscription_tier: "premium" })}
+          />
         )}
 
         {screen !== "subscription" && (
