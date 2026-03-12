@@ -491,15 +491,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
         )}
       </div>
 
-      {/* ── Invite a Friend ──────────────────────────────────────────── */}
-      <div className="rounded-2xl p-4 flex items-center gap-3 bg-wc-surface border border-wc-border">
-        <Share2 size={20} className="text-wc-accent flex-shrink-0" />
-        <div className="flex-1">
-          <p className="text-wc-text text-sm font-bold">ادعُ صديقاً</p>
-          <p className="text-[10px] text-wc-muted">شاركه الرابط وينضم للدردشة</p>
-        </div>
-      <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">شارك</button>
-      </div>
 
       {/* ── User Stats ──────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
