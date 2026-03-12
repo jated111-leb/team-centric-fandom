@@ -386,8 +386,6 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
 
   return (
     <div className="flex flex-col px-4 pb-4 gap-3">
-      {/* ── Mini Leaderboard ─────────────────────────────────────────── */}
-      <MiniLeaderboard refreshKey={userPoints} />
       <div className="rounded-2xl p-3 bg-wc-surface border border-wc-border">
         <p className="text-[10px] text-wc-muted mb-2 text-center">
           محاكاة حدث في المباراة
