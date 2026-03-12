@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import StatusBar from "@/components/worldcup/StatusBar";
 import BottomTabBar from "@/components/worldcup/BottomTabBar";
-import HomeFeed from "@/components/worldcup/HomeFeed";
 import MatchHub from "@/components/worldcup/MatchHub";
 import SubscriptionScreen from "@/components/worldcup/SubscriptionScreen";
 import { supabase } from "@/integrations/supabase/client";
