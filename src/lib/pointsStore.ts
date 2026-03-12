@@ -197,13 +197,13 @@ export async function syncPointsToDb(userId: string): Promise<void> {
  * Call this on app start when a session is detected.
  */
 export async function loadPointsFromDb(userId: string, username: string): Promise<void> {
-  const { data: pts } = await supabase
+  const { data: pts } = await (supabase as any)
     .from("user_points")
     .select("total_points")
     .eq("user_id", userId)
     .maybeSingle();
 
-  const { data: history } = await supabase
+  const { data: history } = await (supabase as any)
     .from("points_history")
     .select("amount, source, match_id, created_at")
     .eq("user_id", userId)

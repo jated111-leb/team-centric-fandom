@@ -345,7 +345,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
 
     // Persist to Supabase if authenticated
     if (userId) {
-      supabase
+      (supabase as any)
         .from("chat_messages")
         .insert({ user_id: userId, match_id: MATCH_ID, message: text })
         .then(() => {});
