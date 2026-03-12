@@ -366,7 +366,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           ]).map((opt) => (
             <button
               key={opt.key}
-              onClick={() => { if (prediction) return; setPrediction(opt.key); savePrediction(opt.key); }}
+              onClick={() => { setPrediction(opt.key); savePrediction(opt.key); }}
               className={`flex-1 py-2.5 rounded-full text-xs font-bold transition-all ${
                 prediction === opt.key ? "bg-wc-accent text-wc-accent-foreground" : "bg-wc-elevated text-wc-muted"
               }`}
