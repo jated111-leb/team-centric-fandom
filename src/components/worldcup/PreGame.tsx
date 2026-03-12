@@ -18,6 +18,7 @@ import todLogo from "@/assets/tod-logo.png";
 interface PreGameProps {
   todActivated: boolean;
   onActivateTod: () => void;
+  onNavigateToSubscription?: () => void;
   userId?: string | null;
   username?: string | null;
 }
