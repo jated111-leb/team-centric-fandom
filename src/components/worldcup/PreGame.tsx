@@ -202,49 +202,47 @@ const PreGame = ({ todActivated, onActivateTod, userId, username }: PreGameProps
   const totalPoints = getTotalPoints();
   const accuracy = getQuizAccuracy();
 
-  // ── Floating Hype Widget ──
-  const renderFloatingHype = () => (
-    <div className="absolute top-2 left-2 right-2 z-20 pointer-events-none">
-      <div className="pointer-events-auto">
-        {hypeExpanded ? (
-          <div className="rounded-xl p-3 border border-wc-accent/30 backdrop-blur-md bg-wc-surface/90 shadow-lg shadow-wc-accent/10 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-wc-text">🔥 حرارة الجمهور</span>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
-                <button onClick={() => setHypeExpanded(false)} className="p-0.5 rounded-full hover:bg-wc-elevated">
-                  <X size={12} className="text-wc-muted" />
-                </button>
-              </div>
-            </div>
-            <div className="h-2.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
-              <div className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`} style={{ width: `${hypeFill}%` }} />
-            </div>
-            <p className="text-[10px] text-wc-muted text-center mb-2">{hypeTier.label}</p>
-            {!hasTapped ? (
-              <button
-                onClick={() => { setHasTapped(true); setHypeCount((prev) => prev + 1); }}
-                className="w-full py-2 rounded-full font-bold text-wc-accent-foreground text-xs bg-wc-accent active:scale-95 transition-transform"
-              >
-                أشعل الحماس 🔥
+  // ── Pinned Hype Widget (above chat) ──
+  const renderPinnedHype = () => (
+    <div className="px-3 py-2 border-b border-wc-border flex-shrink-0">
+      {hypeExpanded ? (
+        <div className="rounded-xl p-3 border border-wc-accent/30 bg-wc-accent/5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-wc-text">🔥 حرارة الجمهور</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-wc-secondary">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+              <button onClick={() => setHypeExpanded(false)} className="p-0.5 rounded-full hover:bg-wc-elevated">
+                <ChevronUp size={12} className="text-wc-muted" />
               </button>
-            ) : (
-              <div className="w-full py-2 rounded-full text-center text-[10px] font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
-                أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع ✅
-              </div>
-            )}
+            </div>
           </div>
-        ) : (
-          <button
-            onClick={() => setHypeExpanded(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md bg-wc-surface/80 border border-wc-accent/30 shadow-md shadow-wc-accent/10 hover:bg-wc-surface/95 transition-all animate-in fade-in duration-200"
-          >
-            <span className="text-xs">🔥</span>
-            <span className="text-[10px] font-bold text-wc-accent">{hypeCount.toLocaleString("ar-EG")}</span>
-            <ChevronDown size={10} className="text-wc-muted" />
-          </button>
-        )}
-      </div>
+          <div className="h-2.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
+            <div className={`h-full rounded-full transition-all duration-700 ${hypeTier.barClass}`} style={{ width: `${hypeFill}%` }} />
+          </div>
+          <p className="text-[10px] text-wc-muted text-center mb-2">{hypeTier.label}</p>
+          {!hasTapped ? (
+            <button
+              onClick={() => { setHasTapped(true); setHypeCount((prev) => prev + 1); }}
+              className="w-full py-2 rounded-full font-bold text-wc-accent-foreground text-xs bg-wc-accent active:scale-95 transition-transform"
+            >
+              أشعل الحماس 🔥
+            </button>
+          ) : (
+            <div className="w-full py-2 rounded-full text-center text-[10px] font-bold bg-wc-elevated text-wc-accent border border-wc-accent">
+              أنت من بين {hypeCount.toLocaleString("ar-EG")} مشجع ✅
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={() => setHypeExpanded(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-wc-accent/10 border border-wc-accent/30 hover:bg-wc-accent/15 transition-all"
+        >
+          <span className="text-xs">🔥</span>
+          <span className="text-[10px] font-bold text-wc-accent">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
+          <ChevronDown size={10} className="text-wc-muted" />
+        </button>
+      )}
     </div>
   );
 
