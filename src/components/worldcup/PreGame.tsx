@@ -472,10 +472,10 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
             { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
             { label: "ترتيبك", value: `#${getUserRank()}`, icon: "📈" },
           ].map((stat, i) => (
-            <div key={i} className="rounded-xl p-2.5 text-center bg-wc-elevated border border-wc-border">
-              <span className="text-base">{stat.icon}</span>
-              <p className="text-wc-text font-bold text-sm mt-0.5">{stat.value}</p>
-              <p className="text-[9px] text-wc-muted">{stat.label}</p>
+            <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
+              <span className="text-lg">{stat.icon}</span>
+              <p className="text-wc-text font-bold text-lg mt-1">{stat.value}</p>
+              <p className="text-xs text-wc-muted mt-0.5">{stat.label}</p>
             </div>
           ))}
         </div>
