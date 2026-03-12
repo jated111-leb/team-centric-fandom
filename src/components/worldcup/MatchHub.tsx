@@ -213,6 +213,17 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
             <span>شاهد على TOD 📺</span>
           </button>
         )}
+
+        {/* Post-game — disabled */}
+        {phase === "post" && (
+          <button
+            disabled
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm bg-wc-elevated border border-wc-border text-wc-muted opacity-60 cursor-not-allowed"
+            style={{ height: 46 }}
+          >
+            <span>اللعبة انتهت</span>
+          </button>
+        )}
       </div>
 
       {/* ── Tag Pills ─────────────────────────────────────────────────────── */}
