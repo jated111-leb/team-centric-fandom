@@ -61,10 +61,10 @@ All colors MUST be HSL.
     --shadow-elevated: 0 8px 24px -8px hsl(0 0% 0% / 0.6);
 
     /* World Cup / 1001 mobile tokens — Official Brand Palette */
-    --wc-bg: 240 56% 6%;              /* Carbon Black #000119 */
-    --wc-surface: 240 35% 13%;        /* Ink Navy #15162D */
-    --wc-surface-elevated: 240 53% 10%; /* Midnight Blue #0D0E25 */
-    --wc-accent: 147 83% 44%;         /* Verdant #13CB5C */
+    --wc-bg: 240 29% 15%;             /* Background #1C1D32 */
+    --wc-surface: 240 29% 18%;        /* Surface - slightly lighter */
+    --wc-surface-elevated: 240 29% 13%; /* Elevated surface */
+    --wc-accent: 151 82% 44%;         /* Verdant #13CB5C */
     --wc-accent-foreground: 0 0% 100%;
     --wc-text: 240 4% 93%;            /* Cloud White #EBEBED */
     --wc-text-muted: 240 3% 49%;      /* Slate Grey #757683 */
@@ -74,12 +74,12 @@ All colors MUST be HSL.
     --wc-info: 217 100% 58%;          /* Electric Blue #2B7FFF */
     --wc-success: 151 83% 31%;        /* Success Green #0D9041 */
     --wc-evergreen: 152 78% 10%;      /* Evergreen #042F15 */
-    --wc-border: 240 25% 18%;
+    --wc-border: 240 16% 27%;         /* Border #3B3B4E */
     --wc-gradient-hero: linear-gradient(180deg, hsl(152 78% 10%) 0%, hsl(240 35% 13%) 100%);
     --wc-gradient-card: linear-gradient(135deg, hsl(240 35% 13%) 0%, hsl(152 78% 10%) 100%);
 
     /* Font families */
-    --font-display: 'Inter Display', 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Readex Pro', 'Inter Display', ui-sans-serif, system-ui, sans-serif;
     --font-arabic: 'Readex Pro', 'Inter Display', ui-sans-serif, system-ui, sans-serif;
 
     --sidebar-background: 210 50% 6%;

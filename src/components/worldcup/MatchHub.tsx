@@ -42,6 +42,9 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
   return (
     <div className="flex-1 overflow-y-auto bg-wc-bg">
 
+      {/* ── Phase Tabs (prototype visualization) ──────────────────── */}
+      <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
+
       {/* ── Full-bleed Hero ───────────────────────────────────────────────── */}
       {/* No horizontal margin — goes edge to edge like the TOD screenshot   */}
       <div className="relative w-full" style={{ height: 300 }}>
@@ -182,22 +185,37 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
           <Heart size={17} className={liked ? "text-white fill-white" : "text-wc-text"} />
         </button>
 
-        {/* ذكرني — prominent pill CTA, toggles green when active */}
-        <button
-          onClick={() => setReminded((v) => !v)}
-          className={`flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition-all ${
-            reminded
-              ? "text-white border-0"
-              : "bg-wc-surface border border-wc-border text-wc-muted"
-          }`}
-          style={{
-            height: 46,
-            background: reminded ? "#22c55e" : undefined,
-          }}
-        >
-          <Bell size={15} className={reminded ? "fill-white text-white" : ""} />
-          <span>ذكّرني</span>
-        </button>
+        {/* ذكرني — only in pre-game */}
+        {phase === "pre" && (
+          <button
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm text-white"
+            style={{ height: 46, background: "#22c55e" }}
+          >
+            <Bell size={15} className="fill-white text-white" />
+            <span>ذكّرني</span>
+          </button>
+        )}
+
+        {/* شاهد على TOD — only in live */}
+        {phase === "live" && (
+          <button
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm text-wc-accent-foreground bg-wc-accent"
+            style={{ height: 46 }}
+          >
+            <span>شاهد على TOD 📺</span>
+          </button>
+        )}
+
+        {/* Post-game — disabled */}
+        {phase === "post" && (
+          <button
+            disabled
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl font-bold text-sm bg-wc-elevated border border-wc-border text-wc-muted opacity-60 cursor-not-allowed"
+            style={{ height: 46 }}
+          >
+            <span>اللعبة انتهت</span>
+          </button>
+        )}
       </div>
 
       {/* ── Tag Pills ─────────────────────────────────────────────────────── */}
@@ -256,23 +274,20 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
         </div>
       )}
 
-      {/* Live: Watch on TOD strip */}
-      {phase === "live" && (
-        <div className="px-4 pt-3 pb-2">
-          <button className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 bg-wc-danger">
-            شاهد على TOD
-          </button>
-        </div>
-      )}
 
       {/* ── Divider ───────────────────────────────────────────────────────── */}
       <div className="h-px mx-4 my-3 bg-wc-border" />
 
-      {/* ── Phase Tabs + Engagement Layer ─────────────────────────────────── */}
-      <PhaseIndicator activePhase={phase} onPhaseChange={setPhase} />
+      {/* ── Phase Engagement Layer ─────────────────────────────────── */}
 
       {phase === "pre" && (
-        <PreGame todActivated={todActivated} onActivateTod={() => setTodActivated(true)} />
+        <PreGame
+          todActivated={todActivated}
+          onActivateTod={() => setTodActivated(true)}
+          onNavigateToSubscription={onNavigateToSubscription}
+          userId={userProfile?.id ?? null}
+          username={userProfile?.username ?? userProfile?.display_name ?? null}
+        />
       )}
       {phase === "live" && (
         <InGame

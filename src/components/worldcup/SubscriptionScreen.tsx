@@ -19,7 +19,7 @@ const SubscriptionScreen = ({ onBack, userProfile, onSubscribed }: SubscriptionS
     setSubscribing(true);
 
     if (userProfile?.id) {
-      await supabase
+      await (supabase as any)
         .from("profiles")
         .update({
           is_subscribed: true,
