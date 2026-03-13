@@ -169,8 +169,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
   };
 
 
-  const totalPoints = getTotalPoints();
-  const accuracy = getQuizAccuracy();
 
   // ── Pinned Hype Widget (above chat) ──
   const renderPinnedHype = () => (

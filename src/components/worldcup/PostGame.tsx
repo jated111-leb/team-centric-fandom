@@ -16,7 +16,6 @@ const PostGame = () => {
   const [reminded, setReminded] = useState(false);
   const [totalPoints, setTotalPoints] = useState(getTotalPoints);
   const [userRank, setUserRank] = useState(getUserRank);
-  const [accuracy] = useState(getQuizAccuracy);
   const [predictionCorrect] = useState(() => getPrediction() === "A");
   const [leaderboardKey, setLeaderboardKey] = useState(0);
 
