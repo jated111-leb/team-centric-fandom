@@ -341,7 +341,17 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           ]).map((opt) => (
             <button
               key={opt.key}
-              onClick={() => { setPrediction(opt.key); savePrediction(opt.key); }}
+              onClick={() => {
+                setVotes((prev) => {
+                  const updated = { ...prev, [opt.key]: prev[opt.key] + 1 };
+                  if (prediction && prediction !== opt.key) {
+                    updated[prediction as "A" | "draw" | "B"] = Math.max(0, updated[prediction as "A" | "draw" | "B"] - 1);
+                  }
+                  return updated;
+                });
+                setPrediction(opt.key);
+                savePrediction(opt.key);
+              }}
               className={`flex-1 py-2.5 rounded-full text-xs font-bold transition-all ${
                 prediction === opt.key ? "bg-wc-info text-white" : "bg-wc-elevated text-wc-muted"
               }`}
