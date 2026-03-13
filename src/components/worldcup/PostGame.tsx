@@ -4,7 +4,6 @@ import { mockRelatedContent } from "@/lib/worldcupMockData";
 import {
   getTotalPoints,
   getUserRank,
-  getQuizAccuracy,
   getPrediction,
   awardPredictionPoints,
 } from "@/lib/pointsStore";
