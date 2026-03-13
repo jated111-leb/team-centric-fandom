@@ -265,7 +265,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
               <p className={`text-[10px] font-bold ${preQuizSelected === currentQuiz.correctIndex ? "text-wc-accent" : "text-wc-danger"}`}>
                 {preQuizSelected === currentQuiz.correctIndex
                   ? `🎉 صح! +${currentQuiz.points} نقطة`
-                  : `❌ الإجابة: ${currentQuiz.options[currentQuiz.correctIndex]}`}
+                  : `❌ الصحيح: ${currentQuiz.options[currentQuiz.correctIndex]}`}
               </p>
               <button onClick={handleNextQuiz} className="text-[9px] text-wc-accent underline">التالي ›</button>
             </div>
@@ -330,7 +330,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
       {/* ── Prediction ──────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-wc-text font-bold text-sm">من سيفوز؟</h3>
+          <h3 className="text-wc-text font-bold text-sm">من تتوقع الفوز؟</h3>
           {prediction && <span className="text-[10px] text-wc-muted">{total.toLocaleString()} صوت</span>}
         </div>
         <div className="flex gap-2">

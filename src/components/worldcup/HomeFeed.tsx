@@ -33,7 +33,7 @@ const HomeFeed = ({ onNavigateToMatch, onNavigateToSubscription }: HomeFeedProps
 
     {/* 1001 Originals */}
     <div className="mt-5 px-4">
-      <h3 className="text-white font-bold text-sm mb-3">1001 أصلية</h3>
+      <h3 className="text-white font-bold text-sm mb-3">حصرياً على 1001</h3>
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide" style={{ direction: "ltr" }}>
         {mockOriginals.map((item) => (
           <div key={item.id} className="flex-shrink-0 w-[120px]">
@@ -75,7 +75,7 @@ const HomeFeed = ({ onNavigateToMatch, onNavigateToSubscription }: HomeFeedProps
         <div className="p-5">
           <div className="text-3xl mb-1">⚽🏆</div>
           <h2 className="text-white font-bold text-xl leading-tight">كأس العالم 2026</h2>
-          <p className="text-xs mt-1" style={{ color: "#8B949E" }}>تابع المباريات · تفاعل مع الجمهور</p>
+          <p className="text-xs mt-1" style={{ color: "#8B949E" }}>مباشر · تعليق عربي · تفاعل مع الجمهور</p>
           <div className="mt-3 inline-flex items-center gap-1 px-4 py-2 rounded-full text-xs font-bold text-white" style={{ background: "#2ECC71" }}>
             <span>جدول المباريات</span>
             <ChevronLeft size={14} />

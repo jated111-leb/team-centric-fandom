@@ -554,7 +554,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
     <div className="flex flex-col px-4 pb-4 gap-3">
       <div className="rounded-2xl p-3 bg-wc-surface border border-wc-border">
         <p className="text-[10px] text-wc-muted mb-2 text-center">
-          محاكاة حدث في المباراة
+          جرّب أحداث المباراة المباشرة
         </p>
         <div className="flex gap-2">
           {(Object.entries(EVENT_CONFIG) as [EventType, (typeof EVENT_CONFIG)[EventType]][]).map(
@@ -703,7 +703,7 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
               >
                 {quizSelected === activeQuiz.correctIndex
                   ? `🎉 صح! +${activeQuiz.points} نقطة`
-                  : `❌ الإجابة: ${activeQuiz.options[activeQuiz.correctIndex]}`}
+                  : `❌ الصحيح: ${activeQuiz.options[activeQuiz.correctIndex]}`}
               </p>
             )}
           </div>

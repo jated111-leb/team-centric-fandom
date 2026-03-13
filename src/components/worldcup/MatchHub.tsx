@@ -236,10 +236,13 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
           <p className="text-xs text-wc-muted font-medium">
             الأربعاء 18 يونيو 2026 · 9:00 م بتوقيت بغداد
           </p>
+          <p className="text-[11px] text-wc-muted mt-1 leading-relaxed">
+            أول ظهور عراقي في كأس العالم منذ 1986 — الحدث الكروي الأكبر يبدأ الليلة.
+          </p>
 
           {/* Countdown */}
           <div className="mt-4 mb-1">
-            <p className="text-[11px] text-wc-muted mb-2 text-center">تبدأ المباراة خلال</p>
+            <p className="text-[11px] text-wc-muted mb-2 text-center">تبدأ الإثارة خلال</p>
             <div className="flex items-end justify-center gap-2">
               {[
                 { val: countdown.h, label: "ساعة" },
