@@ -6,9 +6,7 @@ import {
   recordQuizAnswer,
   savePrediction,
   getPrediction,
-  getTotalPoints,
   getUserRank,
-  getQuizAccuracy,
   getPlayerData,
   setUsername as storeSetUsername,
 } from "@/lib/pointsStore";
