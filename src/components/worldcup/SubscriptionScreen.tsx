@@ -75,7 +75,7 @@ const SubscriptionScreen = ({ onBack, userProfile, onSubscribed }: SubscriptionS
         <p className="text-xs mt-3 leading-relaxed text-wc-muted">
           شاهد فوراً على StarzPlay و TOD والمزيد.
           <br />
-          استمتع بالمشاهدة على تطبيقاتهم الرسمية بدون أي عناء.
+          انتقل لتطبيقاتهم الرسمية مباشرة — بلا إعادة تسجيل.
         </p>
       </div>
 
@@ -95,7 +95,7 @@ const SubscriptionScreen = ({ onBack, userProfile, onSubscribed }: SubscriptionS
           </button>
         )}
         <button className="w-full text-center text-sm font-medium text-wc-accent">
-          اختر خطة
+          استكشف الخطط
         </button>
       </div>
     </div>

@@ -55,7 +55,7 @@ const PostGame = () => {
 
       {/* Your Match Stats */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">إحصائياتك</h3>
+        <h3 className="text-wc-text font-bold text-sm mb-3">كيف كان أداؤك؟</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
@@ -104,7 +104,7 @@ const PostGame = () => {
       {/* Related Content */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-wc-text font-bold text-sm">استمر في المشاهدة</h3>
+          <h3 className="text-wc-text font-bold text-sm">استكشف المزيد</h3>
           <span className="text-[10px] text-wc-accent">عرض الكل ›</span>
         </div>
         <div className="space-y-3">
@@ -163,7 +163,7 @@ const PostGame = () => {
         <Share2 size={20} className="text-wc-accent" />
         <div className="flex-1">
           <p className="text-wc-text text-sm font-bold">ادعُ صديقاً للمباراة القادمة</p>
-          <p className="text-[10px] text-wc-muted">شارك التجربة مع أصدقائك</p>
+          <p className="text-[10px] text-wc-muted">لا تشاهد المباراة القادمة وحدك!</p>
         </div>
         <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">
           شارك
@@ -180,7 +180,7 @@ const PostGame = () => {
             </button>
           ))}
         </div>
-        {rating > 0 && <p className="text-xs text-wc-accent">شكراً لتقييمك! ⭐</p>}
+        {rating > 0 && <p className="text-xs text-wc-accent">شكراً! رأيك يساعدنا ⭐</p>}
       </div>
     </div>
   );

@@ -78,7 +78,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         {!todActivated ? (
           <div className="space-y-1.5">
             <p className="text-xs text-wc-muted">✅ اشتراكك في 1001 يشمل TOD</p>
-            <p className="text-xs text-wc-muted">📲 اضغط أدناه لتفعيل حسابك في TOD</p>
+            <p className="text-xs text-wc-muted">📲 فعّل حسابك في TOD بضغطة واحدة</p>
             <p className="text-xs text-wc-muted">📺 افتح تطبيق TOD عند بداية المباراة</p>
             <button
               onClick={onActivateTod}
@@ -106,7 +106,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-wc-text font-bold text-base">🔥 حرارة الجمهور</h3>
           <span className="text-sm text-wc-secondary font-medium">
-            {hypeCount.toLocaleString("ar-EG")} مشجع
+            {hypeCount.toLocaleString("ar-EG")} مشجع حول العالم
           </span>
         </div>
         <div className="h-3.5 rounded-full mb-2 overflow-hidden bg-wc-elevated">
@@ -136,7 +136,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
       {/* ── Prediction (with live vote trickle) ─────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-wc-text font-bold text-sm">من سيفوز؟</h3>
+          <h3 className="text-wc-text font-bold text-sm">من تتوقع الفوز؟</h3>
           {prediction && (
             <span className="text-[10px] text-wc-muted">{total.toLocaleString()} صوت</span>
           )}
@@ -232,7 +232,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
             >
               {preQuizSelected === currentQuiz.correctIndex
                 ? `🎉 إجابة صحيحة! +${currentQuiz.points} نقطة`
-                : `❌ الإجابة: ${currentQuiz.options[currentQuiz.correctIndex]}`}
+                : `❌ الصحيح: ${currentQuiz.options[currentQuiz.correctIndex]}`}
             </p>
             <button onClick={handleNextQuiz} className="text-[10px] text-wc-accent underline">
               السؤال التالي ›
@@ -246,7 +246,7 @@ const PreGame = ({ todActivated, onActivateTod }: PreGameProps) => {
         <Share2 size={20} className="text-wc-accent flex-shrink-0" />
         <div className="flex-1">
           <p className="text-wc-text text-sm font-bold">ادعُ صديقاً</p>
-          <p className="text-[10px] text-wc-muted">شاركه الرابط وينضم للدردشة</p>
+          <p className="text-[10px] text-wc-muted">لا تشاهد وحدك — شارك الإثارة مع صديق</p>
         </div>
         <button className="px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">
           شارك
