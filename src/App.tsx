@@ -76,6 +76,7 @@ const App = () => (
             }
           />
           <Route path="/world-cup" element={<WorldCup />} />
+          <Route path="/la-liga" element={<LaLiga />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route
             path="*"
