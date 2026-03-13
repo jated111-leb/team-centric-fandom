@@ -572,29 +572,6 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
         </div>
       </div>
 
-      {/* ── Friends + Rank Row ───────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <div className="flex -space-x-1.5" style={{ direction: "ltr" }}>
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] bg-wc-elevated border-2 border-wc-bg"
-              >
-                👤
-              </div>
-            ))}
-          </div>
-          <span className="text-[11px] text-wc-muted">3 أصدقاء يشاهدون</span>
-        </div>
-        <button
-          onClick={() => setShowLeaderboard(!showLeaderboard)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-wc-elevated border border-wc-border"
-        >
-          <Trophy size={12} className="text-wc-warning" />
-          <span className="text-xs font-bold text-wc-text">#{userRank}</span>
-        </button>
-      </div>
 
       {/* ── Leaderboard (expandable) ─────────────────────────────────────── */}
       {showLeaderboard && (
