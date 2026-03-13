@@ -1,75 +1,91 @@
 
-What I found
 
-- The admin-route warn item is already addressed in code:
-  - `src/App.tsx` now uses `<ProtectedRoute requireAdmin>` for `/admin`, `/admin/notification-logs`, `/admin/analytics`, and `/copilot`.
-  - `src/components/ProtectedRoute.tsx` now checks `user_roles` before rendering admin-only routes.
-- The remaining warn issue is the public `braze-webhook` endpoint:
-  - `supabase/functions/braze-webhook/index.ts` currently accepts unauthenticated POSTs.
-  - Your Braze webhook step currently has no auth header, no query token, and no body secret.
-- You chose `URL token` as the protection method.
-- Important technical nuance: the scan’s recommendation to switch some functions to `verify_jwt = true` is outdated for this project setup. Current guidance is to keep public/admin functions at `verify_jwt = false` and validate JWTs in code with `getClaims()`. So I would not apply that config change.
+# Plan: Create La Liga Fan Hub Page
 
-Plan
+## Overview
+Clone the World Cup fan hub as a separate `/la-liga` page connected to real match data from the database. Replace all TOD branding with **فدشي** (Fedshi). Add a dummy video player area. When multiple La Liga matches overlap, auto-select Real Madrid or Barcelona matches as priority.
 
-1. Secure the Braze webhook with a URL token
-   - Generate/store a new secret token for Braze webhook auth.
-   - Keep `braze-webhook` as a public function (`verify_jwt = false`) because Braze is the caller.
-   - Add server-side validation in `supabase/functions/braze-webhook/index.ts` that rejects requests unless a required query parameter token matches the stored secret.
-   - Do the token check before any payload parsing or database work.
-   - Return `401` for missing/invalid token and avoid logging the token value.
+## Key Differences from World Cup
 
-2. Keep the Braze payload contract unchanged
-   - Preserve the existing JSON body shape (`events`, `dispatch_id`, `properties.match_id`, etc.).
-   - Do not alter the webhook analytics/deduplication logic beyond adding request authentication.
-   - This minimizes risk to the current Canvas delivery-tracking flow.
+1. **Brand: فدشي (not TOD, not 1001)** -- copy the uploaded logo files into `src/assets/` and use them in place of `tod-logo.png`
+2. **Dummy video player** -- a placeholder video player area (dark rectangle with play icon) embedded in the live phase, representing in-app viewing (La Liga is playable within the app)
+3. **Real match data** from `matches` table (`competition = 'PD'`) with Arabic team names from `team_translations`
+4. **Smart match selection** -- when multiple matches share the same date/time, prioritize Real Madrid CF or FC Barcelona; user can also manually switch between matches
 
-3. Align Braze configuration with the new protection
-   - Update the webhook URL in Braze from:
-     `.../functions/v1/braze-webhook`
-     to:
-     `.../functions/v1/braze-webhook?token=...`
-   - No request-header changes are needed since you selected URL-token auth.
-   - Existing body mapping can remain as-is.
+## Files to Create
 
-4. Treat the admin-route warning as fixed
-   - The current `ProtectedRoute` implementation already covers the warn-level client-side access issue.
-   - I would validate that this matches the intended UX:
-     - unauthenticated users go to `/auth`
-     - authenticated non-admins are redirected to `/`
-     - admins can access protected admin pages
+### 1. `src/assets/fedshi-logo.png` (copy from uploaded Fadshiii.png -- green on dark)
+### 2. `src/lib/laligaMockData.ts`
+- La Liga-themed quiz questions (about La Liga history, El Clasico, Messi/Ronaldo records)
+- La Liga-themed chat usernames ("مدريدي عتيق", "كوليه حتى النخاع", "عاشق الليغا")
+- La Liga-themed chat auto-messages
 
-5. Handle the stale scan guidance correctly
-   - Do not change `braze-canvas-test` and `growth-copilot` to `verify_jwt = true`.
-   - Their current pattern—`verify_jwt = false` plus explicit JWT/admin validation in code—is the correct approach here.
-   - After implementation, I would update the security findings so:
-     - `client_role_checks` can be cleared
-     - `webhook_endpoints_open` is resolved based on URL-token verification rather than Braze signature validation
-     - non-warn findings remain untouched, per your instruction
+### 3. `src/pages/LaLiga.tsx`
+- Same structure as `WorldCup.tsx` but queries `matches` table for `competition = 'PD'`
+- Fetches upcoming/live/finished matches ordered by date
+- Auto-selects the "best" match: prioritize LIVE > today > next upcoming; within same timeslot, prefer Real Madrid or Barcelona
+- Horizontal match picker at top for switching between same-day matches
+- Passes selected match data (team names, scores, status, utc_date) to `LaLigaMatchHub`
 
-Technical details
+### 4. `src/components/laliga/LaLigaMatchHub.tsx`
+- Copy of `MatchHub.tsx` adapted to accept dynamic match props
+- Hero: team initials in large circles instead of emoji flags (La Liga teams don't have emoji flags)
+- Phase auto-derived from match `status`: SCHEDULED/TIMED -> pre, IN_PLAY/PAUSED -> live, FINISHED -> post (phase toggle still available for prototype testing)
+- Countdown computed from real `utc_date` in Baghdad timezone
+- Scores from `score_home`/`score_away`
+- Match title uses Arabic team names from `team_translations`
+- Tags: "الدوري الإسباني", "تعليق عربي", "2025/26"
+- Action buttons: "شاهد على فدشي 📺" (not TOD), and in live phase this scrolls to the embedded player
 
-- Files involved:
-  - `supabase/functions/braze-webhook/index.ts`
-  - potentially security findings only; no database schema change is needed
-- No migration is needed:
-  - this is an edge-function hardening change, not a table/RLS change
-- RLS context is already appropriate:
-  - `user_roles` allows users to read their own role, which supports the current `ProtectedRoute` admin check
-- Security behavior after the fix:
-  - public callers without the token get rejected
-  - Braze keeps working once its webhook URL includes the token
-  - admin UI access remains role-gated on the client and protected server-side by existing backend rules
+### 5. `src/components/laliga/LaLigaPreGame.tsx`
+- Copy of `PreGame.tsx` with:
+  - فدشي logo/branding instead of TOD
+  - "شاهد الدوري الإسباني مباشرة على فدشي" subscription card
+  - "شاهد الآن" button (in-app, not external redirect)
+  - Dynamic team names in prediction labels (from match props)
+  - La Liga chat messages and quizzes from `laligaMockData.ts`
 
-Implementation notes I would follow
+### 6. `src/components/laliga/LaLigaInGame.tsx`
+- Copy of `InGame.tsx` with:
+  - **Dummy video player** at the top: a dark 16:9 rectangle with a play button overlay and "مباشر على فدشي" badge -- representing the in-app stream
+  - La Liga chat messages and quizzes
+  - فدشي branding throughout
 
-- Validate token from URL query params, not request body.
-- Fail closed if the secret is missing in backend configuration.
-- Keep the webhook’s CORS/OPTIONS handling intact.
-- Avoid adding the token to logs, responses, or stored payloads.
+### 7. `src/components/laliga/LaLigaPostGame.tsx`
+- Copy of `PostGame.tsx` with dynamic team names and scores from match data
 
-Most likely next implementation sequence
+## Files to Modify
 
-1. Add the webhook token verification to `braze-webhook`
-2. Keep current admin-route changes as the fix for the client-side warn item
-3. Re-run / reconcile the security findings so only the warn issues are closed with the correct rationale
+### 8. `src/App.tsx`
+- Add `/la-liga` route pointing to `LaLiga` page (no auth required)
+
+## Match Selection Logic
+
+```text
+1. Query: matches WHERE competition='PD' AND match_date >= today, ORDER BY utc_date ASC, LIMIT 30
+2. Group by match_date
+3. For the nearest matchday with matches:
+   a. If any match is IN_PLAY/PAUSED → select it (prefer RM/Barca if multiple live)
+   b. Else pick TIMED/SCHEDULED match where home_team or away_team contains "Real Madrid" or "Barcelona"
+   c. Else pick the first match of the day
+4. Show all same-day matches in horizontal picker for manual switching
+5. Only the selected match gets the full engagement layer (chat, quizzes, predictions)
+```
+
+## Dummy Video Player (Live Phase)
+
+A styled placeholder box at the top of `LaLigaInGame`:
+- Dark background (16:9 aspect ratio)
+- Centered play triangle icon
+- "مباشر" red badge in corner
+- "فدشي" watermark
+- Tapping shows a toast: "البث المباشر سيتوفر قريباً" (Coming soon)
+
+## No Database Changes Required
+- `matches` and `team_translations` tables already have public SELECT RLS policies
+- No new tables needed
+
+## Shared Components (reused, not copied)
+- `StatusBar`, `BottomTabBar`, `PhaseIndicator`, `MiniLeaderboard`, `UserStatsCard`
+- `pointsStore` (same points system across both experiences)
+
