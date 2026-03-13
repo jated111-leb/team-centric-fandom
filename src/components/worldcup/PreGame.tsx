@@ -13,6 +13,7 @@ import {
   setUsername as storeSetUsername,
 } from "@/lib/pointsStore";
 import MiniLeaderboard from "./MiniLeaderboard";
+import UserStatsCard from "./UserStatsCard";
 import todLogo from "@/assets/tod-logo.png";
 
 interface PreGameProps {

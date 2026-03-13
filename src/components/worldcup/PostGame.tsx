@@ -9,6 +9,7 @@ import {
   awardPredictionPoints,
 } from "@/lib/pointsStore";
 import MiniLeaderboard from "./MiniLeaderboard";
+import UserStatsCard from "./UserStatsCard";
 
 const PostGame = () => {
   const [rating, setRating] = useState(0);
