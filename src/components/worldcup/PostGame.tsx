@@ -4,18 +4,17 @@ import { mockRelatedContent } from "@/lib/worldcupMockData";
 import {
   getTotalPoints,
   getUserRank,
-  getQuizAccuracy,
   getPrediction,
   awardPredictionPoints,
 } from "@/lib/pointsStore";
 import MiniLeaderboard from "./MiniLeaderboard";
+import UserStatsCard from "./UserStatsCard";
 
 const PostGame = () => {
   const [rating, setRating] = useState(0);
   const [reminded, setReminded] = useState(false);
   const [totalPoints, setTotalPoints] = useState(getTotalPoints);
   const [userRank, setUserRank] = useState(getUserRank);
-  const [accuracy] = useState(getQuizAccuracy);
   const [predictionCorrect] = useState(() => getPrediction() === "A");
   const [leaderboardKey, setLeaderboardKey] = useState(0);
 
@@ -88,22 +87,7 @@ const PostGame = () => {
         </div>
       </div>
 
-      {/* Your Match Stats */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">كيف كان أداؤك؟</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
-            { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
-          ].map((stat, i) => (
-            <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
-              <span className="text-lg">{stat.icon}</span>
-              <p className="text-wc-text font-bold text-lg mt-1">{stat.value}</p>
-              <p className="text-xs text-wc-muted mt-0.5">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <UserStatsCard refreshKey={leaderboardKey} />
 
       {/* Mini Leaderboard */}
       <MiniLeaderboard refreshKey={leaderboardKey} />

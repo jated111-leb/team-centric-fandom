@@ -6,13 +6,12 @@ import {
   recordQuizAnswer,
   savePrediction,
   getPrediction,
-  getTotalPoints,
   getUserRank,
-  getQuizAccuracy,
   getPlayerData,
   setUsername as storeSetUsername,
 } from "@/lib/pointsStore";
 import MiniLeaderboard from "./MiniLeaderboard";
+import UserStatsCard from "./UserStatsCard";
 import todLogo from "@/assets/tod-logo.png";
 
 interface PreGameProps {
@@ -170,8 +169,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
   };
 
 
-  const totalPoints = getTotalPoints();
-  const accuracy = getQuizAccuracy();
 
   // ── Pinned Hype Widget (above chat) ──
   const renderPinnedHype = () => (
@@ -457,22 +454,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
       </div>
 
 
-      {/* ── User Stats ──────────────────────────────────────────────── */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <h3 className="text-wc-text font-bold text-sm mb-3">📊 إحصائياتك</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: "مجموع النقاط", value: totalPoints.toLocaleString("ar-EG"), icon: "🏆" },
-            { label: "دقة الأجوبة", value: accuracy > 0 ? `${accuracy}%` : "—", icon: "🎯" },
-          ].map((stat, i) => (
-            <div key={i} className="rounded-xl p-3 text-center bg-wc-elevated border border-wc-border">
-              <span className="text-lg">{stat.icon}</span>
-              <p className="text-wc-text font-bold text-lg mt-1">{stat.value}</p>
-              <p className="text-xs text-wc-muted mt-0.5">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <UserStatsCard refreshKey={leaderboardKey} />
 
       {/* ── Mini Leaderboard ────────────────────────────────────────── */}
       <MiniLeaderboard refreshKey={leaderboardKey} />
