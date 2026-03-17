@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { Calendar, Settings, BarChart3, FileText, RefreshCw, LogOut, Sparkles } from "lucide-react";
+import { Calendar, Settings, BarChart3, FileText, RefreshCw, LogOut, Sparkles, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -125,6 +125,18 @@ export function AppSidebar() {
                 >
                   <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                   <span>{isRefreshing ? 'Syncing...' : 'Refresh Data'}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/world-cup"}
+                  tooltip="World Cup Prototype"
+                >
+                  <NavLink to="/world-cup">
+                    <Trophy className="h-4 w-4" />
+                    <span>World Cup Prototype</span>
+                  </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
