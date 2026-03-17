@@ -127,6 +127,18 @@ export function AppSidebar() {
                   <span>{isRefreshing ? 'Syncing...' : 'Refresh Data'}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/world-cup"}
+                  tooltip="World Cup Prototype"
+                >
+                  <NavLink to="/world-cup">
+                    <Trophy className="h-4 w-4" />
+                    <span>World Cup Prototype</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
