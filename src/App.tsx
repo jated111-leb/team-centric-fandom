@@ -75,8 +75,8 @@ const App = () => (
               </ProtectedRoute>
             }
           />
-          <Route path="/world-cup" element={<WorldCup />} />
-          <Route path="/la-liga" element={<LaLiga />} />
+          <Route path="/world-cup" element={<ProtectedRoute requireAdmin><WorldCup /></ProtectedRoute>} />
+          <Route path="/la-liga" element={<ProtectedRoute requireAdmin><LaLiga /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route
             path="*"
