@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { Calendar, Settings, BarChart3, FileText, RefreshCw, LogOut, Sparkles } from "lucide-react";
+import { Calendar, Settings, BarChart3, FileText, RefreshCw, LogOut, Sparkles, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
