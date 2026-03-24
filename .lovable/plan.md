@@ -1,43 +1,56 @@
 
 
-# Plan: Append-Only Google Sheets Sync
+# Plan: Fix Google Sheets Sync Issues
 
-## Overview
-Rewrite the `google-sheets-sync` edge function to use append-only logic with in-place updates. All matches are synced (no featured-teams filter). Existing rows are updated when match data changes; new matches are appended. Rows are never deleted.
+## Three Problems & Solutions
 
-## File to Modify
+### A. 1000-row limit cutting off matches after March 7
 
-### `supabase/functions/google-sheets-sync/index.ts`
+**Root cause**: Despite `.limit(5000)` in the edge function, the Supabase client defaults to 1000 rows per request.
 
-**Changes:**
+**Fix**: Use pagination in `google-sheets-sync/index.ts` -- fetch matches in batches of 1000 using `.range(offset, offset + 999)` until no more rows are returned, then merge all results before writing to the sheet.
 
-1. **Remove featured-teams filter** -- delete the `featured_teams` query and the `.or()` filter. Query all matches with `.limit(5000)`.
+### B. Missing Arabic team names
 
-2. **Add Match ID column** as the first column (used as the unique key for row matching).
+**Root cause**: The `team_translations` table doesn't have entries for every team across all competitions. Many non-featured teams were never translated.
 
-3. **Add "Last Synced" column** as the last column with a UTC timestamp.
+**Fix**: In `sync-football-data/index.ts`, after upserting each match, auto-insert missing team names into `team_translations` with a blank `arabic_name` as a placeholder. Then add a UI indicator on the Team Translations page showing untranslated teams so you can fill them in. Also in the sheets sync, fall back to the English name when no Arabic translation exists (instead of showing blank).
 
-4. **New sync logic:**
-   - `GET` existing sheet data via `values:get`
-   - Build a map of `{ matchId → rowNumber }` from existing rows
-   - For each DB match:
-     - If Match ID exists in sheet → update that row in place via `values:update`
-     - If Match ID is new → collect for batch append
-   - Use `values:batchUpdate` for updates and `values:append` for new rows
-   - Never call `clear` (removed)
+### C. Past matches stuck on "TIMED" status
 
-5. **New headers:**
-   ```
-   Match ID | Competition | Competition (AR) | Matchday | Date | Time (Baghdad) | Home Team | Home Team (AR) | Away Team | Away Team (AR) | Status | Score | Stage | Priority | Priority Score | Reason | Last Synced
-   ```
+**Root cause**: `sync-football-data` only queries `daysAhead` (default 30 days into the future). Past matches that were "TIMED" when last synced never get re-checked for FINISHED status.
 
-## No other files change. No database changes needed.
+**Fix**: In `sync-football-data/index.ts`, add a second pass that queries the DB for matches with `status = 'TIMED'` and `match_date < today`, then re-fetches those specific matches from the football API by match ID to update their status and scores.
+
+## Files to Modify
+
+### 1. `supabase/functions/google-sheets-sync/index.ts`
+- Replace single `.limit(5000)` query with a pagination loop fetching 1000 rows at a time
+- In `matchToRow`, use English name as fallback when Arabic translation is empty: `teamMap.get(name) || name`
+
+### 2. `supabase/functions/sync-football-data/index.ts`
+- After the main competition loop, add a "stale match refresh" step:
+  - Query DB for matches where `status IN ('TIMED', 'SCHEDULED')` and `match_date < today`
+  - For each, call `football-data.org/v4/matches/{id}` to get current status/score
+  - Upsert the updated data
+- After upserting each match, check if home/away team exists in `team_translations`; if not, insert a row with blank `arabic_name`
+
+## No Database Changes Required
 
 ## Technical Details
-- Uses Sheets API `values:get` to read existing data before writing
-- Uses `values:batchUpdate` for efficient in-place row updates
-- Uses `values:append` for new rows at the bottom
-- Match ID (integer from football-data.org) is the unique key
-- Old/past/postponed matches remain in the sheet indefinitely
-- Date range filter removed from the query so historical matches also get updated if their status changes
+
+**Pagination pattern for Supabase**:
+```text
+let allMatches = [];
+let offset = 0;
+while (true) {
+  const { data } = await supabase.from('matches').select('*')
+    .order('match_date').range(offset, offset + 999);
+  if (!data || data.length === 0) break;
+  allMatches.push(...data);
+  offset += 1000;
+}
+```
+
+**Stale match refresh** uses the football-data.org single-match endpoint (`/v4/matches/{id}`) which doesn't count against competition-level rate limits. We batch these with 1-second delays to respect rate limits.
 
