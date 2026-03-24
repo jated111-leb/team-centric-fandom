@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
     try { body = await req.json(); } catch { body = {}; }
 
     const isInternalCall = body._internal === true;
+    const clearSheet = body.clearSheet === true;
 
     if (!isInternalCall) {
       const authHeader = req.headers.get('Authorization');
