@@ -5,6 +5,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const COMPETITION_MAP: Record<string, string> = {
+  PD: 'LaLiga',
+  PL: 'Premier League',
+  SA: 'Serie A',
+  FL1: 'Ligue 1',
+  DED: 'Eredivisie',
+  CL: 'Champions League',
+  EL: 'Europa League',
+  ECL: 'Conference League',
+  ELC: 'Carabao Cup',
+};
+
+const HEADERS = [
+  'Match ID', 'Competition', 'Competition (AR)', 'Matchday', 'Date', 'Time (Baghdad)',
+  'Home Team', 'Home Team (AR)', 'Away Team', 'Away Team (AR)',
+  'Status', 'Score', 'Stage', 'Priority', 'Priority Score', 'Reason', 'Last Synced',
+];
+
 async function getGoogleAccessToken(serviceAccount: any): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'RS256', typ: 'JWT' };
@@ -61,12 +79,6 @@ async function getGoogleAccessToken(serviceAccount: any): Promise<string> {
   return tokenData.access_token;
 }
 
-const HEADERS = [
-  'Match ID', 'Competition', 'Competition (AR)', 'Matchday', 'Date', 'Time (Baghdad)',
-  'Home Team', 'Home Team (AR)', 'Away Team', 'Away Team (AR)',
-  'Status', 'Score', 'Stage', 'Priority', 'Priority Score', 'Reason', 'Last Synced',
-];
-
 function matchToRow(m: any, teamMap: Map<string, string>, compMap: Map<string, string>): string[] {
   return [
     m.id.toString(),
@@ -87,6 +99,123 @@ function matchToRow(m: any, teamMap: Map<string, string>, compMap: Map<string, s
     m.priority_reason || '',
     new Date().toISOString(),
   ];
+}
+
+interface SyncResult {
+  sheetName: string;
+  updated: number;
+  appended: number;
+  total: number;
+}
+
+async function syncSheet(
+  sheetName: string,
+  matches: any[],
+  teamMap: Map<string, string>,
+  compMap: Map<string, string>,
+  sheetsApiBase: string,
+  authHeaders: Record<string, string>,
+  clearSheet: boolean,
+): Promise<SyncResult> {
+  const encodedName = encodeURIComponent(sheetName);
+
+  // Clear if requested
+  if (clearSheet) {
+    await fetch(`${sheetsApiBase}/values/${encodedName}!A:Z:clear`, {
+      method: 'POST',
+      headers: authHeaders,
+    });
+    await fetch(`${sheetsApiBase}/values/${encodedName}!A1?valueInputOption=RAW`, {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({ range: `${sheetName}!A1`, majorDimension: 'ROWS', values: [HEADERS] }),
+    });
+  }
+
+  // Read existing data
+  const getResponse = await fetch(`${sheetsApiBase}/values/${encodedName}!A:Q`, { headers: authHeaders });
+  if (!getResponse.ok) {
+    const err = await getResponse.text();
+    console.warn(`⚠️ Could not read sheet "${sheetName}": ${err}. Skipping.`);
+    return { sheetName, updated: 0, appended: 0, total: matches.length };
+  }
+
+  let existingRows: string[][] = [];
+  const getData = await getResponse.json();
+  existingRows = getData.values || [];
+
+  // Build matchId → row number map
+  const existingMap = new Map<string, number>();
+  for (let i = 1; i < existingRows.length; i++) {
+    const matchId = existingRows[i][0];
+    if (matchId) existingMap.set(matchId, i + 1);
+  }
+
+  // Write headers if empty
+  if (existingRows.length === 0) {
+    await fetch(`${sheetsApiBase}/values/${encodedName}!A1?valueInputOption=RAW`, {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({ range: `${sheetName}!A1`, majorDimension: 'ROWS', values: [HEADERS] }),
+    });
+  }
+
+  // Separate updates vs appends
+  const updateData: { range: string; values: string[][] }[] = [];
+  const appendRows: string[][] = [];
+
+  for (const m of matches) {
+    const row = matchToRow(m, teamMap, compMap);
+    const matchId = m.id.toString();
+    const existingRowNum = existingMap.get(matchId);
+
+    if (existingRowNum) {
+      updateData.push({
+        range: `${sheetName}!A${existingRowNum}:Q${existingRowNum}`,
+        values: [row],
+      });
+    } else {
+      appendRows.push(row);
+    }
+  }
+
+  let updatedCount = 0;
+  let appendedCount = 0;
+
+  // Batch update existing rows
+  if (updateData.length > 0) {
+    const batchRes = await fetch(`${sheetsApiBase}/values:batchUpdate`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ valueInputOption: 'RAW', data: updateData }),
+    });
+    if (!batchRes.ok) {
+      const err = await batchRes.text();
+      console.error(`Batch update failed for "${sheetName}": ${err}`);
+    } else {
+      updatedCount = updateData.length;
+    }
+  }
+
+  // Append new rows
+  if (appendRows.length > 0) {
+    const appendRes = await fetch(
+      `${sheetsApiBase}/values/${encodedName}!A:Q:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+      {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ majorDimension: 'ROWS', values: appendRows }),
+      }
+    );
+    if (!appendRes.ok) {
+      const err = await appendRes.text();
+      console.error(`Append failed for "${sheetName}": ${err}`);
+    } else {
+      appendedCount = appendRows.length;
+    }
+  }
+
+  return { sheetName, updated: updatedCount, appended: appendedCount, total: matches.length };
 }
 
 Deno.serve(async (req) => {
@@ -137,7 +266,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch ALL matches with pagination (Supabase caps at 1000 per request)
+    // Fetch ALL matches with pagination
     let allMatches: any[] = [];
     let offset = 0;
     while (true) {
@@ -153,8 +282,7 @@ Deno.serve(async (req) => {
       if (data.length < 1000) break;
       offset += 1000;
     }
-    const matches = allMatches;
-    console.log(`Fetched ${matches.length} total matches across ${Math.ceil(matches.length / 1000)} pages`);
+    console.log(`Fetched ${allMatches.length} total matches`);
 
     // Fetch translations
     const { data: teamTranslations } = await supabase.from('team_translations').select('*');
@@ -179,101 +307,37 @@ Deno.serve(async (req) => {
     const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
     const authHeaders = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 
-    // If clearSheet requested, wipe everything first
-    if (clearSheet) {
-      await fetch(`${sheetsApiBase}/values/Sheet1!A:Z:clear`, {
-        method: 'POST',
-        headers: authHeaders,
-      });
-      // Write headers
-      await fetch(`${sheetsApiBase}/values/Sheet1!A1?valueInputOption=RAW`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify({ range: 'Sheet1!A1', majorDimension: 'ROWS', values: [HEADERS] }),
-      });
+    // Phase 1: Sync all matches to Sheet1
+    const sheet1Result = await syncSheet('Sheet1', allMatches, teamMap, compMap, sheetsApiBase, authHeaders, clearSheet);
+    console.log(`✅ Sheet1: ${sheet1Result.updated} updated, ${sheet1Result.appended} appended`);
+
+    // Phase 2: Sync per-league tabs
+    const leagueResults: SyncResult[] = [];
+    const grouped: Record<string, any[]> = {};
+    for (const m of allMatches) {
+      const code = m.competition;
+      if (!grouped[code]) grouped[code] = [];
+      grouped[code].push(m);
     }
 
-    // Read existing sheet data
-    const getResponse = await fetch(`${sheetsApiBase}/values/Sheet1!A:Q`, { headers: authHeaders });
-    let existingRows: string[][] = [];
-    if (getResponse.ok) {
-      const getData = await getResponse.json();
-      existingRows = getData.values || [];
-    }
-
-    // Build map of matchId → row number (1-indexed in Sheets)
-    const existingMap = new Map<string, number>();
-    for (let i = 1; i < existingRows.length; i++) { // skip header row
-      const matchId = existingRows[i][0];
-      if (matchId) existingMap.set(matchId, i + 1); // Sheets rows are 1-indexed
-    }
-
-    // If sheet is empty, write headers first
-    if (existingRows.length === 0) {
-      await fetch(`${sheetsApiBase}/values/Sheet1!A1?valueInputOption=RAW`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify({ range: 'Sheet1!A1', majorDimension: 'ROWS', values: [HEADERS] }),
-      });
-    }
-
-    // Separate matches into updates vs appends
-    const updateData: { range: string; values: string[][] }[] = [];
-    const appendRows: string[][] = [];
-
-    for (const m of (matches || [])) {
-      const row = matchToRow(m, teamMap, compMap);
-      const matchId = m.id.toString();
-      const existingRowNum = existingMap.get(matchId);
-
-      if (existingRowNum) {
-        updateData.push({
-          range: `Sheet1!A${existingRowNum}:Q${existingRowNum}`,
-          values: [row],
-        });
-      } else {
-        appendRows.push(row);
+    for (const [code, matches] of Object.entries(grouped)) {
+      const tabName = COMPETITION_MAP[code];
+      if (!tabName) {
+        console.log(`No tab mapping for competition code "${code}", skipping`);
+        continue;
       }
+      const result = await syncSheet(tabName, matches, teamMap, compMap, sheetsApiBase, authHeaders, clearSheet);
+      leagueResults.push(result);
+      console.log(`✅ ${tabName}: ${result.updated} updated, ${result.appended} appended (${result.total} matches)`);
     }
-
-    let updatedCount = 0;
-    let appendedCount = 0;
-
-    // Batch update existing rows
-    if (updateData.length > 0) {
-      const batchRes = await fetch(`${sheetsApiBase}/values:batchUpdate`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({ valueInputOption: 'RAW', data: updateData }),
-      });
-      if (!batchRes.ok) {
-        const err = await batchRes.text();
-        throw new Error(`Batch update failed: ${err}`);
-      }
-      updatedCount = updateData.length;
-    }
-
-    // Append new rows
-    if (appendRows.length > 0) {
-      const appendRes = await fetch(
-        `${sheetsApiBase}/values/Sheet1!A:Q:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-        {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({ majorDimension: 'ROWS', values: appendRows }),
-        }
-      );
-      if (!appendRes.ok) {
-        const err = await appendRes.text();
-        throw new Error(`Append failed: ${err}`);
-      }
-      appendedCount = appendRows.length;
-    }
-
-    console.log(`✅ Google Sheets sync: ${updatedCount} updated, ${appendedCount} appended`);
 
     return new Response(
-      JSON.stringify({ success: true, updated: updatedCount, appended: appendedCount, total: (matches || []).length }),
+      JSON.stringify({
+        success: true,
+        sheet1: sheet1Result,
+        leagues: leagueResults,
+        total: allMatches.length,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

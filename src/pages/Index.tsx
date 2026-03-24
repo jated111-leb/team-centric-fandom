@@ -177,7 +177,8 @@ const Index = () => {
                     headers: { Authorization: `Bearer ${session.access_token}` },
                   });
                   if (error) throw error;
-                  toast({ title: "Synced!", description: `${data.matchesWritten} matches written to Google Sheets` });
+                  const leagues = (data.leagues || []).map((l: any) => l.sheetName).join(', ');
+                  toast({ title: "Synced!", description: `${data.total} matches synced to Sheet1 + ${(data.leagues || []).length} league tabs` });
                 } catch (err: any) {
                   toast({ title: "Sync failed", description: err.message || "Unknown error", variant: "destructive" });
                 } finally {
