@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
     const authHeaders = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 
     // Phase 1: Sync all matches to Sheet1
-    const sheet1Result = await syncSheet('Sheet1', allMatches, teamMap, compMap, sheetsApiBase, authHeaders, clearSheet);
+    const sheet1Result = await syncSheet('All-Leagues', allMatches, teamMap, compMap, sheetsApiBase, authHeaders, clearSheet);
     console.log(`✅ Sheet1: ${sheet1Result.updated} updated, ${sheet1Result.appended} appended`);
 
     // Phase 2: Sync per-league tabs
