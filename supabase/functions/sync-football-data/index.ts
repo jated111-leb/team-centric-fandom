@@ -265,6 +265,22 @@ Deno.serve(async (req) => {
 
           if (error) {
             console.error(`Error upserting match ${match.id}:`, error);
+          } else {
+            // Auto-insert missing team translations as placeholders
+            for (const teamName of [match.homeTeam.name, match.awayTeam.name]) {
+              const { data: existing } = await supabase
+                .from('team_translations')
+                .select('id')
+                .eq('team_name', teamName)
+                .maybeSingle();
+              if (!existing) {
+                await supabase.from('team_translations').insert({
+                  team_name: teamName,
+                  arabic_name: '',
+                });
+                console.log(`📝 Auto-inserted placeholder translation for: ${teamName}`);
+              }
+            }
           }
 
           // If match just became FINISHED with scores and hasn't been processed for congrats yet
@@ -292,6 +308,56 @@ Deno.serve(async (req) => {
         console.error(`Error processing ${compCode}:`, error);
         results[compCode] = 0;
       }
+    }
+
+    // === STALE MATCH REFRESH ===
+    // Re-check past matches still stuck on TIMED/SCHEDULED to get final scores
+    console.log('🔄 Checking for stale past matches...');
+    const today = new Date().toISOString().split('T')[0];
+    const { data: staleMatches } = await supabase
+      .from('matches')
+      .select('id, home_team, away_team, status, match_date')
+      .in('status', ['TIMED', 'SCHEDULED'])
+      .lt('match_date', today)
+      .limit(50);
+
+    if (staleMatches && staleMatches.length > 0) {
+      console.log(`Found ${staleMatches.length} stale matches to refresh`);
+      let refreshed = 0;
+      for (const stale of staleMatches) {
+        try {
+          const resp = await fetch(`${FOOTBALL_API_BASE}/matches/${stale.id}`, {
+            headers: { 'X-Auth-Token': footballApiKey }
+          });
+          if (resp.ok) {
+            const matchData = await resp.json();
+            const updated: any = { status: matchData.status };
+            if (matchData.score?.fullTime?.home != null) {
+              updated.score_home = matchData.score.fullTime.home;
+              updated.score_away = matchData.score.fullTime.away;
+            }
+            await supabase.from('matches').update(updated).eq('id', stale.id);
+            if (matchData.status !== stale.status) {
+              console.log(`✅ Refreshed match ${stale.id} (${stale.home_team} vs ${stale.away_team}): ${stale.status} → ${matchData.status}`);
+              refreshed++;
+            }
+
+            // If now FINISHED, set congrats_status
+            if (matchData.status === 'FINISHED' && matchData.score?.fullTime?.home != null) {
+              const { data: existing } = await supabase.from('matches').select('congrats_status').eq('id', stale.id).maybeSingle();
+              if (!existing?.congrats_status) {
+                await supabase.from('matches').update({ congrats_status: 'pending' }).eq('id', stale.id);
+              }
+            }
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (err) {
+          console.error(`Error refreshing match ${stale.id}:`, err);
+        }
+      }
+      console.log(`Refreshed ${refreshed} stale matches`);
+    } else {
+      console.log('No stale matches found');
     }
 
     console.log('Sync completed:', results);
