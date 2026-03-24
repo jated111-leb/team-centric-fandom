@@ -175,7 +175,19 @@ Deno.serve(async (req) => {
     ]);
 
     // Authenticate with Google
-    const serviceAccount = JSON.parse(serviceAccountJson);
+    let serviceAccount: any;
+    try {
+      // Handle potential double-encoding or escaped JSON
+      let cleaned = serviceAccountJson.trim();
+      // If wrapped in extra quotes, unwrap
+      if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+        cleaned = JSON.parse(cleaned);
+      }
+      serviceAccount = typeof cleaned === 'string' ? JSON.parse(cleaned) : cleaned;
+    } catch (parseErr) {
+      console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON. First 50 chars:', serviceAccountJson.substring(0, 50));
+      throw new Error('Invalid GOOGLE_SERVICE_ACCOUNT_JSON format. Please re-enter the full JSON key.');
+    }
     const accessToken = await getGoogleAccessToken(serviceAccount);
 
     const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
