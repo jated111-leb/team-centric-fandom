@@ -76,9 +76,9 @@ function matchToRow(m: any, teamMap: Map<string, string>, compMap: Map<string, s
     m.match_date,
     m.match_time || '',
     m.home_team,
-    teamMap.get(m.home_team) || '',
+    teamMap.get(m.home_team) || m.home_team,
     m.away_team,
-    teamMap.get(m.away_team) || '',
+    teamMap.get(m.away_team) || m.away_team,
     m.status,
     m.score_home != null && m.score_away != null ? `${m.score_home}-${m.score_away}` : '',
     m.stage || '',
@@ -137,14 +137,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch ALL matches (no date filter, no featured-teams filter)
-    const { data: matches, error: matchError } = await supabase
-      .from('matches')
-      .select('*')
-      .order('match_date', { ascending: true })
-      .order('match_time', { ascending: true })
-      .limit(5000);
-    if (matchError) throw matchError;
+    // Fetch ALL matches with pagination (Supabase caps at 1000 per request)
+    let allMatches: any[] = [];
+    let offset = 0;
+    while (true) {
+      const { data, error: matchError } = await supabase
+        .from('matches')
+        .select('*')
+        .order('match_date', { ascending: true })
+        .order('match_time', { ascending: true })
+        .range(offset, offset + 999);
+      if (matchError) throw matchError;
+      if (!data || data.length === 0) break;
+      allMatches.push(...data);
+      if (data.length < 1000) break;
+      offset += 1000;
+    }
+    const matches = allMatches;
+    console.log(`Fetched ${matches.length} total matches across ${Math.ceil(matches.length / 1000)} pages`);
 
     // Fetch translations
     const { data: teamTranslations } = await supabase.from('team_translations').select('*');
