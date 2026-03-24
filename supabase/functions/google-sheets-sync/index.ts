@@ -273,8 +273,8 @@ Deno.serve(async (req) => {
       const { data, error: matchError } = await supabase
         .from('matches')
         .select('*')
-        .order('match_date', { ascending: true })
-        .order('match_time', { ascending: true })
+        .order('match_date', { ascending: false })
+        .order('match_time', { ascending: false })
         .range(offset, offset + 999);
       if (matchError) throw matchError;
       if (!data || data.length === 0) break;
