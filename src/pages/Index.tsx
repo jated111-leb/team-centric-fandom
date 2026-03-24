@@ -148,7 +148,7 @@ const Index = () => {
               Internal match scheduling & notification management
             </p>
           </div>
-          <div className="flex gap-6 text-sm">
+          <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" />
               <span className="text-muted-foreground">
@@ -161,6 +161,33 @@ const Index = () => {
                 <span className="font-semibold text-foreground">{stats.highPriority}</span> high priority
               </span>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isSyncing}
+              onClick={async () => {
+                setIsSyncing(true);
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) {
+                    toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
+                    return;
+                  }
+                  const { data, error } = await supabase.functions.invoke('google-sheets-sync', {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                  });
+                  if (error) throw error;
+                  toast({ title: "Synced!", description: `${data.matchesWritten} matches written to Google Sheets` });
+                } catch (err: any) {
+                  toast({ title: "Sync failed", description: err.message || "Unknown error", variant: "destructive" });
+                } finally {
+                  setIsSyncing(false);
+                }
+              }}
+            >
+              <Sheet className="h-4 w-4 mr-1" />
+              {isSyncing ? "Syncing..." : "Sync to Sheets"}
+            </Button>
           </div>
         </div>
       </div>
