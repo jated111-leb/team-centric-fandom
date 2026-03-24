@@ -49,10 +49,10 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { email, action, inviteId, userId } = await req.json();
+    const { email, action, inviteId, userId: reqUserId } = await req.json();
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     const normalizedInviteId = typeof inviteId === 'string' ? inviteId.trim() : '';
-    const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+    const normalizedUserId = typeof reqUserId === 'string' ? reqUserId.trim() : '';
     const isResendAction = action === 'resend';
 
     if (!isResendAction) {
