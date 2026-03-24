@@ -5,7 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Generate a JWT for Google Sheets API using service account credentials
 async function getGoogleAccessToken(serviceAccount: any): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'RS256', typ: 'JWT' };
@@ -20,7 +19,6 @@ async function getGoogleAccessToken(serviceAccount: any): Promise<string> {
   const encode = (obj: any) => btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const unsignedToken = `${encode(header)}.${encode(payload)}`;
 
-  // Import the private key
   const pemContents = serviceAccount.private_key
     .replace(/-----BEGIN PRIVATE KEY-----/, '')
     .replace(/-----END PRIVATE KEY-----/, '')
@@ -48,7 +46,6 @@ async function getGoogleAccessToken(serviceAccount: any): Promise<string> {
 
   const jwt = `${unsignedToken}.${signature}`;
 
-  // Exchange JWT for access token
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -64,6 +61,34 @@ async function getGoogleAccessToken(serviceAccount: any): Promise<string> {
   return tokenData.access_token;
 }
 
+const HEADERS = [
+  'Match ID', 'Competition', 'Competition (AR)', 'Matchday', 'Date', 'Time (Baghdad)',
+  'Home Team', 'Home Team (AR)', 'Away Team', 'Away Team (AR)',
+  'Status', 'Score', 'Stage', 'Priority', 'Priority Score', 'Reason', 'Last Synced',
+];
+
+function matchToRow(m: any, teamMap: Map<string, string>, compMap: Map<string, string>): string[] {
+  return [
+    m.id.toString(),
+    m.competition_name || m.competition,
+    compMap.get(m.competition) || '',
+    m.matchday || '',
+    m.match_date,
+    m.match_time || '',
+    m.home_team,
+    teamMap.get(m.home_team) || '',
+    m.away_team,
+    teamMap.get(m.away_team) || '',
+    m.status,
+    m.score_home != null && m.score_away != null ? `${m.score_home}-${m.score_away}` : '',
+    m.stage || '',
+    m.priority,
+    m.priority_score?.toString() || '0',
+    m.priority_reason || '',
+    new Date().toISOString(),
+  ];
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -75,16 +100,11 @@ Deno.serve(async (req) => {
     const serviceAccountJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
     const sheetId = Deno.env.get('GOOGLE_SHEET_ID');
 
-    if (!serviceAccountJson) {
-      throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_JSON secret');
-    }
-    if (!sheetId) {
-      throw new Error('Missing GOOGLE_SHEET_ID secret');
-    }
+    if (!serviceAccountJson) throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_JSON secret');
+    if (!sheetId) throw new Error('Missing GOOGLE_SHEET_ID secret');
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check auth for manual calls (skip for internal service-role calls)
     let body: any = {};
     try { body = await req.json(); } catch { body = {}; }
 
@@ -116,30 +136,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch matches (next 4 weeks, featured teams)
-    const today = new Date().toISOString().split('T')[0];
-    const fourWeeksOut = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const { data: featuredTeams } = await supabase
-      .from('featured_teams')
-      .select('team_name');
-    const teamNames = (featuredTeams || []).map((t: any) => t.team_name);
-
-    let query = supabase
+    // Fetch ALL matches (no date filter, no featured-teams filter)
+    const { data: matches, error: matchError } = await supabase
       .from('matches')
       .select('*')
-      .gte('match_date', today)
-      .lte('match_date', fourWeeksOut)
       .order('match_date', { ascending: true })
-      .order('match_time', { ascending: true });
-
-    if (teamNames.length > 0) {
-      query = query.or(
-        teamNames.map(team => `home_team.eq.${team},away_team.eq.${team}`).join(',')
-      );
-    }
-
-    const { data: matches, error: matchError } = await query;
+      .order('match_time', { ascending: true })
+      .limit(5000);
     if (matchError) throw matchError;
 
     // Fetch translations
@@ -149,74 +152,103 @@ Deno.serve(async (req) => {
     const teamMap = new Map((teamTranslations || []).map((t: any) => [t.team_name, t.arabic_name]));
     const compMap = new Map((compTranslations || []).map((c: any) => [c.competition_code, c.arabic_name]));
 
-    // Build rows
-    const headers = [
-      'Competition', 'Competition (AR)', 'Matchday', 'Date', 'Time (Baghdad)',
-      'Home Team', 'Home Team (AR)', 'Away Team', 'Away Team (AR)',
-      'Status', 'Score', 'Stage', 'Priority', 'Priority Score', 'Reason',
-    ];
-
-    const rows = (matches || []).map((m: any) => [
-      m.competition_name || m.competition,
-      compMap.get(m.competition) || '',
-      m.matchday || '',
-      m.match_date,
-      m.match_time || '',
-      m.home_team,
-      teamMap.get(m.home_team) || '',
-      m.away_team,
-      teamMap.get(m.away_team) || '',
-      m.status,
-      m.score_home != null && m.score_away != null ? `${m.score_home}-${m.score_away}` : '',
-      m.stage || '',
-      m.priority,
-      m.priority_score?.toString() || '0',
-      m.priority_reason || '',
-    ]);
-
-    // Authenticate with Google
+    // Parse service account
     let serviceAccount: any;
     try {
-      // Handle potential double-encoding or escaped JSON
       let cleaned = serviceAccountJson.trim();
-      // If wrapped in extra quotes, unwrap
       if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
         cleaned = JSON.parse(cleaned);
       }
       serviceAccount = typeof cleaned === 'string' ? JSON.parse(cleaned) : cleaned;
-    } catch (parseErr) {
-      console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON. First 50 chars:', serviceAccountJson.substring(0, 50));
-      throw new Error('Invalid GOOGLE_SERVICE_ACCOUNT_JSON format. Please re-enter the full JSON key.');
+    } catch {
+      throw new Error('Invalid GOOGLE_SERVICE_ACCOUNT_JSON format.');
     }
     const accessToken = await getGoogleAccessToken(serviceAccount);
 
     const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+    const authHeaders = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 
-    // Clear the sheet
-    await fetch(`${sheetsApiBase}/values/Sheet1!A:Z:clear`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-
-    // Write headers + data
-    const allRows = [headers, ...rows];
-    const writeResponse = await fetch(`${sheetsApiBase}/values/Sheet1!A1?valueInputOption=RAW`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ range: 'Sheet1!A1', majorDimension: 'ROWS', values: allRows }),
-    });
-
-    if (!writeResponse.ok) {
-      const err = await writeResponse.text();
-      throw new Error(`Google Sheets write failed: ${err}`);
+    // Read existing sheet data
+    const getResponse = await fetch(`${sheetsApiBase}/values/Sheet1!A:Q`, { headers: authHeaders });
+    let existingRows: string[][] = [];
+    if (getResponse.ok) {
+      const getData = await getResponse.json();
+      existingRows = getData.values || [];
     }
 
-    const result = await writeResponse.json();
-    console.log(`✅ Google Sheets sync complete: ${rows.length} matches written`);
+    // Build map of matchId → row number (1-indexed in Sheets)
+    const existingMap = new Map<string, number>();
+    for (let i = 1; i < existingRows.length; i++) { // skip header row
+      const matchId = existingRows[i][0];
+      if (matchId) existingMap.set(matchId, i + 1); // Sheets rows are 1-indexed
+    }
+
+    // If sheet is empty, write headers first
+    if (existingRows.length === 0) {
+      await fetch(`${sheetsApiBase}/values/Sheet1!A1?valueInputOption=RAW`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ range: 'Sheet1!A1', majorDimension: 'ROWS', values: [HEADERS] }),
+      });
+    }
+
+    // Separate matches into updates vs appends
+    const updateData: { range: string; values: string[][] }[] = [];
+    const appendRows: string[][] = [];
+
+    for (const m of (matches || [])) {
+      const row = matchToRow(m, teamMap, compMap);
+      const matchId = m.id.toString();
+      const existingRowNum = existingMap.get(matchId);
+
+      if (existingRowNum) {
+        updateData.push({
+          range: `Sheet1!A${existingRowNum}:Q${existingRowNum}`,
+          values: [row],
+        });
+      } else {
+        appendRows.push(row);
+      }
+    }
+
+    let updatedCount = 0;
+    let appendedCount = 0;
+
+    // Batch update existing rows
+    if (updateData.length > 0) {
+      const batchRes = await fetch(`${sheetsApiBase}/values:batchUpdate`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ valueInputOption: 'RAW', data: updateData }),
+      });
+      if (!batchRes.ok) {
+        const err = await batchRes.text();
+        throw new Error(`Batch update failed: ${err}`);
+      }
+      updatedCount = updateData.length;
+    }
+
+    // Append new rows
+    if (appendRows.length > 0) {
+      const appendRes = await fetch(
+        `${sheetsApiBase}/values/Sheet1!A:Q:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+        {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ majorDimension: 'ROWS', values: appendRows }),
+        }
+      );
+      if (!appendRes.ok) {
+        const err = await appendRes.text();
+        throw new Error(`Append failed: ${err}`);
+      }
+      appendedCount = appendRows.length;
+    }
+
+    console.log(`✅ Google Sheets sync: ${updatedCount} updated, ${appendedCount} appended`);
 
     return new Response(
-      JSON.stringify({ success: true, matchesWritten: rows.length, updatedCells: result.updatedCells }),
+      JSON.stringify({ success: true, updated: updatedCount, appended: appendedCount, total: (matches || []).length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
