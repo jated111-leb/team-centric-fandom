@@ -5,7 +5,9 @@ import { Card } from "@/components/ui/card";
 import { ScheduleFilters } from "@/components/ScheduleFilters";
 import { MatchRow } from "@/components/MatchRow";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar, TrendingUp, RefreshCw } from "lucide-react";
+import { Calendar, TrendingUp, RefreshCw, Sheet } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 import type { Match } from "@/types/match";
 
 const Index = () => {
