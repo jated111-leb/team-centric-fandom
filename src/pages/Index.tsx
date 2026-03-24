@@ -11,6 +11,8 @@ import { toast } from "@/hooks/use-toast";
 import type { Match } from "@/types/match";
 
 const Index = () => {
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCompetition, setSelectedCompetition] = useState("all");
   const [selectedPriority, setSelectedPriority] = useState("all");
