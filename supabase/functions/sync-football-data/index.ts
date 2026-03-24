@@ -309,6 +309,21 @@ Deno.serve(async (req) => {
       console.error('Error triggering scheduler:', error);
     }
 
+    // Trigger Google Sheets sync
+    console.log('🔄 Triggering google-sheets-sync after sync...');
+    try {
+      const { data: sheetsResult, error: sheetsError } = await supabase.functions.invoke('google-sheets-sync', {
+        body: { _internal: true },
+      });
+      if (sheetsError) {
+        console.error('Failed to trigger Google Sheets sync:', sheetsError);
+      } else {
+        console.log('✅ Google Sheets sync triggered successfully:', sheetsResult);
+      }
+    } catch (error) {
+      console.error('Error triggering Google Sheets sync:', error);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
