@@ -1,56 +1,41 @@
 
 
-# Plan: Fix Google Sheets Sync Issues
+# Plan: Multi-Sheet Sync (All Leagues + Per-League Tabs)
 
-## Three Problems & Solutions
+## Overview
+Update `google-sheets-sync` to first sync all matches to Sheet1 (as it does now), then also sync each competition's matches to its own named tab.
 
-### A. 1000-row limit cutting off matches after March 7
+## File to Modify
 
-**Root cause**: Despite `.limit(5000)` in the edge function, the Supabase client defaults to 1000 rows per request.
+### `supabase/functions/google-sheets-sync/index.ts`
 
-**Fix**: Use pagination in `google-sheets-sync/index.ts` -- fetch matches in batches of 1000 using `.range(offset, offset + 999)` until no more rows are returned, then merge all results before writing to the sheet.
+**Changes:**
 
-### B. Missing Arabic team names
+1. **Add a competition-to-sheet-name map:**
+   ```text
+   PD  → LaLiga
+   PL  → Premier League
+   SA  → Serie A
+   FL1 → Ligue 1
+   DED → Eredivisie
+   CL  → Champions League
+   EL  → Europa League
+   ECL → Conference League
+   ELC → Carabao Cup
+   ```
 
-**Root cause**: The `team_translations` table doesn't have entries for every team across all competitions. Many non-featured teams were never translated.
+2. **After syncing Sheet1 (all matches)**, add a second phase:
+   - Group all matches by `competition` code
+   - For each competition group, run the same read → update/append logic against the corresponding named tab
+   - If `clearSheet` is true, clear all league tabs too before writing
 
-**Fix**: In `sync-football-data/index.ts`, after upserting each match, auto-insert missing team names into `team_translations` with a blank `arabic_name` as a placeholder. Then add a UI indicator on the Team Translations page showing untranslated teams so you can fill them in. Also in the sheets sync, fall back to the English name when no Arabic translation exists (instead of showing blank).
+3. **Reuse the same `syncSheet()` helper** to avoid duplicating logic -- extract the current read/update/append logic into a function that takes a sheet name and a list of matches.
 
-### C. Past matches stuck on "TIMED" status
-
-**Root cause**: `sync-football-data` only queries `daysAhead` (default 30 days into the future). Past matches that were "TIMED" when last synced never get re-checked for FINISHED status.
-
-**Fix**: In `sync-football-data/index.ts`, add a second pass that queries the DB for matches with `status = 'TIMED'` and `match_date < today`, then re-fetches those specific matches from the football API by match ID to update their status and scores.
-
-## Files to Modify
-
-### 1. `supabase/functions/google-sheets-sync/index.ts`
-- Replace single `.limit(5000)` query with a pagination loop fetching 1000 rows at a time
-- In `matchToRow`, use English name as fallback when Arabic translation is empty: `teamMap.get(name) || name`
-
-### 2. `supabase/functions/sync-football-data/index.ts`
-- After the main competition loop, add a "stale match refresh" step:
-  - Query DB for matches where `status IN ('TIMED', 'SCHEDULED')` and `match_date < today`
-  - For each, call `football-data.org/v4/matches/{id}` to get current status/score
-  - Upsert the updated data
-- After upserting each match, check if home/away team exists in `team_translations`; if not, insert a row with blank `arabic_name`
-
-## No Database Changes Required
+## No other files change. No database changes needed.
 
 ## Technical Details
-
-**Pagination pattern for Supabase**:
-```text
-let allMatches = [];
-let offset = 0;
-while (true) {
-  const { data } = await supabase.from('matches').select('*')
-    .order('match_date').range(offset, offset + 999);
-  if (!data || data.length === 0) break;
-  allMatches.push(...data);
-  offset += 1000;
-}
-```
-
-**Stale match refresh** uses the football-data.org single-match endpoint (`/v4/matches/{id}`) which doesn't count against competition-level rate limits. We batch these with 1-second delays to respect rate limits.
+- The user has already created the tabs manually, so no need to create them via API
+- Each league tab gets the same headers and column structure as Sheet1
+- Match IDs are unique across competitions so the update/append logic works identically per tab
+- If a tab name doesn't exist in the spreadsheet, the API will return an error for that tab -- we'll log a warning and skip it rather than failing the whole sync
 
