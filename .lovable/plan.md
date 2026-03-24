@@ -1,75 +1,64 @@
 
-What I found
 
-- The admin-route warn item is already addressed in code:
-  - `src/App.tsx` now uses `<ProtectedRoute requireAdmin>` for `/admin`, `/admin/notification-logs`, `/admin/analytics`, and `/copilot`.
-  - `src/components/ProtectedRoute.tsx` now checks `user_roles` before rendering admin-only routes.
-- The remaining warn issue is the public `braze-webhook` endpoint:
-  - `supabase/functions/braze-webhook/index.ts` currently accepts unauthenticated POSTs.
-  - Your Braze webhook step currently has no auth header, no query token, and no body secret.
-- You chose `URL token` as the protection method.
-- Important technical nuance: the scan’s recommendation to switch some functions to `verify_jwt = true` is outdated for this project setup. Current guidance is to keep public/admin functions at `verify_jwt = false` and validate JWTs in code with `getClaims()`. So I would not apply that config change.
+# Plan: Auto-Sync Match Schedule to Google Sheets
 
-Plan
+## Overview
+Create an edge function that pushes the current match schedule to a Google Sheet automatically after each football data sync. This keeps your Google Sheet always up-to-date without manual effort.
 
-1. Secure the Braze webhook with a URL token
-   - Generate/store a new secret token for Braze webhook auth.
-   - Keep `braze-webhook` as a public function (`verify_jwt = false`) because Braze is the caller.
-   - Add server-side validation in `supabase/functions/braze-webhook/index.ts` that rejects requests unless a required query parameter token matches the stored secret.
-   - Do the token check before any payload parsing or database work.
-   - Return `401` for missing/invalid token and avoid logging the token value.
+## How It Works
 
-2. Keep the Braze payload contract unchanged
-   - Preserve the existing JSON body shape (`events`, `dispatch_id`, `properties.match_id`, etc.).
-   - Do not alter the webhook analytics/deduplication logic beyond adding request authentication.
-   - This minimizes risk to the current Canvas delivery-tracking flow.
+```text
+Football API sync (daily 11PM UTC)
+  └── sync-football-data edge function
+        └── triggers google-sheets-sync edge function
+              └── writes all matches to your Google Sheet
+```
 
-3. Align Braze configuration with the new protection
-   - Update the webhook URL in Braze from:
-     `.../functions/v1/braze-webhook`
-     to:
-     `.../functions/v1/braze-webhook?token=...`
-   - No request-header changes are needed since you selected URL-token auth.
-   - Existing body mapping can remain as-is.
+You'll also get a manual "Sync to Google Sheets" button on the Match Schedule page.
 
-4. Treat the admin-route warning as fixed
-   - The current `ProtectedRoute` implementation already covers the warn-level client-side access issue.
-   - I would validate that this matches the intended UX:
-     - unauthenticated users go to `/auth`
-     - authenticated non-admins are redirected to `/`
-     - admins can access protected admin pages
+## Setup Required (One-Time)
 
-5. Handle the stale scan guidance correctly
-   - Do not change `braze-canvas-test` and `growth-copilot` to `verify_jwt = true`.
-   - Their current pattern—`verify_jwt = false` plus explicit JWT/admin validation in code—is the correct approach here.
-   - After implementation, I would update the security findings so:
-     - `client_role_checks` can be cleared
-     - `webhook_endpoints_open` is resolved based on URL-token verification rather than Braze signature validation
-     - non-warn findings remain untouched, per your instruction
+You'll need a **Google Service Account** to allow the app to write to your Google Sheet:
 
-Technical details
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a project (or use existing) → Enable the **Google Sheets API**
+3. Create a **Service Account** → Download the JSON key file
+4. Create a Google Sheet → Share it with the service account email (as Editor)
+5. Provide the service account JSON key and the Sheet ID to Lovable
 
-- Files involved:
-  - `supabase/functions/braze-webhook/index.ts`
-  - potentially security findings only; no database schema change is needed
-- No migration is needed:
-  - this is an edge-function hardening change, not a table/RLS change
-- RLS context is already appropriate:
-  - `user_roles` allows users to read their own role, which supports the current `ProtectedRoute` admin check
-- Security behavior after the fix:
-  - public callers without the token get rejected
-  - Braze keeps working once its webhook URL includes the token
-  - admin UI access remains role-gated on the client and protected server-side by existing backend rules
+## Files to Create
 
-Implementation notes I would follow
+### 1. `supabase/functions/google-sheets-sync/index.ts`
+- Authenticates with Google Sheets API using service account credentials
+- Queries the `matches` table (same filters as the Index page: featured teams, next 4 weeks)
+- Joins `team_translations` for Arabic names and `competition_translations` for competition names
+- Clears the target sheet and writes fresh data with headers:
+  - Competition, Matchday, Date, Time (Baghdad), Home Team, Away Team, Status, Score, Stage, Priority, Priority Score, Reason, Arabic Home, Arabic Away
+- Called by `sync-football-data` after each sync run
+- Also callable manually via admin auth
 
-- Validate token from URL query params, not request body.
-- Fail closed if the secret is missing in backend configuration.
-- Keep the webhook’s CORS/OPTIONS handling intact.
-- Avoid adding the token to logs, responses, or stored payloads.
+### 2. UI: Add "Sync to Sheets" button on Index page
+- Small button in the page header next to the stats
+- Triggers the edge function manually
+- Shows success/error toast
 
-Most likely next implementation sequence
+## Files to Modify
 
-1. Add the webhook token verification to `braze-webhook`
-2. Keep current admin-route changes as the fix for the client-side warn item
-3. Re-run / reconcile the security findings so only the warn issues are closed with the correct rationale
+### 3. `supabase/functions/sync-football-data/index.ts`
+- After the existing `braze-scheduler` trigger, add a call to `google-sheets-sync`
+
+### 4. `src/pages/Index.tsx`
+- Add a "Sync to Google Sheets" button in the header area
+
+## Secrets Needed
+- `GOOGLE_SERVICE_ACCOUNT_JSON` — the full JSON key from Google Cloud
+- `GOOGLE_SHEET_ID` — the ID from your Google Sheet URL
+
+## No Database Changes Required
+
+## Technical Details
+- Uses Google Sheets API v4 via REST (no SDK needed in Deno)
+- Service account JWT is generated in the edge function using the private key from the JSON credentials
+- Sheet is fully replaced on each sync (clear + write) to avoid stale rows
+- Rate: syncs once daily automatically + on-demand via button
+
