@@ -169,6 +169,20 @@ Deno.serve(async (req) => {
     const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
     const authHeaders = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 
+    // If clearSheet requested, wipe everything first
+    if (clearSheet) {
+      await fetch(`${sheetsApiBase}/values/Sheet1!A:Z:clear`, {
+        method: 'POST',
+        headers: authHeaders,
+      });
+      // Write headers
+      await fetch(`${sheetsApiBase}/values/Sheet1!A1?valueInputOption=RAW`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ range: 'Sheet1!A1', majorDimension: 'ROWS', values: [HEADERS] }),
+      });
+    }
+
     // Read existing sheet data
     const getResponse = await fetch(`${sheetsApiBase}/values/Sheet1!A:Q`, { headers: authHeaders });
     let existingRows: string[][] = [];
