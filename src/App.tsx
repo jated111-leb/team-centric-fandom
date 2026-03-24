@@ -13,7 +13,7 @@ import NotificationLogs from "./pages/NotificationLogs";
 import Analytics from "./pages/Analytics";
 import Copilot from "./pages/Copilot";
 import WorldCup from "./pages/WorldCup";
-import LaLiga from "./pages/LaLiga";
+
 
 const queryClient = new QueryClient();
 
@@ -76,7 +76,7 @@ const App = () => (
             }
           />
           <Route path="/world-cup" element={<ProtectedRoute requireAdmin><WorldCup /></ProtectedRoute>} />
-          <Route path="/la-liga" element={<ProtectedRoute requireAdmin><LaLiga /></ProtectedRoute>} />
+          
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route
             path="*"
