@@ -265,6 +265,22 @@ Deno.serve(async (req) => {
 
           if (error) {
             console.error(`Error upserting match ${match.id}:`, error);
+          } else {
+            // Auto-insert missing team translations as placeholders
+            for (const teamName of [match.homeTeam.name, match.awayTeam.name]) {
+              const { data: existing } = await supabase
+                .from('team_translations')
+                .select('id')
+                .eq('team_name', teamName)
+                .maybeSingle();
+              if (!existing) {
+                await supabase.from('team_translations').insert({
+                  team_name: teamName,
+                  arabic_name: '',
+                });
+                console.log(`📝 Auto-inserted placeholder translation for: ${teamName}`);
+              }
+            }
           }
 
           // If match just became FINISHED with scores and hasn't been processed for congrats yet
