@@ -582,21 +582,15 @@ const InGame = ({ userId = null, username = null }: InGameProps) => {
         </div>
       )}
 
-      {/* ── Reaction Bar ─────────────────────────────────────────────────── */}
-      <div
-        className="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5"
-        style={{ direction: "ltr" }}
-      >
-        {reactions.map((r, i) => (
-          <button
-            key={r.label}
-            onClick={() => handleReaction(i)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full flex-shrink-0 text-xs active:scale-95 transition-transform bg-wc-elevated border border-wc-border"
-          >
-            <span>{r.emoji}</span>
-            <span className="text-wc-muted">{r.count}</span>
-          </button>
-        ))}
+      {/* ── Live Heat ────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setHypeCount((c) => c + 1)}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs active:scale-95 transition-transform bg-wc-elevated border border-wc-border"
+        >
+          <span>🔥</span>
+          <span className="text-wc-muted font-medium">{hypeCount.toLocaleString("ar-EG")}</span>
+        </button>
       </div>
 
       {/* ── Live Chat (YouTube-style) ────────────────────────────────────── */}
