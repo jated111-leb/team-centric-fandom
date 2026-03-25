@@ -27,6 +27,7 @@ const MATCH_ID = "wc-iraq-germany-2026";
 interface InGameProps {
   userId?: string | null;
   username?: string | null;
+  onNavigateToInvite?: () => void;
 }
 
 type EventType = "goal" | "yellow_card" | "halftime" | "var";
@@ -131,7 +132,7 @@ function getUsernameColor(username: string): string {
   return USERNAME_COLORS[Math.abs(hash) % USERNAME_COLORS.length];
 }
 
-const InGame = ({ userId = null, username = null }: InGameProps) => {
+const InGame = ({ userId = null, username = null, onNavigateToInvite }: InGameProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>(
     mockLiveChatMessages.map((m) => ({ ...m }))
   );
