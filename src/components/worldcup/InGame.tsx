@@ -583,16 +583,6 @@ const InGame = ({ userId = null, username = null, onNavigateToInvite }: InGamePr
         </div>
       )}
 
-      {/* ── Live Heat ────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setHypeCount((c) => c + 1)}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs active:scale-95 transition-transform bg-wc-elevated border border-wc-border"
-        >
-          <span>🔥</span>
-          <span className="text-wc-muted font-medium">{hypeCount.toLocaleString("ar-EG")}</span>
-        </button>
-      </div>
 
       {/* ── Live Chat (YouTube-style) ────────────────────────────────────── */}
       <div
