@@ -272,6 +272,13 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
       )}
 
 
+      {/* ── Dual-app framing ─────────────────────────────────────────────── */}
+      <p className="text-xs text-wc-muted text-center px-6 pt-3 pb-1">
+        {phase === "pre" && "📺 شاهد على TOD وخلّي 1001 مفتوح للتفاعل المباشر"}
+        {phase === "live" && "📺 المشاهدة على TOD، والدردشة والتحديات هنا"}
+        {phase === "post" && "هذا هو مكانك للنقاش والتفاعل بعد المباراة"}
+      </p>
+
       {/* ── Divider ───────────────────────────────────────────────────────── */}
       <div className="h-px mx-4 my-3 bg-wc-border" />
 
