@@ -260,37 +260,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
   return (
     <div className="space-y-4 px-4 pb-6">
 
-      {/* ── TOD World Cup Package ─────────────────────────────────── */}
-      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex items-center gap-1.5" style={{ direction: "ltr" }}>
-            <img src={todLogo} alt="TOD" className="h-5 w-auto" />
-          </div>
-          <span className="text-wc-text text-sm font-bold">شاهد كأس العالم مباشرة على</span>
-        </div>
-        {!todActivated ? (
-          <div className="space-y-1.5">
-            <p className="text-xs text-wc-muted">🏆 باقة كأس العالم — جميع المباريات مباشرة</p>
-            <p className="text-xs text-wc-muted">📺 اشترك الآن وشاهد كل لحظة</p>
-            <button
-              onClick={onNavigateToSubscription}
-              className="w-full mt-2 py-2.5 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent"
-            >
-              اشترك الآن
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-lg">✅</span>
-            <div>
-              <p className="text-wc-text text-sm font-medium">أنت مشترك!</p>
-              <p className="text-xs text-wc-muted">افتح TOD عند بداية المباراة</p>
-            </div>
-            <button className="mr-auto px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">فتح TOD</button>
-          </div>
-        )}
-      </div>
-
       {/* ── Prediction ──────────────────────────────────────────────── */}
       <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
         <div className="flex items-center justify-between mb-3">
@@ -425,6 +394,37 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
 
       {/* ── Mini Leaderboard ────────────────────────────────────────── */}
       <MiniLeaderboard refreshKey={leaderboardKey} />
+
+      {/* ── TOD World Cup Package ─────────────────────────────────── */}
+      <div className="rounded-2xl p-4 bg-wc-surface border border-wc-border">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-1.5" style={{ direction: "ltr" }}>
+            <img src={todLogo} alt="TOD" className="h-5 w-auto" />
+          </div>
+          <span className="text-wc-text text-sm font-bold">شاهد كأس العالم مباشرة على</span>
+        </div>
+        {!todActivated ? (
+          <div className="space-y-1.5">
+            <p className="text-xs text-wc-muted">🏆 باقة كأس العالم — جميع المباريات مباشرة</p>
+            <p className="text-xs text-wc-muted">📺 اشترك الآن وشاهد كل لحظة</p>
+            <button
+              onClick={onNavigateToSubscription}
+              className="w-full mt-2 py-2.5 rounded-full font-bold text-wc-accent-foreground text-sm bg-wc-accent"
+            >
+              اشترك الآن
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-lg">✅</span>
+            <div>
+              <p className="text-wc-text text-sm font-medium">أنت مشترك!</p>
+              <p className="text-xs text-wc-muted">افتح TOD عند بداية المباراة</p>
+            </div>
+            <button className="mr-auto px-3 py-1.5 rounded-full text-xs font-bold text-wc-accent border border-wc-accent">فتح TOD</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
