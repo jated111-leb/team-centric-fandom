@@ -159,7 +159,7 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
           <button onClick={onBack}>
             <ArrowRight size={22} className="text-white drop-shadow-lg" />
           </button>
-          <Cast size={20} className="text-white/80 drop-shadow-lg" />
+          
         </div>
       </div>
       {/* ── End Hero ─────────────────────────────────────────────────────── */}
