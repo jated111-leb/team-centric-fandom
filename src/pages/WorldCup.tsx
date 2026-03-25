@@ -3,10 +3,11 @@ import StatusBar from "@/components/worldcup/StatusBar";
 import BottomTabBar from "@/components/worldcup/BottomTabBar";
 import MatchHub from "@/components/worldcup/MatchHub";
 import SubscriptionScreen from "@/components/worldcup/SubscriptionScreen";
+import InviteScreen from "@/components/worldcup/InviteScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { loadPointsFromDb, setUsername as storeSetUsername } from "@/lib/pointsStore";
 
-type Screen = "match" | "subscription";
+type Screen = "match" | "subscription" | "invite";
 
 export interface UserProfile {
   id: string;
@@ -36,12 +37,10 @@ const WorldCup = () => {
 
       if (data) {
         setUserProfile(data as UserProfile);
-        // Sync username into localStorage so pointsStore leaderboard picks it up
         const name = data.username ?? data.display_name ?? null;
         if (name) storeSetUsername(name);
         await loadPointsFromDb(userId, name ?? "");
       } else {
-        // Profile row not yet created (race with trigger) — set minimal profile
         setUserProfile({ id: userId, username: null, display_name: null, is_subscribed: false, subscription_tier: null });
       }
     };
@@ -81,6 +80,7 @@ const WorldCup = () => {
           <MatchHub
             onBack={() => setScreen("match")}
             onNavigateToSubscription={() => setScreen("subscription")}
+            onNavigateToInvite={() => setScreen("invite")}
             userProfile={userProfile}
           />
         )}
@@ -91,8 +91,14 @@ const WorldCup = () => {
             onSubscribed={() => handleProfileUpdate({ is_subscribed: true, subscription_tier: "premium" })}
           />
         )}
+        {screen === "invite" && (
+          <InviteScreen
+            onBack={() => setScreen("match")}
+            username={userProfile?.username ?? userProfile?.display_name}
+          />
+        )}
 
-        {screen !== "subscription" && (
+        {screen !== "subscription" && screen !== "invite" && (
           <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
         )}
       </div>

@@ -11,10 +11,11 @@ type Phase = "pre" | "live" | "post";
 interface MatchHubProps {
   onBack: () => void;
   onNavigateToSubscription?: () => void;
+  onNavigateToInvite?: () => void;
   userProfile?: UserProfile | null;
 }
 
-const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubProps) => {
+const MatchHub = ({ onBack, onNavigateToSubscription, onNavigateToInvite, userProfile }: MatchHubProps) => {
   const [phase, setPhase] = useState<Phase>("pre");
   const [todActivated, setTodActivated] = useState(false);
   const [countdown, setCountdown] = useState({ h: 2, m: 34, s: 15 });
@@ -297,6 +298,7 @@ const MatchHub = ({ onBack, onNavigateToSubscription, userProfile }: MatchHubPro
         <InGame
           userId={userProfile?.id ?? null}
           username={userProfile?.username ?? userProfile?.display_name ?? null}
+          onNavigateToInvite={onNavigateToInvite}
         />
       )}
       {phase === "post" && <PostGame />}
