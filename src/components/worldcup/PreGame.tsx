@@ -358,11 +358,13 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
             className="flex-1 text-xs text-wc-text px-3 py-2 rounded-full border-0 outline-none bg-wc-elevated placeholder:text-wc-muted"
           />
           <button
-            onClick={() => setHypeCount((c) => c + 1)}
-            className="flex items-center gap-1 px-2 h-8 rounded-full flex-shrink-0 bg-wc-elevated border border-wc-border active:scale-125 transition-transform duration-150"
+            onClick={() => { setHypeCount((c) => c + 1); setHasTapped(true); }}
+            className={`flex items-center gap-1 px-2 h-8 rounded-full flex-shrink-0 active:scale-125 transition-all duration-150 ${
+              hasTapped ? "bg-wc-accent/20 border border-wc-accent/50" : "bg-wc-elevated border border-wc-border"
+            }`}
           >
             <span className="text-sm">🔥</span>
-            <span className="text-[10px] font-bold text-wc-muted">{hypeCount.toLocaleString("ar-EG")}</span>
+            <span className={`text-[10px] font-bold ${hasTapped ? "text-wc-accent" : "text-wc-muted"}`}>{hypeCount.toLocaleString("ar-EG")}</span>
           </button>
           <button onClick={sendMessage} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-wc-accent">
             <Send size={14} className="text-wc-accent-foreground" />
