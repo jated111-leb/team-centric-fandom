@@ -174,7 +174,7 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
   const renderPinnedHype = () => (
     <div className="px-3 py-2 border-b border-wc-border flex-shrink-0">
       <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-wc-accent/10 border border-wc-accent/30">
-        <span className="text-xs">🔥</span>
+        <span className="text-xs">👥</span>
         <span className="text-xs font-bold text-wc-accent">{hypeCount.toLocaleString("ar-EG")} مشجع</span>
       </div>
     </div>
