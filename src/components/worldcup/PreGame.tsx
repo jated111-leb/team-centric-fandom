@@ -359,9 +359,10 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
           />
           <button
             onClick={() => setHypeCount((c) => c + 1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-wc-elevated border border-wc-border active:scale-90 transition-transform"
+            className="flex items-center gap-1 px-2 h-8 rounded-full flex-shrink-0 bg-wc-elevated border border-wc-border active:scale-125 transition-transform duration-150"
           >
             <span className="text-sm">🔥</span>
+            <span className="text-[10px] font-bold text-wc-muted">{hypeCount.toLocaleString("ar-EG")}</span>
           </button>
           <button onClick={sendMessage} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-wc-accent">
             <Send size={14} className="text-wc-accent-foreground" />
