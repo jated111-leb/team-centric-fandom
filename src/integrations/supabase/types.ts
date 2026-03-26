@@ -474,6 +474,39 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          is_subscribed: boolean
+          subscribed_at: string | null
+          subscription_tier: string | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+          is_subscribed?: boolean
+          subscribed_at?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_subscribed?: boolean
+          subscribed_at?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       schedule_ledger: {
         Row: {
           braze_schedule_id: string
