@@ -304,9 +304,6 @@ const PreGame = ({ todActivated, onActivateTod, onNavigateToSubscription, userId
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-wc-border flex-shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-wc-text text-sm font-bold">الدردشة</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-wc-accent/20 text-wc-accent">
-              قبل المباراة
-            </span>
           </div>
           <button
             onClick={() => {
