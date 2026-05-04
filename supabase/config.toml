@@ -62,3 +62,27 @@ verify_jwt = false
 
 [functions.sync-campaign-analytics]
 verify_jwt = false
+
+# ============================================================================
+# World Cup 2026 reminder engine (B2B08 v2)
+# Lives in parallel with the existing club football scheduler — does not
+# read or write any of the existing tables.
+# ============================================================================
+
+[functions.sync-worldcup-data]
+verify_jwt = false
+
+[functions.braze-worldcup-scheduler]
+verify_jwt = false
+
+[functions.braze-worldcup-reconcile]
+verify_jwt = false
+
+[functions.braze-worldcup-webhook]
+verify_jwt = false
+
+[functions.gap-detection-worldcup]
+verify_jwt = false
+
+[functions.pre-send-verification-worldcup]
+verify_jwt = false
