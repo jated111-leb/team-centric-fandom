@@ -27,10 +27,10 @@ Deno.serve(async (req) => {
   );
 
   try {
-    const brazeApiKey     = Deno.env.get('BRAZE_REST_API_KEY') ?? Deno.env.get('BRAZE_API_KEY');
-    const brazeEndpoint   = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCampaignId = Deno.env.get('BRAZE_WC_CAMPAIGN_ID');
-    if (!brazeApiKey || !brazeEndpoint || !brazeCampaignId) {
+    const brazeApiKey   = Deno.env.get('BRAZE_REST_API_KEY') ?? Deno.env.get('BRAZE_API_KEY');
+    const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
+    const brazeCanvasId = Deno.env.get('BRAZE_WC_CANVAS_ID');
+    if (!brazeApiKey || !brazeEndpoint || !brazeCanvasId) {
       throw new Error('Missing Braze configuration');
     }
 
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       // exists. Braze does not expose a perfect "get schedule" API, so we
       // treat any 4xx (other than auth) as missing → re-queue.
       try {
-        const verifyRes = await fetch(`${brazeEndpoint}/campaigns/details?campaign_id=${brazeCampaignId}`, {
+        const verifyRes = await fetch(`${brazeEndpoint}/canvas/details?canvas_id=${brazeCanvasId}`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${brazeApiKey}` },
         });

@@ -1,36 +1,94 @@
-# Switch World Cup Pre-Game Reminders to Braze Campaign
+# World Cup 2026 Reminder Admin Dashboard
 
-Move the World Cup pre-game reminder flow from Braze **Canvas** to **Campaign** API, mirroring the old club/leagues reminder pattern. Secret `BRAZE_WC_CAMPAIGN_ID` is now configured.
+Build the read/write admin UI on top of the existing `wc_*` Supabase tables and `*-worldcup-*` edge functions. No new DDL — the migration `20260504000001_worldcup_pregame_reminders.sql` already defines:
 
-## Changes
+- `wc_matches`, `wc_schedule_ledger`, `wc_notification_sends`, `wc_scheduler_logs`
+- `wc_featured_teams` (12 nations seeded), `wc_team_mappings`
+- `wc_feature_flags` (scheduler_enabled, dry_run_mode, holdout_enabled, holdout_percentage, iraq_safety_net_enabled, iraq_eliminated)
+- `wc_scheduler_locks` and pg_cron jobs
 
-### 1. `supabase/functions/braze-worldcup-scheduler/index.ts`
-- Replace `BRAZE_WC_CANVAS_ID` env var with `BRAZE_WC_CAMPAIGN_ID`.
-- Replace endpoint `POST /canvas/trigger/schedule/create` with `POST /campaigns/trigger/schedule/create`.
-- Replace request body field `canvas_id` with `campaign_id`. Replace `canvas_entry_properties` with `trigger_properties` (Campaign API equivalent for personalization).
-- Keep everything else identical: `broadcast: true`, `schedule.time`, `audience` (OR of `WC Team 1/2/3` custom attributes, optional holdout AND), retries, advisory lock, dry-run path, signature dedup.
-- Update signature input from `${match.id}|${targetTeam}|${brazeCanvasId}` to `${match.id}|${targetTeam}|${brazeCampaignId}` so the new flow re-queues cleanly without colliding with prior canvas signatures.
-- Update all log messages mentioning "Canvas" to "Campaign".
+## Routing strategy
 
-### 2. `supabase/functions/braze-worldcup-reconcile/index.ts` and `pre-send-verification-worldcup/index.ts`
-- Audit and switch any `/canvas/trigger/schedule/*` calls (update / delete / list) to `/campaigns/trigger/schedule/*` and swap `canvas_id` → `campaign_id`. Same for env var name.
+The existing app already owns `/`, `/admin`, `/admin/analytics`, `/admin/notification-logs` for the **Premier League** scheduler and uses `/world-cup` for an unrelated game prototype. To avoid breaking those, the World Cup admin lives under its own namespace:
 
-### 3. `wc_schedule_ledger` column
-- The column `braze_canvas_id` keeps its name (no DDL changes — per project rules, schema is already migrated). It will simply store the campaign ID going forward. No code outside the schedulers reads it semantically.
+- `/wc` → Match Schedule
+- `/wc/admin` → Operations Panel
+- `/wc/admin/analytics` → KPIs
+- `/wc/admin/notification-logs` → Live log tail
+- `/wc/admin/users` → Admin user management
 
-### 4. Admin UI labels (`src/pages/wc/*`, `src/types/worldcup.ts`)
-- Rename UI-visible references from "Canvas" to "Campaign" where relevant (e.g., notification logs, schedule rows). TypeScript field name `braze_canvas_id` stays the same to match DB; only display strings change.
+A new "🏆 World Cup 2026" sidebar group exposes these routes. The existing Premier League screens stay untouched.
 
-### 5. Memory update
-- Update memory note: WC pre-game reminders now use Campaign API (matching club flow pre-match), not Canvas. Keep Canvas note for club pre-match (which still uses Canvas, per existing `BRAZE_CANVAS_ID`).
+## Pages
+
+### `/wc` — Match Schedule
+- Table of `wc_matches` with kickoff in next 30 days, sorted by `kickoff_utc`.
+- Columns: kickoff (UTC + Asia/Baghdad), Home v Away, stage, group, priority_flag, featured_match badge, scheduled_send count (joined from `wc_schedule_ledger` grouped by `match_id`).
+- Filters: stage (multi-select), group_letter, featured_match toggle, priority_flag.
+- Per-row "Force re-schedule" button (admin-only) → invokes `braze-worldcup-scheduler` with `{ match_id }`.
+
+### `/wc/admin` — Operations Panel
+- Feature-flag toggles (Switch per row reading `wc_feature_flags`): `scheduler_enabled`, `dry_run_mode`, `iraq_safety_net_enabled`, `holdout_enabled`, `iraq_eliminated`. Numeric input for `holdout_percentage`.
+- Action buttons (with toast + log preview): Run scheduler, Run reconciler, Run gap detection, Sync fixtures.
+- CRUD section for `wc_featured_teams` (canonical_name, iso_code, display_name_en/ar, braze_attribute_value, priority_flag, enabled).
+- CRUD section for `wc_team_mappings` (featured_team picker, football_data_name, football_data_id, match_pattern).
+
+### `/wc/admin/analytics` — KPIs (last 7 days, with date-range picker)
+- Cards: Notifications scheduled, Notifications delivered, Unique users reached, Holdout cohort size estimate, Gap-detection alerts (`wc_scheduler_logs` where `function_name='gap-detection-worldcup'` and `log_level='warn'`).
+- Per-team breakdown (bar chart, joins ledger → featured_teams).
+- Per-stage breakdown (bar chart from `wc_matches` joined to ledger).
+- Time-of-day distribution of `wc_notification_sends.delivered_at` (24-bucket bar chart).
+- Recharts; React Query with 60s stale time.
+
+### `/wc/admin/notification-logs` — Live tail
+- `wc_scheduler_logs` ordered by `created_at DESC`, polled every 5s via React Query `refetchInterval`.
+- Filters: log_level (info/warn/error), function_name (5 WC functions), time range.
+- Click row to expand `context` JSONB in a pretty-printed `<pre>`.
+- Pagination (50 per page).
+
+### `/wc/admin/users` — Admin user management
+- Reuses existing invite-only flow (`AdminManagement` + `add-admin` edge function, `admin_invites` + `user_roles`).
+- Admin-only via `ProtectedRoute requireAdmin`.
+
+## Auth
+
+Keeps the existing invite-only model (no public signup, no `viewer` role, first-signup-as-admin trigger remains unused). All `/wc/admin/*` routes wrap in `ProtectedRoute requireAdmin`; `/wc` wraps in `ProtectedRoute` (any authenticated user). This matches the current project's security memory — the spec's "first signup = admin, others = viewer" is incompatible with the locked-down auth posture and would be a separate discussion.
+
+## Technical details
+
+- **Data layer**: TanStack React Query hooks in `src/hooks/wc/*.ts` (`useWcMatches`, `useWcLedger`, `useWcLogs`, `useWcFeatureFlags`, `useWcFeaturedTeams`, `useWcTeamMappings`, `useWcAnalytics`). All use the existing `supabase` client; reads are RLS-aware (tables allow public SELECT, mutations require auth).
+- **Edge function invocations**: `supabase.functions.invoke('sync-worldcup-data' | 'braze-worldcup-scheduler' | 'braze-worldcup-reconcile' | 'gap-detection-worldcup' | 'pre-send-verification-worldcup', { body })`.
+- **Types**: `wc_*` tables don't appear in the auto-generated `src/integrations/supabase/types.ts` yet (migration not yet reflected). Use `supabase.from('wc_matches' as any)` with locally-defined TypeScript interfaces in `src/types/worldcup.ts` until the types file refreshes.
+- **Timezone**: Reuse `src/lib/timezone.ts` for UTC↔Baghdad conversions.
+- **Components**: shadcn Table, Card, Switch, Button, Dialog (for force-reschedule confirm + team CRUD modals), Tabs, Select, DatePickerWithRange, Recharts.
+- **Theming**: Reuse the dark 1001 brand palette already defined in `index.css` / `tailwind.config.ts`. New WC sidebar group icon: Trophy from lucide-react.
+- **File layout**:
+  ```text
+  src/pages/wc/Schedule.tsx
+  src/pages/wc/Admin.tsx
+  src/pages/wc/Analytics.tsx
+  src/pages/wc/NotificationLogs.tsx
+  src/pages/wc/Users.tsx
+  src/components/wc/MatchScheduleTable.tsx
+  src/components/wc/FeatureFlagsPanel.tsx
+  src/components/wc/OpsActionButtons.tsx
+  src/components/wc/FeaturedTeamsCrud.tsx
+  src/components/wc/TeamMappingsCrud.tsx
+  src/components/wc/AnalyticsKpiCards.tsx
+  src/components/wc/PerTeamBreakdownChart.tsx
+  src/components/wc/PerStageBreakdownChart.tsx
+  src/components/wc/HourlyDistributionChart.tsx
+  src/components/wc/LogsTable.tsx
+  src/components/wc/LogContextDialog.tsx
+  src/hooks/wc/*.ts
+  src/types/worldcup.ts
+  ```
+- Add 5 routes in `src/App.tsx`; add the new sidebar group to `src/components/AppSidebar.tsx`.
 
 ## Out of scope
-- No DDL / migration changes.
-- No changes to club football scheduler.
-- No removal of old `BRAZE_WC_CANVAS_ID` secret (just stops being read).
-- No analytics/webhook code changes (Campaign sends emit `campaign.sent` instead of `canvas.sent` — flagging as a follow-up if WC analytics are needed later).
 
-## Verification after build
-1. Confirm `BRAZE_WC_CAMPAIGN_ID` is read in scheduler.
-2. Invoke `braze-worldcup-scheduler` with `dry_run_mode = true` → check `wc_scheduler_logs` shows "DRY RUN — would have called Braze Campaign trigger" with `trigger_properties` payload.
-3. Spot-check ledger rows have new signature hash (no collisions with old canvas rows).
+- DDL changes (migration already applied).
+- Edits to existing Premier League screens (`/`, `/admin`, `/admin/analytics`, `/admin/notification-logs`).
+- Edits to the `/world-cup` game prototype.
+- Edge function code changes — they exist and the user says they work.
+- The pre-launch checklist items (secrets setup, Football API plan, Braze IAM, dry-run flips) are operational tasks done outside the dashboard, after merge.
