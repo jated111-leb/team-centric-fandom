@@ -86,7 +86,7 @@ export default function WcSchedule() {
         <Trophy className="h-7 w-7 text-primary" />
         <div>
           <h1 className="text-3xl font-bold">World Cup 2026 — Match Schedule</h1>
-          <p className="text-muted-foreground text-sm">Next 30 days of WC fixtures</p>
+          <p className="text-muted-foreground text-sm">All upcoming WC fixtures</p>
         </div>
       </div>
 
