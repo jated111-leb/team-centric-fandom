@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       // exists. Braze does not expose a perfect "get schedule" API, so we
       // treat any 4xx (other than auth) as missing → re-queue.
       try {
-        const verifyRes = await fetch(`${brazeEndpoint}/canvas/details?canvas_id=${brazeCanvasId}`, {
+        const verifyRes = await fetch(`${brazeEndpoint}/campaigns/details?campaign_id=${brazeCampaignId}`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${brazeApiKey}` },
         });
