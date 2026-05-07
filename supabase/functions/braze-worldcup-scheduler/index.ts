@@ -404,21 +404,21 @@ Deno.serve(async (req) => {
       }
 
       // ----------------------------------------------------------------
-      // LIVE — call Braze Canvas trigger
+      // LIVE — call Braze Campaign trigger
       // ----------------------------------------------------------------
       try {
-        const brazeRes = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/create`, {
+        const brazeRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/create`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${brazeApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            canvas_id: row.braze_canvas_id,
+            campaign_id: row.braze_canvas_id, // column name retained, holds campaign_id
             broadcast: true,
             schedule: { time: row.scheduled_send_at_utc },
             audience,
-            canvas_entry_properties: canvasEntryProperties,
+            trigger_properties: triggerProperties,
           }),
         });
 
