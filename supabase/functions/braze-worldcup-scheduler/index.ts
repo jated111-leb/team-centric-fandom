@@ -28,7 +28,7 @@ const corsHeaders = {
 
 const SEND_OFFSET_MINUTES   = 60;   // T-60m before kickoff
 const FIRE_WINDOW_MINUTES   = 20;   // Send rows whose send time is within 20 min
-const QUEUE_LOOKAHEAD_DAYS  = 30;   // Queue rows for matches up to 30 days out
+const QUEUE_LOOKAHEAD_DAYS  = 45;   // Queue rows for matches up to 45 days out
 const MAX_ATTEMPTS          = 3;
 const LOCK_TIMEOUT_MINUTES  = 10;
 const SCHEDULER_LOCK_KEY    = 41003;
