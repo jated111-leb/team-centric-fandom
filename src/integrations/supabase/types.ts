@@ -824,36 +824,48 @@ export type Database = {
           braze_event_type: string | null
           braze_send_id: string | null
           braze_webhook_payload: Json | null
+          canvas_id: string | null
+          canvas_name: string | null
+          canvas_step_name: string | null
           created_at: string | null
           delivered_at: string | null
           delivery_status: string | null
           external_user_id: string | null
           id: string
           ledger_id: string | null
+          match_id: string | null
         }
         Insert: {
           braze_dispatch_id?: string | null
           braze_event_type?: string | null
           braze_send_id?: string | null
           braze_webhook_payload?: Json | null
+          canvas_id?: string | null
+          canvas_name?: string | null
+          canvas_step_name?: string | null
           created_at?: string | null
           delivered_at?: string | null
           delivery_status?: string | null
           external_user_id?: string | null
           id?: string
           ledger_id?: string | null
+          match_id?: string | null
         }
         Update: {
           braze_dispatch_id?: string | null
           braze_event_type?: string | null
           braze_send_id?: string | null
           braze_webhook_payload?: Json | null
+          canvas_id?: string | null
+          canvas_name?: string | null
+          canvas_step_name?: string | null
           created_at?: string | null
           delivered_at?: string | null
           delivery_status?: string | null
           external_user_id?: string | null
           id?: string
           ledger_id?: string | null
+          match_id?: string | null
         }
         Relationships: [
           {
