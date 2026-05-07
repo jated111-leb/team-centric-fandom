@@ -210,14 +210,14 @@ Deno.serve(async (req) => {
       }
 
       for (const targetTeam of targets) {
-        const signature = await sha256(`${match.id}|${targetTeam}|${brazeCanvasId}`);
+        const signature = await sha256(`${match.id}|${targetTeam}|${brazeCampaignId}`);
 
         // Insert ON CONFLICT DO NOTHING — signature unique constraint dedups
         const { error: insertErr } = await supabase
           .from('wc_schedule_ledger')
           .insert({
             match_id: match.id,
-            braze_canvas_id: brazeCanvasId,
+            braze_canvas_id: brazeCampaignId, // column reused to store campaign_id
             target_team_canonical: targetTeam,
             scheduled_send_at_utc: sendAt.toISOString(),
             status: 'queued',
