@@ -8,7 +8,7 @@
 //            Argentina = two ledger rows). Deduped by SHA-256 signature.
 //
 //   Phase 2: For every queued ledger row whose send time falls within the
-//            next 20 minutes, call Braze Canvas trigger/schedule/create with
+//            next 20 minutes, call Braze Campaign trigger/schedule/create with
 //            audience targeting WC Team 1/2/3 = target_team_canonical.
 //
 // Mirrors the safety pattern of braze-scheduler (advisory lock, feature flag,
