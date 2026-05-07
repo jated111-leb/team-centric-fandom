@@ -113,6 +113,30 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
+          <SidebarGroupLabel>🏆 World Cup 2026</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {[
+                { title: "Schedule", url: "/wc", icon: Calendar },
+                { title: "Operations", url: "/wc/admin", icon: Settings },
+                { title: "Analytics", url: "/wc/admin/analytics", icon: BarChart3 },
+                { title: "Logs", url: "/wc/admin/notification-logs", icon: FileText },
+                { title: "Users", url: "/wc/admin/users", icon: Trophy },
+              ].map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title}>
+                    <NavLink to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
           <SidebarGroupLabel>📱 Prototypes</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -124,7 +148,7 @@ export function AppSidebar() {
                 >
                   <NavLink to="/world-cup">
                     <Trophy className="h-4 w-4" />
-                    <span>World Cup</span>
+                    <span>WC Prototype</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
