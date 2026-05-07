@@ -689,6 +689,324 @@ export type Database = {
         }
         Relationships: []
       }
+      wc_feature_flags: {
+        Row: {
+          description: string | null
+          enabled: boolean
+          key: string
+          updated_at: string | null
+          updated_by: string | null
+          value: string | null
+        }
+        Insert: {
+          description?: string | null
+          enabled?: boolean
+          key: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: string | null
+        }
+        Update: {
+          description?: string | null
+          enabled?: boolean
+          key?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: string | null
+        }
+        Relationships: []
+      }
+      wc_featured_teams: {
+        Row: {
+          braze_attribute_value: string
+          canonical_name: string
+          created_at: string | null
+          display_name_ar: string
+          display_name_en: string
+          enabled: boolean
+          id: string
+          iso_code: string
+          priority_flag: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          braze_attribute_value: string
+          canonical_name: string
+          created_at?: string | null
+          display_name_ar: string
+          display_name_en: string
+          enabled?: boolean
+          id?: string
+          iso_code: string
+          priority_flag?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          braze_attribute_value?: string
+          canonical_name?: string
+          created_at?: string | null
+          display_name_ar?: string
+          display_name_en?: string
+          enabled?: boolean
+          id?: string
+          iso_code?: string
+          priority_flag?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      wc_matches: {
+        Row: {
+          away_team_canonical: string
+          away_team_iso: string | null
+          competition_code: string
+          created_at: string | null
+          featured_match: boolean
+          football_data_id: number
+          group_letter: string | null
+          home_team_canonical: string
+          home_team_iso: string | null
+          id: string
+          kickoff_utc: string
+          last_synced_at: string | null
+          priority_flag: string | null
+          raw_api_payload: Json | null
+          stage: string
+          status: string
+          venue: string | null
+          venue_timezone: string | null
+        }
+        Insert: {
+          away_team_canonical: string
+          away_team_iso?: string | null
+          competition_code?: string
+          created_at?: string | null
+          featured_match?: boolean
+          football_data_id: number
+          group_letter?: string | null
+          home_team_canonical: string
+          home_team_iso?: string | null
+          id?: string
+          kickoff_utc: string
+          last_synced_at?: string | null
+          priority_flag?: string | null
+          raw_api_payload?: Json | null
+          stage: string
+          status?: string
+          venue?: string | null
+          venue_timezone?: string | null
+        }
+        Update: {
+          away_team_canonical?: string
+          away_team_iso?: string | null
+          competition_code?: string
+          created_at?: string | null
+          featured_match?: boolean
+          football_data_id?: number
+          group_letter?: string | null
+          home_team_canonical?: string
+          home_team_iso?: string | null
+          id?: string
+          kickoff_utc?: string
+          last_synced_at?: string | null
+          priority_flag?: string | null
+          raw_api_payload?: Json | null
+          stage?: string
+          status?: string
+          venue?: string | null
+          venue_timezone?: string | null
+        }
+        Relationships: []
+      }
+      wc_notification_sends: {
+        Row: {
+          braze_dispatch_id: string | null
+          braze_event_type: string | null
+          braze_send_id: string | null
+          braze_webhook_payload: Json | null
+          created_at: string | null
+          delivered_at: string | null
+          delivery_status: string | null
+          external_user_id: string | null
+          id: string
+          ledger_id: string | null
+        }
+        Insert: {
+          braze_dispatch_id?: string | null
+          braze_event_type?: string | null
+          braze_send_id?: string | null
+          braze_webhook_payload?: Json | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
+          external_user_id?: string | null
+          id?: string
+          ledger_id?: string | null
+        }
+        Update: {
+          braze_dispatch_id?: string | null
+          braze_event_type?: string | null
+          braze_send_id?: string | null
+          braze_webhook_payload?: Json | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
+          external_user_id?: string | null
+          id?: string
+          ledger_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wc_notification_sends_ledger_id_fkey"
+            columns: ["ledger_id"]
+            isOneToOne: false
+            referencedRelation: "wc_schedule_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wc_schedule_ledger: {
+        Row: {
+          attempt_count: number
+          braze_canvas_id: string
+          braze_send_id: string | null
+          created_at: string | null
+          dry_run: boolean
+          error_message: string | null
+          id: string
+          match_id: string
+          scheduled_send_at_utc: string
+          signature: string
+          status: string
+          target_team_canonical: string
+          updated_at: string | null
+        }
+        Insert: {
+          attempt_count?: number
+          braze_canvas_id: string
+          braze_send_id?: string | null
+          created_at?: string | null
+          dry_run?: boolean
+          error_message?: string | null
+          id?: string
+          match_id: string
+          scheduled_send_at_utc: string
+          signature: string
+          status?: string
+          target_team_canonical: string
+          updated_at?: string | null
+        }
+        Update: {
+          attempt_count?: number
+          braze_canvas_id?: string
+          braze_send_id?: string | null
+          created_at?: string | null
+          dry_run?: boolean
+          error_message?: string | null
+          id?: string
+          match_id?: string
+          scheduled_send_at_utc?: string
+          signature?: string
+          status?: string
+          target_team_canonical?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wc_schedule_ledger_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "wc_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wc_scheduler_locks: {
+        Row: {
+          expires_at: string | null
+          lock_name: string
+          locked_at: string | null
+          locked_by: string | null
+        }
+        Insert: {
+          expires_at?: string | null
+          lock_name: string
+          locked_at?: string | null
+          locked_by?: string | null
+        }
+        Update: {
+          expires_at?: string | null
+          lock_name?: string
+          locked_at?: string | null
+          locked_by?: string | null
+        }
+        Relationships: []
+      }
+      wc_scheduler_logs: {
+        Row: {
+          context: Json | null
+          created_at: string | null
+          function_name: string
+          id: string
+          log_level: string
+          match_id: string | null
+          message: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string | null
+          function_name: string
+          id?: string
+          log_level?: string
+          match_id?: string | null
+          message?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string | null
+          function_name?: string
+          id?: string
+          log_level?: string
+          match_id?: string | null
+          message?: string | null
+        }
+        Relationships: []
+      }
+      wc_team_mappings: {
+        Row: {
+          created_at: string | null
+          featured_team_id: string
+          football_data_id: number | null
+          football_data_name: string
+          id: string
+          match_pattern: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          featured_team_id: string
+          football_data_id?: number | null
+          football_data_name: string
+          id?: string
+          match_pattern?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          featured_team_id?: string
+          football_data_id?: number | null
+          football_data_name?: string
+          id?: string
+          match_pattern?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wc_team_mappings_featured_team_id_fkey"
+            columns: ["featured_team_id"]
+            isOneToOne: false
+            referencedRelation: "wc_featured_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
