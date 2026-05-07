@@ -462,7 +462,7 @@ Deno.serve(async (req) => {
           function_name: 'braze-worldcup-scheduler',
           log_level: 'info',
           match_id: match.id,
-          message: `Scheduled Braze Canvas send for ${row.target_team_canonical}`,
+          message: `Scheduled Braze Campaign send for ${row.target_team_canonical}`,
           context: {
             ledger_id: row.id,
             target_team: row.target_team_canonical,
