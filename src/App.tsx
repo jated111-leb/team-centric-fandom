@@ -13,6 +13,11 @@ import NotificationLogs from "./pages/NotificationLogs";
 import Analytics from "./pages/Analytics";
 import Copilot from "./pages/Copilot";
 import WorldCup from "./pages/WorldCup";
+import WcSchedule from "./pages/wc/Schedule";
+import WcAdmin from "./pages/wc/Admin";
+import WcAnalytics from "./pages/wc/Analytics";
+import WcLogs from "./pages/wc/NotificationLogs";
+import WcUsers from "./pages/wc/Users";
 
 
 const queryClient = new QueryClient();
