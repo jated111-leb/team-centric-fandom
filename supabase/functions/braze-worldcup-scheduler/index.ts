@@ -396,8 +396,8 @@ Deno.serve(async (req) => {
           function_name: 'braze-worldcup-scheduler',
           log_level: 'info',
           match_id: match.id,
-          message: 'DRY RUN — would have called Braze Canvas trigger',
-          context: { ledger_id: row.id, target_team: row.target_team_canonical, audience, canvasEntryProperties },
+          message: 'DRY RUN — would have called Braze Campaign trigger',
+          context: { ledger_id: row.id, target_team: row.target_team_canonical, audience, triggerProperties },
         });
         dryRunCount++;
         continue;
