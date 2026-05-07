@@ -63,10 +63,10 @@ Deno.serve(async (req) => {
       })
       .eq('lock_name', 'braze-worldcup-reconcile');
 
-    const brazeApiKey   = Deno.env.get('BRAZE_REST_API_KEY') ?? Deno.env.get('BRAZE_API_KEY');
-    const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCanvasId = Deno.env.get('BRAZE_WC_CANVAS_ID');
-    if (!brazeApiKey || !brazeEndpoint || !brazeCanvasId) {
+    const brazeApiKey     = Deno.env.get('BRAZE_REST_API_KEY') ?? Deno.env.get('BRAZE_API_KEY');
+    const brazeEndpoint   = Deno.env.get('BRAZE_REST_ENDPOINT');
+    const brazeCampaignId = Deno.env.get('BRAZE_WC_CAMPAIGN_ID');
+    if (!brazeApiKey || !brazeEndpoint || !brazeCampaignId) {
       throw new Error('Missing Braze configuration');
     }
 
