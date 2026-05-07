@@ -8,7 +8,7 @@
 //            Argentina = two ledger rows). Deduped by SHA-256 signature.
 //
 //   Phase 2: For every queued ledger row whose send time falls within the
-//            next 20 minutes, call Braze Canvas trigger/schedule/create with
+//            next 20 minutes, call Braze Campaign trigger/schedule/create with
 //            audience targeting WC Team 1/2/3 = target_team_canonical.
 //
 // Mirrors the safety pattern of braze-scheduler (advisory lock, feature flag,
@@ -116,12 +116,12 @@ Deno.serve(async (req) => {
     // ------------------------------------------------------------------
     // Env vars
     // ------------------------------------------------------------------
-    const brazeApiKey   = Deno.env.get('BRAZE_REST_API_KEY') ?? Deno.env.get('BRAZE_API_KEY');
-    const brazeEndpoint = Deno.env.get('BRAZE_REST_ENDPOINT');
-    const brazeCanvasId = Deno.env.get('BRAZE_WC_CANVAS_ID');
+    const brazeApiKey     = Deno.env.get('BRAZE_REST_API_KEY') ?? Deno.env.get('BRAZE_API_KEY');
+    const brazeEndpoint   = Deno.env.get('BRAZE_REST_ENDPOINT');
+    const brazeCampaignId = Deno.env.get('BRAZE_WC_CAMPAIGN_ID');
 
-    if (!brazeApiKey || !brazeEndpoint || !brazeCanvasId) {
-      throw new Error('Missing Braze configuration: BRAZE_REST_API_KEY / BRAZE_REST_ENDPOINT / BRAZE_WC_CANVAS_ID');
+    if (!brazeApiKey || !brazeEndpoint || !brazeCampaignId) {
+      throw new Error('Missing Braze configuration: BRAZE_REST_API_KEY / BRAZE_REST_ENDPOINT / BRAZE_WC_CAMPAIGN_ID');
     }
 
     // ------------------------------------------------------------------
@@ -210,14 +210,14 @@ Deno.serve(async (req) => {
       }
 
       for (const targetTeam of targets) {
-        const signature = await sha256(`${match.id}|${targetTeam}|${brazeCanvasId}`);
+        const signature = await sha256(`${match.id}|${targetTeam}|${brazeCampaignId}`);
 
         // Insert ON CONFLICT DO NOTHING — signature unique constraint dedups
         const { error: insertErr } = await supabase
           .from('wc_schedule_ledger')
           .insert({
             match_id: match.id,
-            braze_canvas_id: brazeCanvasId,
+            braze_canvas_id: brazeCampaignId, // column reused to store campaign_id
             target_team_canonical: targetTeam,
             scheduled_send_at_utc: sendAt.toISOString(),
             status: 'queued',
@@ -327,7 +327,7 @@ Deno.serve(async (req) => {
       const isIraqMatch = match.home_team_iso === 'IRQ' || match.away_team_iso === 'IRQ';
       const isKnockout = match.stage && match.stage !== 'GROUP_STAGE';
 
-      const canvasEntryProperties: Record<string, unknown> = {
+      const triggerProperties: Record<string, unknown> = {
         tournament:           'WC2026',
         match_id:             match.id,
         target_team_en:       target?.display_name_en ?? row.target_team_canonical,
@@ -396,29 +396,29 @@ Deno.serve(async (req) => {
           function_name: 'braze-worldcup-scheduler',
           log_level: 'info',
           match_id: match.id,
-          message: 'DRY RUN — would have called Braze Canvas trigger',
-          context: { ledger_id: row.id, target_team: row.target_team_canonical, audience, canvasEntryProperties },
+          message: 'DRY RUN — would have called Braze Campaign trigger',
+          context: { ledger_id: row.id, target_team: row.target_team_canonical, audience, triggerProperties },
         });
         dryRunCount++;
         continue;
       }
 
       // ----------------------------------------------------------------
-      // LIVE — call Braze Canvas trigger
+      // LIVE — call Braze Campaign trigger
       // ----------------------------------------------------------------
       try {
-        const brazeRes = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/create`, {
+        const brazeRes = await fetch(`${brazeEndpoint}/campaigns/trigger/schedule/create`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${brazeApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            canvas_id: row.braze_canvas_id,
+            campaign_id: row.braze_canvas_id, // column name retained, holds campaign_id
             broadcast: true,
             schedule: { time: row.scheduled_send_at_utc },
             audience,
-            canvas_entry_properties: canvasEntryProperties,
+            trigger_properties: triggerProperties,
           }),
         });
 
@@ -462,7 +462,7 @@ Deno.serve(async (req) => {
           function_name: 'braze-worldcup-scheduler',
           log_level: 'info',
           match_id: match.id,
-          message: `Scheduled Braze Canvas send for ${row.target_team_canonical}`,
+          message: `Scheduled Braze Campaign send for ${row.target_team_canonical}`,
           context: {
             ledger_id: row.id,
             target_team: row.target_team_canonical,
