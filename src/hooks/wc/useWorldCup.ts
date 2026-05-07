@@ -18,12 +18,10 @@ export function useWcMatches() {
     queryKey: ['wc_matches'],
     queryFn: async () => {
       const now = new Date().toISOString();
-      const in30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await db
         .from('wc_matches')
         .select('*')
         .gte('kickoff_utc', now)
-        .lte('kickoff_utc', in30)
         .order('kickoff_utc', { ascending: true });
       if (error) throw error;
       return (data || []) as WcMatch[];
