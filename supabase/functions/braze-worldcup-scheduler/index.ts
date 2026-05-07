@@ -327,7 +327,7 @@ Deno.serve(async (req) => {
       const isIraqMatch = match.home_team_iso === 'IRQ' || match.away_team_iso === 'IRQ';
       const isKnockout = match.stage && match.stage !== 'GROUP_STAGE';
 
-      const canvasEntryProperties: Record<string, unknown> = {
+      const triggerProperties: Record<string, unknown> = {
         tournament:           'WC2026',
         match_id:             match.id,
         target_team_en:       target?.display_name_en ?? row.target_team_canonical,
