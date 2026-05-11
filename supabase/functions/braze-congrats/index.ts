@@ -231,8 +231,9 @@ Deno.serve(async (req) => {
         const winningTeamRaw = winnerIsHome ? match.home_team : match.away_team;
         const losingTeamRaw = winnerIsHome ? match.away_team : match.home_team;
 
-        // Resolve canonical name
+        // Resolve canonical names
         const winningCanonical = findCanonicalTeam(winningTeamRaw);
+        const losingCanonical = findCanonicalTeam(losingTeamRaw) || losingTeamRaw;
         if (!winningCanonical) {
           console.log(`Match ${match.id}: winning team "${winningTeamRaw}" has no canonical mapping - skipping`);
           await supabase.from('matches').update({ congrats_status: 'skipped' }).eq('id', match.id);
