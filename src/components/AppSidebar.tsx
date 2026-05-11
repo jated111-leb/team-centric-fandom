@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { Calendar, Settings, BarChart3, FileText, RefreshCw, LogOut, Sparkles, Trophy } from "lucide-react";
+import { Calendar, Settings, BarChart3, FileText, RefreshCw, LogOut, Sparkles, Trophy, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -121,7 +121,6 @@ export function AppSidebar() {
                 { title: "Operations", url: "/wc/admin", icon: Settings },
                 { title: "Analytics", url: "/wc/admin/analytics", icon: BarChart3 },
                 { title: "Logs", url: "/wc/admin/notification-logs", icon: FileText },
-                { title: "Users", url: "/wc/admin/users", icon: Trophy },
               ].map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title}>
@@ -132,6 +131,22 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>👥 Audience</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location.pathname === "/users"} tooltip="Users">
+                  <NavLink to="/users">
+                    <Users className="h-4 w-4" />
+                    <span>Users</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
