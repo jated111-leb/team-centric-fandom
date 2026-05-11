@@ -6,6 +6,9 @@ const corsHeaders = {
 };
 
 const LOCK_TIMEOUT_MINUTES = 10;
+const MAX_MATCHES_PER_RUN = 50;
+// Only send congrats for matches that finished within this window (hours since kickoff)
+const MAX_MATCH_AGE_HOURS = 6;
 
 // Competitions excluded from congrats notifications (same as pre-match)
 const EXCLUDED_COMPETITIONS = ['FL1', 'DED', 'EL', 'ECL'];
@@ -100,13 +103,17 @@ Deno.serve(async (req) => {
     }
 
     // ==================== FETCH PENDING MATCHES ====================
+    const ageCutoff = new Date(Date.now() - MAX_MATCH_AGE_HOURS * 60 * 60 * 1000).toISOString();
     const { data: pendingMatches, error: matchError } = await supabase
       .from('matches')
       .select('*')
       .eq('status', 'FINISHED')
       .eq('congrats_status', 'pending')
       .not('score_home', 'is', null)
-      .not('score_away', 'is', null);
+      .not('score_away', 'is', null)
+      .gte('utc_date', ageCutoff)
+      .order('utc_date', { ascending: false })
+      .limit(MAX_MATCHES_PER_RUN);
 
     if (matchError) throw matchError;
 
@@ -224,8 +231,9 @@ Deno.serve(async (req) => {
         const winningTeamRaw = winnerIsHome ? match.home_team : match.away_team;
         const losingTeamRaw = winnerIsHome ? match.away_team : match.home_team;
 
-        // Resolve canonical name
+        // Resolve canonical names
         const winningCanonical = findCanonicalTeam(winningTeamRaw);
+        const losingCanonical = findCanonicalTeam(losingTeamRaw) || losingTeamRaw;
         if (!winningCanonical) {
           console.log(`Match ${match.id}: winning team "${winningTeamRaw}" has no canonical mapping - skipping`);
           await supabase.from('matches').update({ congrats_status: 'skipped' }).eq('id', match.id);
@@ -273,7 +281,7 @@ Deno.serve(async (req) => {
         const { error: ledgerError } = await supabase.from('congrats_ledger').insert({
           match_id: match.id,
           winning_team: winningCanonical,
-          losing_team: losingTeamRaw,
+          losing_team: losingCanonical,
           score_home: scoreHome,
           score_away: scoreAway,
           status: 'sent',
@@ -305,13 +313,13 @@ Deno.serve(async (req) => {
         // Call Braze Campaign API
         const brazePayload = {
           campaign_id: brazeCampaignId,
-          broadcast: false,
+          broadcast: true,
           audience,
           trigger_properties: {
             match_id: String(match.id),
             winning_team_en: winningCanonical,
             winning_team_ar: winning_ar,
-            losing_team_en: losingTeamRaw,
+            losing_team_en: losingCanonical,
             losing_team_ar: losing_ar,
             score_home: scoreHome,
             score_away: scoreAway,

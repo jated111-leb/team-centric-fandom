@@ -311,8 +311,13 @@ serve(async (req) => {
         matchIdsWithWebhooks.add(matchId);
       }
 
-      // Determine notification_type from campaign_id vs canvas_id
-      const notificationType = pe.campaignId && !pe.canvasId ? 'congrats' : 'pre_match';
+      // Determine notification_type by matching campaign_id to known congrats campaign;
+      // anything Canvas-driven or other is treated as pre_match.
+      const congratsCampaignId = Deno.env.get('BRAZE_CONGRATS_CAMPAIGN_ID');
+      const notificationType =
+        pe.campaignId && congratsCampaignId && pe.campaignId === congratsCampaignId
+          ? 'congrats'
+          : 'pre_match';
 
       notificationRecords.push({
         external_user_id: pe.externalUserId,

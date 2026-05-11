@@ -284,11 +284,14 @@ Deno.serve(async (req) => {
           }
 
           // If match just became FINISHED with scores and hasn't been processed for congrats yet
+          // Skip excluded competitions to keep the queue clean
+          const EXCLUDED_FOR_CONGRATS = ['FL1', 'DED', 'EL', 'ECL'];
           if (
             !error &&
             match.status === 'FINISHED' &&
             match.score?.fullTime?.home != null &&
             match.score?.fullTime?.away != null &&
+            !EXCLUDED_FOR_CONGRATS.includes(compCode) &&
             (!existingMatch || existingMatch.status !== 'FINISHED' || existingMatch.congrats_status === null)
           ) {
             // Only set to pending if not already processed
