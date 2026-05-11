@@ -198,7 +198,15 @@ export function useWcAnalytics(days: number = 7) {
       if (matches.error) throw matches.error;
 
       const ledgerRows = (ledger.data || []) as WcScheduleLedger[];
-      const sendRows = (sends.data || []) as any[];
+      const allSendRows = (sends.data || []) as any[];
+      // Dedupe by user+match (count one delivery per recipient per match)
+      const seen = new Set<string>();
+      const sendRows = allSendRows.filter((s) => {
+        const key = `${s.external_user_id || 'anon'}::${s.match_id || s.braze_send_id || s.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       const matchRows = (matches.data || []) as { id: string; stage: string }[];
       const matchStage: Record<string, string> = {};
       matchRows.forEach((m) => (matchStage[m.id] = m.stage));
