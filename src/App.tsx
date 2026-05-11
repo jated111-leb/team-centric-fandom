@@ -87,6 +87,7 @@ const App = () => (
           <Route path="/wc/admin/analytics" element={<ProtectedRoute requireAdmin><Layout><WcAnalytics /></Layout></ProtectedRoute>} />
           <Route path="/wc/admin/notification-logs" element={<ProtectedRoute requireAdmin><Layout><WcLogs /></Layout></ProtectedRoute>} />
           <Route path="/wc/admin/users" element={<ProtectedRoute requireAdmin><Layout><WcUsers /></Layout></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute requireAdmin><Layout><WcUsers /></Layout></ProtectedRoute>} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route
