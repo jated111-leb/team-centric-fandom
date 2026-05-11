@@ -103,13 +103,17 @@ Deno.serve(async (req) => {
     }
 
     // ==================== FETCH PENDING MATCHES ====================
+    const ageCutoff = new Date(Date.now() - MAX_MATCH_AGE_HOURS * 60 * 60 * 1000).toISOString();
     const { data: pendingMatches, error: matchError } = await supabase
       .from('matches')
       .select('*')
       .eq('status', 'FINISHED')
       .eq('congrats_status', 'pending')
       .not('score_home', 'is', null)
-      .not('score_away', 'is', null);
+      .not('score_away', 'is', null)
+      .gte('utc_date', ageCutoff)
+      .order('utc_date', { ascending: false })
+      .limit(MAX_MATCHES_PER_RUN);
 
     if (matchError) throw matchError;
 
