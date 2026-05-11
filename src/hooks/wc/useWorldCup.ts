@@ -180,7 +180,11 @@ export function useWcAnalytics(days: number = 7) {
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const [ledger, sends, gapAlerts, matches] = await Promise.all([
         db.from('wc_schedule_ledger').select('*').gte('created_at', since),
-        db.from('wc_notification_sends').select('*').gte('created_at', since),
+        db
+          .from('wc_notification_sends')
+          .select('*')
+          .gte('created_at', since)
+          .in('delivery_status', ['canvas.sent', 'push_sent']),
         db
           .from('wc_scheduler_logs')
           .select('*', { count: 'exact', head: true })
@@ -194,7 +198,15 @@ export function useWcAnalytics(days: number = 7) {
       if (matches.error) throw matches.error;
 
       const ledgerRows = (ledger.data || []) as WcScheduleLedger[];
-      const sendRows = (sends.data || []) as any[];
+      const allSendRows = (sends.data || []) as any[];
+      // Dedupe by user+match (count one delivery per recipient per match)
+      const seen = new Set<string>();
+      const sendRows = allSendRows.filter((s) => {
+        const key = `${s.external_user_id || 'anon'}::${s.match_id || s.braze_send_id || s.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       const matchRows = (matches.data || []) as { id: string; stage: string }[];
       const matchStage: Record<string, string> = {};
       matchRows.forEach((m) => (matchStage[m.id] = m.stage));
