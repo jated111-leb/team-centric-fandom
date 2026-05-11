@@ -180,7 +180,11 @@ export function useWcAnalytics(days: number = 7) {
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const [ledger, sends, gapAlerts, matches] = await Promise.all([
         db.from('wc_schedule_ledger').select('*').gte('created_at', since),
-        db.from('wc_notification_sends').select('*').gte('created_at', since),
+        db
+          .from('wc_notification_sends')
+          .select('*')
+          .gte('created_at', since)
+          .in('delivery_status', ['canvas.sent', 'push_sent']),
         db
           .from('wc_scheduler_logs')
           .select('*', { count: 'exact', head: true })
