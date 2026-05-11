@@ -313,13 +313,13 @@ Deno.serve(async (req) => {
         // Call Braze Campaign API
         const brazePayload = {
           campaign_id: brazeCampaignId,
-          broadcast: false,
+          broadcast: true,
           audience,
           trigger_properties: {
             match_id: String(match.id),
             winning_team_en: winningCanonical,
             winning_team_ar: winning_ar,
-            losing_team_en: losingTeamRaw,
+            losing_team_en: losingCanonical,
             losing_team_ar: losing_ar,
             score_home: scoreHome,
             score_away: scoreAway,
