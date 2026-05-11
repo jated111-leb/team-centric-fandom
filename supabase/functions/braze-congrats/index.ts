@@ -281,7 +281,7 @@ Deno.serve(async (req) => {
         const { error: ledgerError } = await supabase.from('congrats_ledger').insert({
           match_id: match.id,
           winning_team: winningCanonical,
-          losing_team: losingTeamRaw,
+          losing_team: losingCanonical,
           score_home: scoreHome,
           score_away: scoreAway,
           status: 'sent',
