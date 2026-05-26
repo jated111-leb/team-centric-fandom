@@ -31,7 +31,7 @@ const LOCK_TIMEOUT_MINUTES  = 10;
 const SCHEDULER_LOCK_KEY    = 41003;
 const BAGHDAD_TIMEZONE      = 'Asia/Baghdad';
 
-const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3'];
+const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3', 'WC Team 4'];
 const HOLDOUT_ATTRIBUTE  = 'wc_holdout_flag';
 
 const COMPETITION_EN = 'FIFA World Cup 2026';
