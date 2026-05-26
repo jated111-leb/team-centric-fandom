@@ -16,7 +16,7 @@ const corsHeaders = {
 const PRE_SEND_LOCK_KEY  = 41005;
 const VERIFY_WINDOW_MIN  = 30;
 const LOCK_TIMEOUT_MIN   = 10;
-const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3'];
+const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3', 'WC Team 4'];
 const HOLDOUT_ATTRIBUTE  = 'wc_holdout_flag';
 
 Deno.serve(async (req) => {
