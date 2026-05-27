@@ -264,6 +264,15 @@ Deno.serve(async (req) => {
       console.error('Failed to chain-trigger braze-worldcup-scheduler:', err);
     }
 
+    // Trigger congrats so any newly-FINISHED matches get processed without
+    // waiting for the next cron tick.
+    try {
+      await supabase.functions.invoke('braze-worldcup-congrats');
+    } catch (err) {
+      console.error('Failed to chain-trigger braze-worldcup-congrats:', err);
+    }
+
+
     return new Response(
       JSON.stringify({ success: true, upserted, featured: featuredCount, fetched: matches.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
