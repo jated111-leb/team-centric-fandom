@@ -19,6 +19,8 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+import { requireCronOrAdmin } from '../_shared/cron-auth.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -32,6 +34,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const unauth = await requireCronOrAdmin(req, corsHeaders);
+  if (unauth) return unauth;
+
+
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,

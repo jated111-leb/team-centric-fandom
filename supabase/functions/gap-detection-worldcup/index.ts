@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { requireCronOrAdmin } from '../_shared/cron-auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +19,10 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const unauth = await requireCronOrAdmin(req, corsHeaders);
+  if (unauth) return unauth;
+
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -102,7 +107,9 @@ Deno.serve(async (req) => {
     // Auto-trigger scheduler if any gaps found, to self-heal
     if (gaps.length > 0) {
       try {
-        await supabase.functions.invoke('braze-worldcup-scheduler');
+        await supabase.functions.invoke('braze-worldcup-scheduler', {
+          headers: { 'x-cron-secret': Deno.env.get('CRON_SECRET') ?? '' },
+        });
       } catch (err) {
         console.error('Failed to chain-trigger scheduler from gap detection:', err);
       }

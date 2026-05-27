@@ -382,7 +382,8 @@ Deno.serve(async (req) => {
     console.log('🔄 Triggering google-sheets-sync after sync...');
     try {
       const { data: sheetsResult, error: sheetsError } = await supabase.functions.invoke('google-sheets-sync', {
-        body: { _internal: true },
+        body: {},
+        headers: { 'X-Internal-Secret': Deno.env.get('CRON_SECRET') ?? '' },
       });
       if (sheetsError) {
         console.error('Failed to trigger Google Sheets sync:', sheetsError);

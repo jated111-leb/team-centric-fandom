@@ -41,12 +41,49 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
+  // Read raw body once so we can both verify the signature and parse JSON
+  const rawBody = await req.text();
+
+  // Optional but enforced when set: HMAC-SHA256 signature verification.
+  // Set BRAZE_WEBHOOK_SECRET in env + configure the matching signing secret
+  // in Braze's webhook settings to lock this endpoint down.
+  const webhookSecret = Deno.env.get('BRAZE_WEBHOOK_SECRET');
+  if (webhookSecret) {
+    const provided = req.headers.get('X-Braze-Signature') ?? req.headers.get('x-braze-signature') ?? '';
+    try {
+      const key = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(webhookSecret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign'],
+      );
+      const sigBytes = new Uint8Array(
+        await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody)),
+      );
+      const expectedHex = Array.from(sigBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      const expectedB64 = btoa(String.fromCharCode(...sigBytes));
+      if (provided !== expectedHex && provided !== expectedB64) {
+        return new Response(JSON.stringify({ error: 'invalid signature' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } catch (e) {
+      console.error('signature verify error:', e);
+      return new Response(JSON.stringify({ error: 'signature verify failed' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   try {
     const wcCanvasId = Deno.env.get('BRAZE_WC_CANVAS_ID');
     const wcCongratsCampaignId = Deno.env.get('BRAZE_WC_CONGRATS_CAMPAIGN_ID');
     if (!wcCanvasId) throw new Error('Missing BRAZE_WC_CANVAS_ID');
 
-    const payload = await req.json();
+    const payload = JSON.parse(rawBody);
     const events: BrazeEvent[] = payload.events ?? (Array.isArray(payload) ? payload : [payload]);
 
     let inserted = 0;

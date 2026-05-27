@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { requireCronOrAdmin } from '../_shared/cron-auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,6 +86,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const unauth = await requireCronOrAdmin(req, corsHeaders);
+  if (unauth) return unauth;
+
+
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -257,9 +263,11 @@ Deno.serve(async (req) => {
       context: { upserted, featured: featuredCount, fetched: matches.length, dateFrom: effectiveFrom, dateTo },
     });
 
+    const chainHeaders = { 'x-cron-secret': Deno.env.get('CRON_SECRET') ?? '' };
+
     // Trigger the WC scheduler immediately so freshly synced matches get queued
     try {
-      await supabase.functions.invoke('braze-worldcup-scheduler');
+      await supabase.functions.invoke('braze-worldcup-scheduler', { headers: chainHeaders });
     } catch (err) {
       console.error('Failed to chain-trigger braze-worldcup-scheduler:', err);
     }
@@ -267,7 +275,7 @@ Deno.serve(async (req) => {
     // Trigger congrats so any newly-FINISHED matches get processed without
     // waiting for the next cron tick.
     try {
-      await supabase.functions.invoke('braze-worldcup-congrats');
+      await supabase.functions.invoke('braze-worldcup-congrats', { headers: chainHeaders });
     } catch (err) {
       console.error('Failed to chain-trigger braze-worldcup-congrats:', err);
     }

@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
     let body: any = {};
     try { body = await req.json(); } catch { body = {}; }
 
-    const isInternalCall = body._internal === true;
+    const isInternalCall = req.headers.get('X-Internal-Secret') === Deno.env.get('CRON_SECRET');
     const clearSheet = body.clearSheet === true;
 
     if (!isInternalCall) {
