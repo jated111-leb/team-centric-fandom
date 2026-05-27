@@ -422,7 +422,7 @@ Deno.serve(async (req) => {
         match, targetTeam: row.target_team_canonical, opponentCanonical,
         targetAr, opponentAr, featuredByCanonical, signature: row.signature,
       });
-      const audience = buildAudience(row.target_team_canonical, featuredByCanonical, holdoutEnabled);
+      const audience = buildAudience(row.target_team_canonical, featuredByCanonical, holdoutEnabled, opponentCanonical);
 
       // dry run
       if (row.dry_run || dryRun) {
