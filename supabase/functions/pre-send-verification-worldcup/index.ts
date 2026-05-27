@@ -23,6 +23,9 @@ const HOLDOUT_ATTRIBUTE  = 'wc_holdout_flag';
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
+  const unauth = await requireCronOrAdmin(req, corsHeaders);
+  if (unauth) return unauth;
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
