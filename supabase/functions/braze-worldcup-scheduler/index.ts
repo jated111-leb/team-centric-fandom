@@ -242,12 +242,13 @@ Deno.serve(async (req) => {
       }
 
       for (const targetTeam of targets) {
-        // ---------- PRE-FLIGHT 1: already-delivered? ----------
+        // ---------- PRE-FLIGHT 1: already-delivered? (per target team) ----------
         const { data: alreadyDelivered } = await supabase
-          .from('wc_notification_sends')
-          .select('id, delivered_at')
+          .from('wc_schedule_ledger')
+          .select('id, updated_at')
           .eq('match_id', match.id)
-          .in('delivery_status', ['canvas.sent', 'push_sent', 'sent'])
+          .eq('target_team_canonical', targetTeam)
+          .eq('status', 'delivered')
           .limit(1)
           .maybeSingle();
         if (alreadyDelivered) {
@@ -257,7 +258,7 @@ Deno.serve(async (req) => {
             log_level: 'info',
             match_id: match.id,
             message: `skipped_already_delivered for ${targetTeam}`,
-            context: { delivered_at: alreadyDelivered.delivered_at, target_team: targetTeam },
+            context: { delivered_at: alreadyDelivered.updated_at, target_team: targetTeam, ledger_id: alreadyDelivered.id },
           });
           continue;
         }
