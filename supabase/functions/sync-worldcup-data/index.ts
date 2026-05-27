@@ -189,7 +189,27 @@ Deno.serve(async (req) => {
       const venue = match.venue || null;
       const venueTimezone = inferVenueTimezone(venue);
 
-      const row = {
+      // Pull final score from API payload (only present for finished games)
+      const scoreHome = match.score?.fullTime?.home ?? null;
+      const scoreAway = match.score?.fullTime?.away ?? null;
+      const apiStatus = match.status ?? 'SCHEDULED';
+      const isFinishedWithScore = apiStatus === 'FINISHED' && scoreHome !== null && scoreAway !== null;
+
+      // Look up existing row so we can detect FINISHED transitions and only
+      // set congrats_status='pending' the first time (never overwrite sent/skipped).
+      const { data: existing } = await supabase
+        .from('wc_matches')
+        .select('id, status, congrats_status, featured_match')
+        .eq('football_data_id', match.id)
+        .maybeSingle();
+
+      const transitioningToFinished = isFinishedWithScore && existing?.status !== 'FINISHED';
+      // Only mark featured matches as pending — congrats only goes to winning
+      // featured-team fans, so non-featured matches never need processing.
+      const wasFeatured = existing?.featured_match ?? featuredMatch;
+      const shouldMarkPending = transitioningToFinished && wasFeatured && !existing?.congrats_status;
+
+      const row: Record<string, unknown> = {
         football_data_id:    match.id,
         competition_code:    WC_COMPETITION_CODE,
         home_team_canonical: home?.canonical ?? match.homeTeam?.name ?? 'TBD',
@@ -203,10 +223,15 @@ Deno.serve(async (req) => {
         group_letter:        match.group?.replace(/^GROUP_/, '') ?? null,
         priority_flag:       priorityFlag,
         featured_match:      featuredMatch,
-        status:              match.status ?? 'SCHEDULED',
+        status:              apiStatus,
+        score_home:          scoreHome,
+        score_away:          scoreAway,
         raw_api_payload:     match,
         last_synced_at:      new Date().toISOString(),
       };
+      if (shouldMarkPending) {
+        row.congrats_status = 'pending';
+      }
 
       const { error: upsertErr } = await supabase
         .from('wc_matches')
