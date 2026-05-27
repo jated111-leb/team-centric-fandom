@@ -26,6 +26,8 @@ interface BrazeEvent {
   canvas_id?: string;
   canvas_name?: string;
   canvas_step_name?: string;
+  campaign_id?: string;
+  campaign_name?: string;
   send_id?: string;
   dispatch_id?: string;
   properties?: Record<string, unknown>;
@@ -41,6 +43,7 @@ Deno.serve(async (req) => {
 
   try {
     const wcCanvasId = Deno.env.get('BRAZE_WC_CANVAS_ID');
+    const wcCongratsCampaignId = Deno.env.get('BRAZE_WC_CONGRATS_CAMPAIGN_ID');
     if (!wcCanvasId) throw new Error('Missing BRAZE_WC_CANVAS_ID');
 
     const payload = await req.json();
@@ -50,8 +53,17 @@ Deno.serve(async (req) => {
     let ignored = 0;
 
     for (const event of events) {
-      // ignore non-WC canvas events
-      if (event.canvas_id && event.canvas_id !== wcCanvasId) {
+      // Determine notification type:
+      //   - canvas events with matching canvas_id → pre_match
+      //   - campaign events with matching congrats campaign_id → congrats
+      //   - everything else → ignored
+      let notificationType: 'pre_match' | 'congrats' | null = null;
+      if (event.canvas_id && event.canvas_id === wcCanvasId) {
+        notificationType = 'pre_match';
+      } else if (event.campaign_id && wcCongratsCampaignId && event.campaign_id === wcCongratsCampaignId) {
+        notificationType = 'congrats';
+      }
+      if (!notificationType) {
         ignored++;
         continue;
       }
@@ -63,38 +75,36 @@ Deno.serve(async (req) => {
         ? new Date(event.time * 1000).toISOString()
         : new Date().toISOString();
 
-      // ---------- correlation ----------
+      // ---------- correlation (pre_match only — congrats has no schedule ledger) ----------
       let ledgerId: string | null = null;
       let matchUuid: string | null = propMatchId;
 
-      // 1) by send_id
-      if (!ledgerId && event.send_id) {
-        const { data } = await supabase
-          .from('wc_schedule_ledger')
-          .select('id, match_id')
-          .eq('braze_send_id', event.send_id)
-          .limit(1)
-          .maybeSingle();
-        if (data) { ledgerId = data.id; matchUuid = matchUuid ?? data.match_id; }
-      }
-
-      // 2) by dispatch_id (we don't store this on ledger today, but may in future)
-      // — left as a no-op fallback for forward compatibility
-
-      // 3) time-window + match_id from props
-      if (!ledgerId && propMatchId) {
-        const start = new Date(new Date(deliveredAt).getTime() - 10 * 60 * 1000).toISOString();
-        const end   = new Date(new Date(deliveredAt).getTime() + 10 * 60 * 1000).toISOString();
-        let q = supabase
-          .from('wc_schedule_ledger')
-          .select('id, match_id')
-          .eq('match_id', propMatchId)
-          .gte('scheduled_send_at_utc', start)
-          .lte('scheduled_send_at_utc', end)
-          .limit(1);
-        if (propTargetTeam) q = q.eq('target_team_canonical', propTargetTeam);
-        const { data } = await q.maybeSingle();
-        if (data) { ledgerId = data.id; matchUuid = matchUuid ?? data.match_id; }
+      if (notificationType === 'pre_match') {
+        // 1) by send_id
+        if (!ledgerId && event.send_id) {
+          const { data } = await supabase
+            .from('wc_schedule_ledger')
+            .select('id, match_id')
+            .eq('braze_send_id', event.send_id)
+            .limit(1)
+            .maybeSingle();
+          if (data) { ledgerId = data.id; matchUuid = matchUuid ?? data.match_id; }
+        }
+        // 2) time-window + match_id from props
+        if (!ledgerId && propMatchId) {
+          const start = new Date(new Date(deliveredAt).getTime() - 10 * 60 * 1000).toISOString();
+          const end   = new Date(new Date(deliveredAt).getTime() + 10 * 60 * 1000).toISOString();
+          let q = supabase
+            .from('wc_schedule_ledger')
+            .select('id, match_id')
+            .eq('match_id', propMatchId)
+            .gte('scheduled_send_at_utc', start)
+            .lte('scheduled_send_at_utc', end)
+            .limit(1);
+          if (propTargetTeam) q = q.eq('target_team_canonical', propTargetTeam);
+          const { data } = await q.maybeSingle();
+          if (data) { ledgerId = data.id; matchUuid = matchUuid ?? data.match_id; }
+        }
       }
 
       const { error: insertErr } = await supabase.from('wc_notification_sends').insert({
@@ -109,6 +119,7 @@ Deno.serve(async (req) => {
         canvas_id: event.canvas_id ?? null,
         canvas_name: event.canvas_name ?? null,
         canvas_step_name: event.canvas_step_name ?? null,
+        notification_type: notificationType,
         braze_webhook_payload: event as unknown as Record<string, unknown>,
       });
 

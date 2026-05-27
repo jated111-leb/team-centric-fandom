@@ -689,6 +689,45 @@ export type Database = {
         }
         Relationships: []
       }
+      wc_congrats_ledger: {
+        Row: {
+          braze_dispatch_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          losing_team_canonical: string
+          match_id: string
+          score_away: number
+          score_home: number
+          status: string
+          winning_team_canonical: string
+        }
+        Insert: {
+          braze_dispatch_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          losing_team_canonical: string
+          match_id: string
+          score_away: number
+          score_home: number
+          status?: string
+          winning_team_canonical: string
+        }
+        Update: {
+          braze_dispatch_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          losing_team_canonical?: string
+          match_id?: string
+          score_away?: number
+          score_home?: number
+          status?: string
+          winning_team_canonical?: string
+        }
+        Relationships: []
+      }
       wc_feature_flags: {
         Row: {
           description: string | null
@@ -760,6 +799,7 @@ export type Database = {
           away_team_canonical: string
           away_team_iso: string | null
           competition_code: string
+          congrats_status: string | null
           created_at: string | null
           featured_match: boolean
           football_data_id: number
@@ -771,6 +811,8 @@ export type Database = {
           last_synced_at: string | null
           priority_flag: string | null
           raw_api_payload: Json | null
+          score_away: number | null
+          score_home: number | null
           stage: string
           status: string
           venue: string | null
@@ -780,6 +822,7 @@ export type Database = {
           away_team_canonical: string
           away_team_iso?: string | null
           competition_code?: string
+          congrats_status?: string | null
           created_at?: string | null
           featured_match?: boolean
           football_data_id: number
@@ -791,6 +834,8 @@ export type Database = {
           last_synced_at?: string | null
           priority_flag?: string | null
           raw_api_payload?: Json | null
+          score_away?: number | null
+          score_home?: number | null
           stage: string
           status?: string
           venue?: string | null
@@ -800,6 +845,7 @@ export type Database = {
           away_team_canonical?: string
           away_team_iso?: string | null
           competition_code?: string
+          congrats_status?: string | null
           created_at?: string | null
           featured_match?: boolean
           football_data_id?: number
@@ -811,6 +857,8 @@ export type Database = {
           last_synced_at?: string | null
           priority_flag?: string | null
           raw_api_payload?: Json | null
+          score_away?: number | null
+          score_home?: number | null
           stage?: string
           status?: string
           venue?: string | null
@@ -834,6 +882,7 @@ export type Database = {
           id: string
           ledger_id: string | null
           match_id: string | null
+          notification_type: string | null
         }
         Insert: {
           braze_dispatch_id?: string | null
@@ -850,6 +899,7 @@ export type Database = {
           id?: string
           ledger_id?: string | null
           match_id?: string | null
+          notification_type?: string | null
         }
         Update: {
           braze_dispatch_id?: string | null
@@ -866,6 +916,7 @@ export type Database = {
           id?: string
           ledger_id?: string | null
           match_id?: string | null
+          notification_type?: string | null
         }
         Relationships: [
           {

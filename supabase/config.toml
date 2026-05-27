@@ -86,3 +86,7 @@ verify_jwt = false
 
 [functions.pre-send-verification-worldcup]
 verify_jwt = false
+
+[functions.braze-worldcup-congrats]
+verify_jwt = false
+

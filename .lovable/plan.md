@@ -1,104 +1,62 @@
-# WC Notification Pipeline — Bug Triage & Fixes
+# Plan: World Cup Post-Game Congrats Push
 
-## Verification summary
+Mirror the league congrats pipeline for World Cup matches: after a WC match finishes, send a single push to fans of the winning team, including the final score.
 
-| # | Reported | Status | Evidence |
-|---|---|---|---|
-| 1 | Webhook inserts non-existent columns | **NOT a bug** | Live schema dump shows `wc_notification_sends` already has `match_id (uuid)`, `canvas_id`, `canvas_name`, `canvas_step_name`. A later migration than the two you cited added them. Webhook insert is valid. |
-| 2 | Scheduler queries non-existent `match_id` on `wc_notification_sends` | **NOT a bug** | Same — column exists. Query returns real rows. |
-| 3 | Already-delivered guard has no per-team filter | **REAL** | `scheduler/index.ts:246-263` filters only by `match_id`. For a match with two featured teams, the first delivery blocks the second team's schedule. |
-| 4 | Gap detection only checks for any ledger row | **REAL** | `gap-detection-worldcup/index.ts:43-47` uses `.limit(1)` on `match_id` only. A match with two featured teams where only one was queued passes the gap check. |
-| 5 | Pre-send verification uses wrong Braze endpoint | **NOT a bug (likely)** | The same `/messages/scheduled_broadcasts` endpoint is in the production league `pre-send-verification` and `braze-reconcile` and works there. Braze returns Canvas broadcasts in this endpoint when the schedule was created with `broadcast: true` (which our WC scheduler does on line 454). Will leave unchanged unless we find empirical evidence of misses. |
+## Approach
 
-## Fixes
+Reuse the league pattern (`congrats_status` on matches + dedicated scheduler edge function + ledger + feature flag + cron) but in the WC namespace, targeting `wc_featured_teams` via Braze custom attributes `WC Team 1..4`. Uses the existing `BRAZE_CONGRATS_CAMPAIGN_ID` setup pattern but with a new dedicated WC campaign ID.
 
-### Fix A — Per-team already-delivered guard (Bug 3)
+## Database changes
 
-`supabase/functions/braze-worldcup-scheduler/index.ts` PRE-FLIGHT 1 (lines 246-263).
+1. **`wc_matches`** — add `congrats_status text` (NULL / 'pending' / 'sent' / 'skipped') + partial index on 'pending'. Also add `score_home int`, `score_away int` (currently scores aren't stored on `wc_matches` — they only exist inside `raw_api_payload`).
+2. **New `wc_congrats_ledger`** table — `match_id uuid` (UNIQUE, FK to wc_matches), `winning_team_canonical`, `losing_team_canonical`, `score_home`, `score_away`, `braze_dispatch_id`, `status`, `created_at`. Admin-only RLS, GRANTs to authenticated + service_role.
+3. **`wc_feature_flags`** — insert `wc_congrats_notifications_enabled` (default false).
+4. **`wc_scheduler_locks`** — insert `braze-worldcup-congrats` lock row.
 
-Switch the check from `wc_notification_sends` (which doesn't carry `target_team_canonical`) to the cleaner source of truth: `wc_schedule_ledger.status = 'delivered'`. The webhook already flips ledger rows to `'delivered'`, and the ledger is keyed by `(match_id, target_team_canonical)`.
+## Edge function: `braze-worldcup-congrats` (new)
 
-```ts
-// PRE-FLIGHT 1: already-delivered? (per target team)
-const { data: alreadyDelivered } = await supabase
-  .from('wc_schedule_ledger')
-  .select('id, updated_at')
-  .eq('match_id', match.id)
-  .eq('target_team_canonical', targetTeam)
-  .eq('status', 'delivered')
-  .limit(1)
-  .maybeSingle();
-```
+1. Check `wc_congrats_notifications_enabled` flag.
+2. Acquire `pg_try_advisory_lock` (WC namespace key).
+3. Query: `status = 'FINISHED' AND congrats_status = 'pending' AND score_home IS NOT NULL AND score_away IS NOT NULL`.
+4. For each match:
+   - Skip draws → set `congrats_status = 'skipped'`.
+   - Resolve winner via existing `home_team_canonical` / `away_team_canonical` (already mapped by sync).
+   - Confirm winner is in `wc_featured_teams` and enabled; otherwise mark `'skipped'`.
+   - Look up `braze_attribute_value` for winning team.
+   - Insert into `wc_congrats_ledger` (UNIQUE on match_id is the dedup gate).
+   - POST `/campaigns/trigger/send` to Braze with `broadcast: true`, audience = OR across `WC Team 1..4` equals winner value, plus `trigger_properties` (winning team EN/AR, losing team EN/AR, score, stage, match_id).
+   - Update ledger with `braze_dispatch_id`; set `wc_matches.congrats_status = 'sent'`.
+   - Log to `wc_scheduler_logs`.
 
-Why this is better than adding a join through `notification_sends`:
-- One round-trip, indexed lookup
-- `(match_id, target_team_canonical)` is the dedup key the rest of the function already uses
-- Survives even if the webhook insert succeeded but ledger update was somehow lost (PRE-FLIGHT 2 still re-evaluates the signature)
+## Edge function: `sync-worldcup-data` (modify)
 
-### Fix B — Gap detection per featured team (Bug 4)
+When upserting a match, if API reports `status = 'FINISHED'` with a score:
+- Persist `score_home` and `score_away` (read from `match.score.fullTime.home/away`).
+- If transitioning to FINISHED for the first time and `congrats_status IS NULL`, set it to `'pending'`.
 
-`supabase/functions/gap-detection-worldcup/index.ts`.
+## Edge function: `braze-worldcup-webhook` (modify)
 
-Currently: load matches → fetch any ledger row → flag if zero rows. Replace with: load matches, compute expected target teams per match (mirroring scheduler's logic: featured home + featured away + Iraq-safety-net), fetch the **set** of `target_team_canonical` already in ledger, log a gap for each missing team.
+Extend webhook insert into `wc_notification_sends` to also handle congrats campaign events (currently only handles canvas/pre-match). Tag with a `notification_type` discriminator — either add the column or infer via presence of `campaign_id` vs `canvas_id` in the payload. (Recommend adding `notification_type text default 'pre_match'` on `wc_notification_sends` for analytics parity with league.)
 
-Logic:
+## Cron
 
-```ts
-// load featured teams + flags once (same as scheduler)
-const { data: featuredTeams } = await supabase
-  .from('wc_featured_teams').select('canonical_name, iso_code, enabled');
-const featuredByCanonical = new Map(
-  featuredTeams?.filter(t => t.enabled).map(t => [t.canonical_name, t]) ?? []
-);
-const { data: flagRows } = await supabase
-  .from('wc_feature_flags').select('key, enabled');
-const flag = (k: string) =>
-  flagRows?.find(f => f.key === k)?.enabled === true;
-const iraqSafetyNet  = flag('iraq_safety_net_enabled');
-const iraqEliminated = flag('iraq_eliminated');
+Add a pg_cron job `braze-worldcup-congrats` at `5,20,35,50 * * * *` calling the new edge function (offset by 5 min from `sync-worldcup-data` so fresh scores are available).
 
-for (const match of upcoming ?? []) {
-  // expected targets — must mirror scheduler exactly
-  const expected = new Set<string>();
-  if (featuredByCanonical.has(match.home_team_canonical))
-    expected.add(match.home_team_canonical);
-  if (featuredByCanonical.has(match.away_team_canonical))
-    expected.add(match.away_team_canonical);
-  if (iraqSafetyNet && !iraqEliminated) {
-    if (match.home_team_iso === 'IRQ') expected.add('Iraq');
-    if (match.away_team_iso === 'IRQ') expected.add('Iraq');
-  }
-  if (iraqEliminated) expected.delete('Iraq');
-  if (expected.size === 0) continue;
+## Secrets
 
-  const { data: ledgerRows } = await supabase
-    .from('wc_schedule_ledger')
-    .select('target_team_canonical')
-    .eq('match_id', match.id)
-    .in('status', ['queued', 'sent_to_braze', 'delivered']);
-  const present = new Set(ledgerRows?.map(r => r.target_team_canonical) ?? []);
+New env var: `BRAZE_WC_CONGRATS_CAMPAIGN_ID` — the Braze Campaign ID for WC congrats pushes. **User must create the campaign in Braze and provide the ID** before the function will send live notifications (dry-run / skip if missing).
 
-  for (const team of expected) {
-    if (!present.has(team)) {
-      gaps.push({ match, missing_team: team });
-      await supabase.from('wc_scheduler_logs').insert({ /* warn log with missing_team */ });
-    }
-  }
-}
-```
+## Config
 
-Note the `wc_matches` SELECT also needs `home_team_iso, away_team_iso` so the Iraq safety-net branch works.
+Add `[functions.braze-worldcup-congrats] verify_jwt = false` to `supabase/config.toml`.
 
-Self-heal trigger (`invoke('braze-worldcup-scheduler')`) stays as-is — one trigger covers all per-team gaps for this run.
+## Dual-fan handling
 
-## Out of scope
+If both teams in a finished match are featured, only fans of the **winning** team get the congrats — losing-team fans get nothing. This naturally avoids the dual-fan dedup problem we solved for pre-match (a fan of both teams in the final will still get exactly one congrats: for the winner).
 
-- No DB migration is required. Both `wc_notification_sends` columns and the `/messages/scheduled_broadcasts` endpoint are already correct.
-- No change to the webhook, reconcile, or league counterparts.
-- The dual-fan dedup logic shipped in the previous turn is untouched.
+## Open questions before implementation
 
-## Deployment
-
-After approval and edits:
-1. Deploy `braze-worldcup-scheduler` and `gap-detection-worldcup`.
-2. Spot-check `wc_scheduler_logs` after the next scheduler run that a `skipped_already_delivered` log line includes `target_team` (proving Fix A scopes correctly) and that gap-detection logs include `missing_team` per gap.
+1. **Braze campaign**: Do you want to create the WC congrats campaign in Braze yourself and share the campaign ID, or reuse `BRAZE_CONGRATS_CAMPAIGN_ID` (the league one) if the message template is generic enough?
+2. **Stage filter**: Send congrats for every WC stage (group + knockouts), or knockouts only?
+3. **Iraq safety-net**: Pre-match logic targets Iraq fans even if Iraq isn't in the match. For congrats, should Iraq fans receive anything when Iraq isn't playing? (Recommend: no — congrats are strictly for fans of the winner.)
+4. **Feature flag default**: Default `false` like league, requiring manual toggle when ready? (Recommend yes.)
