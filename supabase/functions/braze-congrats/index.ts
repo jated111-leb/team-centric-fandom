@@ -8,7 +8,7 @@ const corsHeaders = {
 const LOCK_TIMEOUT_MINUTES = 10;
 const MAX_MATCHES_PER_RUN = 50;
 // Only send congrats for matches that finished within this window (hours since kickoff)
-const MAX_MATCH_AGE_HOURS = 6;
+const MAX_MATCH_AGE_HOURS = 36;
 
 // Competitions excluded from congrats notifications (same as pre-match)
 const EXCLUDED_COMPETITIONS = ['FL1', 'DED', 'EL', 'ECL'];
