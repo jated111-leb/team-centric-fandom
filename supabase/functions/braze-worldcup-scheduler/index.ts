@@ -303,7 +303,7 @@ Deno.serve(async (req) => {
             }
 
             const props = buildEntryProps({ match, targetTeam, opponentCanonical, targetAr, opponentAr, featuredByCanonical, signature });
-            const audience = buildAudience(targetTeam, featuredByCanonical, holdoutEnabled);
+            const audience = buildAudience(targetTeam, featuredByCanonical, holdoutEnabled, opponentCanonical);
 
             try {
               const upd = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/update`, {
@@ -422,7 +422,7 @@ Deno.serve(async (req) => {
         match, targetTeam: row.target_team_canonical, opponentCanonical,
         targetAr, opponentAr, featuredByCanonical, signature: row.signature,
       });
-      const audience = buildAudience(row.target_team_canonical, featuredByCanonical, holdoutEnabled);
+      const audience = buildAudience(row.target_team_canonical, featuredByCanonical, holdoutEnabled, opponentCanonical);
 
       // dry run
       if (row.dry_run || dryRun) {
@@ -581,6 +581,7 @@ function buildAudience(
   targetTeam: string,
   featuredByCanonical: Map<string, any>,
   holdoutEnabled: boolean,
+  opponentCanonical?: string,
 ) {
   const featured = featuredByCanonical.get(targetTeam);
   const value = featured?.braze_attribute_value ?? targetTeam;
@@ -589,7 +590,32 @@ function buildAudience(
       custom_attribute: { custom_attribute_name: attr, comparison: 'equals', value },
     })),
   };
-  return holdoutEnabled
-    ? { AND: [teamMatch, { custom_attribute: { custom_attribute_name: HOLDOUT_ATTRIBUTE, comparison: 'does_not_equal', value: true } }] }
-    : teamMatch;
+
+  // Dual-fan dedup: when the opponent is ALSO a featured team, exactly one of
+  // the two schedules created for this match must claim users who follow both
+  // teams. Deterministic rule: the alphabetically-first canonical name "wins"
+  // dual-fans (no exclusion). The other schedule excludes any user whose WC
+  // slots contain the winner's value, so dual-fans receive exactly one push.
+  const opponentFeatured = opponentCanonical ? featuredByCanonical.get(opponentCanonical) : null;
+  const clauses: any[] = [teamMatch];
+
+  if (opponentFeatured && opponentCanonical) {
+    const targetWinsDualFans = targetTeam.localeCompare(opponentCanonical) < 0;
+    if (!targetWinsDualFans) {
+      const opponentValue = opponentFeatured.braze_attribute_value ?? opponentCanonical;
+      for (const attr of WC_TEAM_ATTRIBUTES) {
+        clauses.push({
+          custom_attribute: { custom_attribute_name: attr, comparison: 'does_not_equal', value: opponentValue },
+        });
+      }
+    }
+  }
+
+  if (holdoutEnabled) {
+    clauses.push({
+      custom_attribute: { custom_attribute_name: HOLDOUT_ATTRIBUTE, comparison: 'does_not_equal', value: true },
+    });
+  }
+
+  return clauses.length === 1 ? teamMatch : { AND: clauses };
 }

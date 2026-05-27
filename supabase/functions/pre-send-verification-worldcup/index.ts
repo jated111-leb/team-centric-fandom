@@ -130,9 +130,25 @@ Deno.serve(async (req) => {
           custom_attribute: { custom_attribute_name: attr, comparison: 'equals', value: audienceValue },
         })),
       };
-      const audience = holdoutEnabled
-        ? { AND: [teamMatch, { custom_attribute: { custom_attribute_name: HOLDOUT_ATTRIBUTE, comparison: 'does_not_equal', value: true } }] }
-        : teamMatch;
+
+      // Dual-fan dedup parity with braze-worldcup-scheduler.buildAudience
+      const opponentCanonical = match.home_team_canonical === row.target_team_canonical
+        ? match.away_team_canonical
+        : match.home_team_canonical;
+      const opponentFeatured = featuredByCanonical.get(opponentCanonical);
+      const clauses: any[] = [teamMatch];
+      if (opponentFeatured && row.target_team_canonical.localeCompare(opponentCanonical) >= 0) {
+        const opponentValue = opponentFeatured.braze_attribute_value ?? opponentCanonical;
+        for (const attr of WC_TEAM_ATTRIBUTES) {
+          clauses.push({
+            custom_attribute: { custom_attribute_name: attr, comparison: 'does_not_equal', value: opponentValue },
+          });
+        }
+      }
+      if (holdoutEnabled) {
+        clauses.push({ custom_attribute: { custom_attribute_name: HOLDOUT_ATTRIBUTE, comparison: 'does_not_equal', value: true } });
+      }
+      const audience = clauses.length === 1 ? teamMatch : { AND: clauses };
 
       const props = {
         tournament: 'WC2026',
