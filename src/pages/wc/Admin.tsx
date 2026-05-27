@@ -29,6 +29,7 @@ const TOGGLE_FLAGS = [
   'iraq_safety_net_enabled',
   'holdout_enabled',
   'iraq_eliminated',
+  'wc_congrats_notifications_enabled',
 ];
 
 const ACTIONS: { name: WcFunctionName; label: string }[] = [
