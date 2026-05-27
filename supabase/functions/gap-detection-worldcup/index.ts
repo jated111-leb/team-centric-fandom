@@ -107,7 +107,9 @@ Deno.serve(async (req) => {
     // Auto-trigger scheduler if any gaps found, to self-heal
     if (gaps.length > 0) {
       try {
-        await supabase.functions.invoke('braze-worldcup-scheduler');
+        await supabase.functions.invoke('braze-worldcup-scheduler', {
+          headers: { 'x-cron-secret': Deno.env.get('CRON_SECRET') ?? '' },
+        });
       } catch (err) {
         console.error('Failed to chain-trigger scheduler from gap detection:', err);
       }
