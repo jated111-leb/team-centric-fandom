@@ -20,8 +20,9 @@ const corsHeaders = {
 const LOCK_TIMEOUT_MINUTES = 10;
 const SCHEDULER_LOCK_KEY   = 41005;
 const MAX_MATCHES_PER_RUN  = 50;
-// Only send congrats for matches finished within this window (hours since kickoff)
-const MAX_MATCH_AGE_HOURS  = 12;
+// Only send congrats for matches finished within this window (hours since kickoff).
+// Widened to 36h to cover early kickoffs whose final scores land late in the DB.
+const MAX_MATCH_AGE_HOURS  = 36;
 
 const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3', 'WC Team 4'];
 const HOLDOUT_ATTRIBUTE  = 'wc_holdout_flag';
