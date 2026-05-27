@@ -16,6 +16,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { formatInTimeZone, toZonedTime } from 'npm:date-fns-tz@3.2.0';
+import { requireCronOrAdmin } from '../_shared/cron-auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
