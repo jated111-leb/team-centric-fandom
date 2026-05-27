@@ -303,7 +303,7 @@ Deno.serve(async (req) => {
             }
 
             const props = buildEntryProps({ match, targetTeam, opponentCanonical, targetAr, opponentAr, featuredByCanonical, signature });
-            const audience = buildAudience(targetTeam, featuredByCanonical, holdoutEnabled);
+            const audience = buildAudience(targetTeam, featuredByCanonical, holdoutEnabled, opponentCanonical);
 
             try {
               const upd = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/update`, {
