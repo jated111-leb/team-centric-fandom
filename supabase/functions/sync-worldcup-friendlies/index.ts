@@ -220,6 +220,11 @@ Deno.serve(async (req) => {
     let errors = 0;
     const now = Date.now();
 
+    // Track (home, away) pairs and their fresh football_data_ids so we can
+    // cascade-clean any stale rows whose kickoff_utc differs (e.g. after a
+    // timezone interpretation change in parseKickoff).
+    const freshIdsByPair = new Map<string, Set<number>>();
+
     for (const r of dataRows) {
       const [rawDate, rawHome, rawAway, rawVenue, rawStatus] = r;
       if (!rawDate || !rawHome || !rawAway) continue;
@@ -235,6 +240,9 @@ Deno.serve(async (req) => {
       if (!homeFeatured && !awayFeatured) { skippedNoFeatured++; continue; }
 
       const fdId = await syntheticFootballDataId(kickoffIso, home, away);
+      const pairKey = `${home.toLowerCase()}|${away.toLowerCase()}`;
+      if (!freshIdsByPair.has(pairKey)) freshIdsByPair.set(pairKey, new Set());
+      freshIdsByPair.get(pairKey)!.add(fdId);
       const venue = rawVenue?.trim() || null;
 
       const row: Record<string, unknown> = {
