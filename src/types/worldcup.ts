@@ -91,6 +91,7 @@ export interface WcFeatureFlag {
 
 export const WC_FUNCTION_NAMES = [
   'sync-worldcup-data',
+  'sync-worldcup-friendlies',
   'braze-worldcup-scheduler',
   'braze-worldcup-reconcile',
   'gap-detection-worldcup',

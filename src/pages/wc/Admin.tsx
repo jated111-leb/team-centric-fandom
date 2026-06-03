@@ -25,6 +25,7 @@ import type { WcFeaturedTeam, WcTeamMapping, WcFunctionName } from '@/types/worl
 
 const TOGGLE_FLAGS = [
   'scheduler_enabled',
+  'friendlies_sync_enabled',
   'dry_run_mode',
   'iraq_safety_net_enabled',
   'holdout_enabled',
@@ -33,7 +34,8 @@ const TOGGLE_FLAGS = [
 ];
 
 const ACTIONS: { name: WcFunctionName; label: string }[] = [
-  { name: 'sync-worldcup-data', label: 'Sync fixtures' },
+  { name: 'sync-worldcup-data', label: 'Sync WC fixtures' },
+  { name: 'sync-worldcup-friendlies', label: 'Sync pre-WC friendlies' },
   { name: 'braze-worldcup-scheduler', label: 'Run scheduler' },
   { name: 'braze-worldcup-reconcile', label: 'Run reconciler' },
   { name: 'gap-detection-worldcup', label: 'Run gap detection' },
