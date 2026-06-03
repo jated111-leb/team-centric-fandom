@@ -281,6 +281,48 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Self-healing cleanup: for every (home, away) pair we just synced, drop any
+    // other FRIENDLY rows that don't match the fresh football_data_ids. This
+    // covers the case where parseKickoff() interpretation changes (e.g. tz fix)
+    // produced a new synthetic id, leaving the old row orphaned and duplicated
+    // in the schedule UI. Only run when we actually read data so an empty sheet
+    // never wipes anything.
+    let staleRemoved = 0;
+    if (dataRows.length > 0 && freshIdsByPair.size > 0) {
+      for (const [pairKey, freshIds] of freshIdsByPair.entries()) {
+        const [homeLc, awayLc] = pairKey.split('|');
+        const { data: existingRows } = await supabase
+          .from('wc_matches')
+          .select('id, football_data_id')
+          .eq('competition_code', 'FRIENDLY')
+          .ilike('home_team_canonical', homeLc)
+          .ilike('away_team_canonical', awayLc);
+        const staleMatchIds = (existingRows ?? [])
+          .filter((row: any) => !freshIds.has(row.football_data_id))
+          .map((row: any) => row.id);
+        if (staleMatchIds.length === 0) continue;
+
+        // Cascade: delete ledger entries first (no Braze cancellation needed
+        // when braze_send_id is null; if any have a send_id, the WC reconciler
+        // will pick up orphaned Braze schedules separately).
+        await supabase.from('wc_schedule_ledger').delete().in('match_id', staleMatchIds);
+        const { error: delErr } = await supabase
+          .from('wc_matches')
+          .delete()
+          .in('id', staleMatchIds);
+        if (!delErr) staleRemoved += staleMatchIds.length;
+      }
+      if (staleRemoved > 0) {
+        await supabase.from('wc_scheduler_logs').insert({
+          function_name: 'sync-worldcup-friendlies',
+          log_level: 'info',
+          message: `Pruned ${staleRemoved} stale friendly row(s) with mismatched football_data_id`,
+          context: { stale_removed: staleRemoved },
+        });
+      }
+    }
+
+
     await supabase.from('wc_scheduler_logs').insert({
       function_name: 'sync-worldcup-friendlies',
       log_level: 'info',
