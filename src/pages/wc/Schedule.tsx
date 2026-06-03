@@ -33,7 +33,7 @@ export default function WcSchedule() {
 
   const [stage, setStage] = useState<string>('all');
   const [groupLetter, setGroupLetter] = useState<string>('all');
-  const [featuredOnly, setFeaturedOnly] = useState(false);
+  const [featuredOnly, setFeaturedOnly] = useState(true);
   const [priority, setPriority] = useState<string>('all');
   const [search, setSearch] = useState('');
 
@@ -86,7 +86,7 @@ export default function WcSchedule() {
         <Trophy className="h-7 w-7 text-primary" />
         <div>
           <h1 className="text-3xl font-bold">World Cup 2026 — Match Schedule</h1>
-          <p className="text-muted-foreground text-sm">All upcoming WC fixtures</p>
+          <p className="text-muted-foreground text-sm">Upcoming fixtures for featured teams</p>
         </div>
       </div>
 
