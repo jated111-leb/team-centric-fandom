@@ -163,7 +163,7 @@ export default function WcSchedule() {
                 ) : filtered.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell className="font-mono text-xs">{formatBaghdadTime(m.kickoff_utc, 'MMM dd HH:mm')}</TableCell>
-                    <TableCell className="font-mono text-xs">{format(new Date(m.kickoff_utc), 'MMM dd HH:mm')}</TableCell>
+                    <TableCell className="font-mono text-xs">{formatInTimeZone(new Date(m.kickoff_utc), 'UTC', 'MMM dd HH:mm')}</TableCell>
                     <TableCell className="font-medium">{m.home_team_canonical} <span className="text-muted-foreground">v</span> {m.away_team_canonical}</TableCell>
                     <TableCell><Badge variant="outline">{m.stage}</Badge></TableCell>
                     <TableCell>{m.group_letter || '—'}</TableCell>
