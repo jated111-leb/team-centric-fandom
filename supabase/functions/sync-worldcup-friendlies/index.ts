@@ -13,7 +13,11 @@
 //   window returns count=0. Manual sheet maintenance is the practical path.
 //
 // Sheet schema — tab name: "WC Friendlies"
-//   A: Kickoff UTC      (ISO-ish: "2026-06-05 19:30" or "2026-06-05T19:30:00Z")
+//   A: Kickoff (Baghdad) — "2026-06-05 19:30" or "2026-06-05T19:30".
+//                          Times WITHOUT a timezone marker are interpreted as
+//                          Asia/Baghdad (UTC+3, no DST) and converted to UTC.
+//                          Append "Z" or "+HH:MM" only if you intentionally
+//                          want to bypass that and supply UTC/offset directly.
 //   B: Home Team        (canonical name, must match wc_featured_teams.canonical_name for at least one side)
 //   C: Away Team        (canonical name)
 //   D: Venue            (optional)
