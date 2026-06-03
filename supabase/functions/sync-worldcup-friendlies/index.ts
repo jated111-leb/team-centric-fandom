@@ -124,9 +124,16 @@ async function syntheticFootballDataId(date: string, home: string, away: string)
 function parseKickoff(raw: string): string | null {
   if (!raw) return null;
   const s = raw.trim();
-  // Accept "2026-06-05 19:30", "2026-06-05T19:30", "2026-06-05T19:30:00Z"
-  const normalized = /T|Z|\+/.test(s) ? s : s.replace(' ', 'T') + ':00Z';
-  const d = new Date(normalized);
+  // Explicit timezone marker (Z, +HH:MM, -HH:MM after the time part) → trust it as-is.
+  const hasExplicitTz = /Z$|[+\-]\d{2}:?\d{2}$/.test(s);
+  if (hasExplicitTz) {
+    const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  // No timezone → interpret as Asia/Baghdad (UTC+3, no DST).
+  // "YYYY-MM-DD HH:mm" or "YYYY-MM-DDTHH:mm" → treat as Baghdad local, convert to UTC.
+  const baghdadIso = (s.includes('T') ? s : s.replace(' ', 'T')) + '+03:00';
+  const d = new Date(baghdadIso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 }
