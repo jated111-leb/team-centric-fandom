@@ -157,9 +157,17 @@ Deno.serve(async (req) => {
     }
 
     const serviceAccountJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
-    const sheetId = Deno.env.get('GOOGLE_SHEET_ID');
+    // Prefer dedicated friendlies sheet; fall back to the main sheet for back-compat.
+    const sheetId =
+      Deno.env.get('GOOGLE_WC_FRIENDLIES_SHEET_ID') ?? Deno.env.get('GOOGLE_SHEET_ID');
     if (!serviceAccountJson) throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_JSON');
-    if (!sheetId) throw new Error('Missing GOOGLE_SHEET_ID');
+    if (!sheetId) throw new Error('Missing GOOGLE_WC_FRIENDLIES_SHEET_ID (or GOOGLE_SHEET_ID)');
+
+    // Surface service account email so admins know which address to share the sheet with.
+    try {
+      const sa = JSON.parse(serviceAccountJson);
+      console.log(`[sync-worldcup-friendlies] service account: ${sa.client_email}`);
+    } catch { /* ignore */ }
 
     const serviceAccount = JSON.parse(serviceAccountJson);
     const accessToken = await getGoogleAccessToken(serviceAccount);
