@@ -137,10 +137,10 @@ function parseKickoff(raw: string): string | null {
     const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
   }
-  // No timezone → interpret as Asia/Baghdad (UTC+3, no DST).
-  // "YYYY-MM-DD HH:mm" or "YYYY-MM-DDTHH:mm" → treat as Baghdad local, convert to UTC.
-  const baghdadIso = (s.includes('T') ? s : s.replace(' ', 'T')) + '+03:00';
-  const d = new Date(baghdadIso);
+  // No timezone → interpret as UTC (the sheet's "Kickoff" column stores UTC).
+  // "YYYY-MM-DD HH:mm" or "YYYY-MM-DDTHH:mm" → treat as UTC.
+  const utcIso = (s.includes('T') ? s : s.replace(' ', 'T')) + 'Z';
+  const d = new Date(utcIso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 }
