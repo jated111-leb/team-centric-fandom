@@ -1,0 +1,1 @@
+UPDATE public.wc_feature_flags SET enabled = false, updated_at = now() WHERE key = 'dry_run_mode';
