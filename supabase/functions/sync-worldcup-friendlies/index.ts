@@ -13,11 +13,14 @@
 //   window returns count=0. Manual sheet maintenance is the practical path.
 //
 // Sheet schema — tab name: "WC Friendlies"
-//   A: Kickoff (Baghdad) — "2026-06-05 19:30" or "2026-06-05T19:30".
+//   A: Kickoff (UTC)    — "2026-06-05 19:30" or "2026-06-05T19:30".
 //                          Times WITHOUT a timezone marker are interpreted as
-//                          Asia/Baghdad (UTC+3, no DST) and converted to UTC.
-//                          Append "Z" or "+HH:MM" only if you intentionally
-//                          want to bypass that and supply UTC/offset directly.
+//                          UTC and stored as-is. Append "+03:00" (or any other
+//                          offset) only if the cell value is in a different
+//                          timezone and needs converting.
+//                          The 60-min pre-kickoff notification is computed
+//                          from this UTC moment, so all users worldwide get
+//                          pinged exactly 60 minutes before kickoff.
 //   B: Home Team        (canonical name, must match wc_featured_teams.canonical_name for at least one side)
 //   C: Away Team        (canonical name)
 //   D: Venue            (optional)
@@ -134,10 +137,10 @@ function parseKickoff(raw: string): string | null {
     const d = new Date(s.includes('T') ? s : s.replace(' ', 'T'));
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
   }
-  // No timezone → interpret as Asia/Baghdad (UTC+3, no DST).
-  // "YYYY-MM-DD HH:mm" or "YYYY-MM-DDTHH:mm" → treat as Baghdad local, convert to UTC.
-  const baghdadIso = (s.includes('T') ? s : s.replace(' ', 'T')) + '+03:00';
-  const d = new Date(baghdadIso);
+  // No timezone → interpret as UTC (the sheet's "Kickoff" column stores UTC).
+  // "YYYY-MM-DD HH:mm" or "YYYY-MM-DDTHH:mm" → treat as UTC.
+  const utcIso = (s.includes('T') ? s : s.replace(' ', 'T')) + 'Z';
+  const d = new Date(utcIso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 }
