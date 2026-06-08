@@ -373,6 +373,15 @@ Deno.serve(async (req) => {
       console.error('chain-trigger braze-worldcup-scheduler:', err);
     }
 
+    // Chain-trigger congrats so any newly-FINISHED friendlies fire immediately
+    try {
+      await supabase.functions.invoke('braze-worldcup-congrats', {
+        headers: { 'x-cron-secret': Deno.env.get('CRON_SECRET') ?? '' },
+      });
+    } catch (err) {
+      console.error('chain-trigger braze-worldcup-congrats:', err);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
