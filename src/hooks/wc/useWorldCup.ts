@@ -175,16 +175,17 @@ export function useWcSchedulerLogs(filters: {
 // ---- Analytics ----
 export function useWcAnalytics(days: number = 7) {
   return useQuery({
-    queryKey: ['wc_analytics', days],
+    queryKey: ['wc_analytics_api', days],
     queryFn: async () => {
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-      const [ledger, sends, gapAlerts, matches] = await Promise.all([
+      const sinceDate = since.slice(0, 10);
+      const [ledger, stats, gapAlerts, matches] = await Promise.all([
         db.from('wc_schedule_ledger').select('*').gte('created_at', since),
         db
-          .from('wc_notification_sends')
+          .from('wc_canvas_daily_stats')
           .select('*')
-          .gte('created_at', since)
-          .in('delivery_status', ['canvas.sent', 'push_sent']),
+          .gte('stat_date', sinceDate)
+          .order('stat_date', { ascending: true }),
         db
           .from('wc_scheduler_logs')
           .select('*', { count: 'exact', head: true })
@@ -194,59 +195,68 @@ export function useWcAnalytics(days: number = 7) {
         db.from('wc_matches').select('id, stage'),
       ]);
       if (ledger.error) throw ledger.error;
-      if (sends.error) throw sends.error;
+      if (stats.error) throw stats.error;
       if (matches.error) throw matches.error;
 
       const ledgerRows = (ledger.data || []) as WcScheduleLedger[];
-      const allSendRows = (sends.data || []) as any[];
-      // Dedupe by user+match (count one delivery per recipient per match)
-      const seen = new Set<string>();
-      const sendRows = allSendRows.filter((s) => {
-        const key = `${s.external_user_id || 'anon'}::${s.match_id || s.braze_send_id || s.id}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+      const statRows = (stats.data || []) as any[];
       const matchRows = (matches.data || []) as { id: string; stage: string }[];
       const matchStage: Record<string, string> = {};
       matchRows.forEach((m) => (matchStage[m.id] = m.stage));
 
-      const uniqueUsers = new Set(sendRows.map((s) => s.external_user_id).filter(Boolean));
+      // KPIs from Braze API
+      let sent = 0, opens = 0, uniqueRecipients = 0, bounces = 0, bodyClicks = 0;
+      const dailySeries: Record<string, { date: string; sent: number; opens: number }> = {};
+      let lastSyncedAt: string | null = null;
+      let preGameSent = 0, congratsSent = 0;
 
-      // per team
+      for (const r of statRows) {
+        sent += r.sent || 0;
+        opens += r.total_opens || 0;
+        uniqueRecipients += r.unique_recipients || 0;
+        bounces += r.bounces || 0;
+        bodyClicks += r.body_clicks || 0;
+        if (r.object_type === 'canvas') preGameSent += r.sent || 0;
+        else congratsSent += r.sent || 0;
+        const k = r.stat_date;
+        if (!dailySeries[k]) dailySeries[k] = { date: k, sent: 0, opens: 0 };
+        dailySeries[k].sent += r.sent || 0;
+        dailySeries[k].opens += r.total_opens || 0;
+        if (!lastSyncedAt || r.synced_at > lastSyncedAt) lastSyncedAt = r.synced_at;
+      }
+
       const perTeam: Record<string, number> = {};
       ledgerRows.forEach((r) => {
         perTeam[r.target_team_canonical] = (perTeam[r.target_team_canonical] || 0) + 1;
       });
-
-      // per stage
       const perStage: Record<string, number> = {};
       ledgerRows.forEach((r) => {
         const stage = matchStage[r.match_id] || 'UNKNOWN';
         perStage[stage] = (perStage[stage] || 0) + 1;
       });
 
-      // hourly distribution of delivered sends
-      const hourly: number[] = Array(24).fill(0);
-      sendRows.forEach((s) => {
-        const t = s.delivered_at || s.created_at;
-        if (t) hourly[new Date(t).getUTCHours()]++;
-      });
-
       return {
         scheduled: ledgerRows.length,
-        delivered: sendRows.length,
-        uniqueUsers: uniqueUsers.size,
+        delivered: sent,
+        uniqueUsers: uniqueRecipients,
+        opens,
+        openRate: sent > 0 ? Math.round((opens / sent) * 1000) / 10 : 0,
+        bounces,
+        bodyClicks,
+        preGameSent,
+        congratsSent,
         gapAlerts: gapAlerts.count || 0,
+        lastSyncedAt,
         perTeam: Object.entries(perTeam)
           .map(([team, count]) => ({ team, count }))
           .sort((a, b) => b.count - a.count),
         perStage: Object.entries(perStage).map(([stage, count]) => ({ stage, count })),
-        hourly: hourly.map((count, hour) => ({ hour: `${hour}:00`, count })),
+        daily: Object.values(dailySeries).sort((a, b) => a.date.localeCompare(b.date)),
       };
     },
   });
 }
+
 
 // ---- Edge function invocations ----
 export function useInvokeWcFunction() {
