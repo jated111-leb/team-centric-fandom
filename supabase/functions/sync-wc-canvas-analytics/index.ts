@@ -77,9 +77,16 @@ async function syncCanvas(canvasId: string, days: number) {
     agg.entries = Number(d.total_stats?.entries || 0);
     agg.revenue = Number(d.total_stats?.revenue || 0);
     agg.conversions = Number(d.total_stats?.conversions || 0);
-    // Aggregate channels under variant_stats -> messages
-    walkMessages(d.variant_stats, agg);
+    // Channel-level stats (sent / opens / bounces / clicks) live inside step_stats[*].messages
     walkMessages(d.step_stats, agg);
+    // unique_recipients lives on the step node itself, not inside the channel objects
+    if (d.step_stats && typeof d.step_stats === 'object') {
+      for (const step of Object.values<any>(d.step_stats)) {
+        if (step && typeof step === 'object' && 'unique_recipients' in step) {
+          agg.unique_recipients += Number(step.unique_recipients || 0);
+        }
+      }
+    }
     return {
       stat_date: String(d.time).slice(0, 10),
       braze_object_id: canvasId,
