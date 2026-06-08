@@ -689,6 +689,72 @@ export type Database = {
         }
         Relationships: []
       }
+      wc_canvas_daily_stats: {
+        Row: {
+          body_clicks: number
+          bounces: number
+          braze_object_id: string
+          conversions: number
+          created_at: string
+          direct_opens: number
+          entries: number
+          id: string
+          name: string | null
+          object_type: string
+          raw_payload: Json | null
+          revenue: number
+          sent: number
+          stat_date: string
+          step_breakdown: Json | null
+          synced_at: string
+          total_opens: number
+          unique_recipients: number
+          variant_breakdown: Json | null
+        }
+        Insert: {
+          body_clicks?: number
+          bounces?: number
+          braze_object_id: string
+          conversions?: number
+          created_at?: string
+          direct_opens?: number
+          entries?: number
+          id?: string
+          name?: string | null
+          object_type: string
+          raw_payload?: Json | null
+          revenue?: number
+          sent?: number
+          stat_date: string
+          step_breakdown?: Json | null
+          synced_at?: string
+          total_opens?: number
+          unique_recipients?: number
+          variant_breakdown?: Json | null
+        }
+        Update: {
+          body_clicks?: number
+          bounces?: number
+          braze_object_id?: string
+          conversions?: number
+          created_at?: string
+          direct_opens?: number
+          entries?: number
+          id?: string
+          name?: string | null
+          object_type?: string
+          raw_payload?: Json | null
+          revenue?: number
+          sent?: number
+          stat_date?: string
+          step_breakdown?: Json | null
+          synced_at?: string
+          total_opens?: number
+          unique_recipients?: number
+          variant_breakdown?: Json | null
+        }
+        Relationships: []
+      }
       wc_congrats_ledger: {
         Row: {
           braze_dispatch_id: string | null
