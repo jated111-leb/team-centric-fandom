@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
     );
 
     // Read the tab — A:E
-    const range = `${SHEET_TAB}!A:E`;
+    const range = `${SHEET_TAB}!A:G`;
     const sheetRes = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`,
       { headers: authHeaders },
@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
     const freshIdsByPair = new Map<string, Set<number>>();
 
     for (const r of dataRows) {
-      const [rawDate, rawHome, rawAway, rawVenue, rawStatus] = r;
+      const [rawDate, rawHome, rawAway, rawVenue, rawStatus, rawScoreHome, rawScoreAway] = r;
       if (!rawDate || !rawHome || !rawAway) continue;
 
       const kickoffIso = parseKickoff(rawDate);
@@ -248,6 +248,26 @@ Deno.serve(async (req) => {
       freshIdsByPair.get(pairKey)!.add(fdId);
       const venue = rawVenue?.trim() || null;
 
+      const status = (rawStatus?.trim() || 'SCHEDULED').toUpperCase();
+      const parseScore = (s: unknown): number | null => {
+        if (s === undefined || s === null || String(s).trim() === '') return null;
+        const n = Number(String(s).trim());
+        return Number.isFinite(n) ? n : null;
+      };
+      const scoreHome = parseScore(rawScoreHome);
+      const scoreAway = parseScore(rawScoreAway);
+      const isFinishedWithScore = status === 'FINISHED' && scoreHome !== null && scoreAway !== null;
+
+      // Look up existing row to detect FINISHED transitions and only set
+      // congrats_status='pending' the first time (never overwrite sent/skipped).
+      const { data: existing } = await supabase
+        .from('wc_matches')
+        .select('id, status, congrats_status')
+        .eq('football_data_id', fdId)
+        .maybeSingle();
+      const transitioningToFinished = isFinishedWithScore && existing?.status !== 'FINISHED';
+      const shouldMarkPending = transitioningToFinished && !existing?.congrats_status;
+
       const row: Record<string, unknown> = {
         football_data_id: fdId,
         competition_code: 'FRIENDLY',
@@ -263,10 +283,13 @@ Deno.serve(async (req) => {
         priority_flag:
           homeFeatured?.iso_code === 'IRQ' || awayFeatured?.iso_code === 'IRQ' ? 'host_team' : null,
         featured_match: true,
-        status: (rawStatus?.trim() || 'SCHEDULED').toUpperCase(),
+        status,
+        score_home: scoreHome,
+        score_away: scoreAway,
         raw_api_payload: { source: 'google_sheet', tab: SHEET_TAB, raw: r },
         last_synced_at: new Date().toISOString(),
       };
+      if (shouldMarkPending) row.congrats_status = 'pending';
 
       const { error: upsertErr } = await supabase
         .from('wc_matches')
@@ -348,6 +371,15 @@ Deno.serve(async (req) => {
       });
     } catch (err) {
       console.error('chain-trigger braze-worldcup-scheduler:', err);
+    }
+
+    // Chain-trigger congrats so any newly-FINISHED friendlies fire immediately
+    try {
+      await supabase.functions.invoke('braze-worldcup-congrats', {
+        headers: { 'x-cron-secret': Deno.env.get('CRON_SECRET') ?? '' },
+      });
+    } catch (err) {
+      console.error('chain-trigger braze-worldcup-congrats:', err);
     }
 
     return new Response(
