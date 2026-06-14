@@ -29,7 +29,11 @@ const UPDATE_BUFFER_MINUTES = 20;
 const QUEUE_LOOKAHEAD_DAYS  = 45;
 const MAX_ATTEMPTS          = 3;
 const LOCK_TIMEOUT_MINUTES  = 10;
-const SCHEDULER_LOCK_KEY    = 41003;
+// Advisory lock keys share one global namespace across ALL edge functions.
+// League uses 41001 (scheduler), 41002 (reconcile), 41003 (pre-send), so the
+// WC jobs must live in their own range to avoid mutual exclusion:
+//   wc-scheduler=41007, wc-reconcile=41004, wc-pre-send=41005, wc-congrats=41006
+const SCHEDULER_LOCK_KEY    = 41007;
 const BAGHDAD_TIMEZONE      = 'Asia/Baghdad';
 
 const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3', 'WC Team 4'];
@@ -483,6 +487,10 @@ Deno.serve(async (req) => {
           braze_send_id: data.schedule_id ?? data.send_id ?? null,
           attempt_count: row.attempt_count + 1,
           error_message: null,
+          // This was a real Braze send. Clear any stale dry_run flag left over
+          // from when the row was queued during dry-run mode, otherwise
+          // pre-send-verification-worldcup would skip verifying it.
+          dry_run: false,
           updated_at: new Date().toISOString(),
         }).eq('id', row.id);
         sent++;
