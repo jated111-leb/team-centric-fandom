@@ -28,7 +28,6 @@ const TOGGLE_FLAGS = [
   'friendlies_sync_enabled',
   'dry_run_mode',
   'iraq_safety_net_enabled',
-  'holdout_enabled',
   'iraq_eliminated',
   'wc_congrats_notifications_enabled',
 ];
@@ -60,9 +59,6 @@ export default function WcAdmin() {
 function FeatureFlagsCard() {
   const { data: flags, isLoading } = useWcFeatureFlags();
   const update = useUpdateWcFeatureFlag();
-  const [pctDraft, setPctDraft] = useState<string>('');
-
-  const holdoutPct = flags?.find((f) => f.key === 'holdout_percentage');
 
   return (
     <Card>
@@ -94,31 +90,6 @@ function FeatureFlagsCard() {
             </div>
           );
         })}
-        {holdoutPct && (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <Label className="text-base">holdout_percentage</Label>
-              <p className="text-xs text-muted-foreground">% of users excluded from sends</p>
-            </div>
-            <div className="flex gap-2 items-center">
-              <Input
-                type="number"
-                className="w-24"
-                defaultValue={holdoutPct.value || ''}
-                onChange={(e) => setPctDraft(e.target.value)}
-              />
-              <Button
-                size="sm"
-                onClick={async () => {
-                  try {
-                    await update.mutateAsync({ key: 'holdout_percentage', value: pctDraft || holdoutPct.value });
-                    toast.success('Updated');
-                  } catch (e: any) { toast.error(e.message); }
-                }}
-              >Save</Button>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

@@ -37,7 +37,6 @@ const SCHEDULER_LOCK_KEY    = 41007;
 const BAGHDAD_TIMEZONE      = 'Asia/Baghdad';
 
 const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3', 'WC Team 4'];
-const HOLDOUT_ATTRIBUTE  = 'wc_holdout_flag';
 
 const COMPETITION_EN = 'FIFA World Cup 2026';
 const COMPETITION_AR = 'كأس العالم 2026';
@@ -116,7 +115,6 @@ Deno.serve(async (req) => {
     const dryRun         = flag('dry_run_mode');
     const iraqSafetyNet  = flag('iraq_safety_net_enabled');
     const iraqEliminated = flag('iraq_eliminated');
-    const holdoutEnabled = flag('holdout_enabled');
 
     // ---------- env ----------
     const brazeApiKey   = Deno.env.get('BRAZE_REST_API_KEY') ?? Deno.env.get('BRAZE_API_KEY');
@@ -312,7 +310,7 @@ Deno.serve(async (req) => {
             }
 
             const props = buildEntryProps({ match, targetTeam, opponentCanonical, targetAr, opponentAr, featuredByCanonical, signature });
-            const audience = buildAudience(targetTeam, featuredByCanonical, holdoutEnabled, opponentCanonical);
+            const audience = buildAudience(targetTeam, featuredByCanonical, opponentCanonical);
 
             try {
               const upd = await fetch(`${brazeEndpoint}/canvas/trigger/schedule/update`, {
@@ -431,7 +429,7 @@ Deno.serve(async (req) => {
         match, targetTeam: row.target_team_canonical, opponentCanonical,
         targetAr, opponentAr, featuredByCanonical, signature: row.signature,
       });
-      const audience = buildAudience(row.target_team_canonical, featuredByCanonical, holdoutEnabled, opponentCanonical);
+      const audience = buildAudience(row.target_team_canonical, featuredByCanonical, opponentCanonical);
 
       // dry run — only honor the *current* feature flag.
       // Ignore stale per-row `row.dry_run` so rows queued while the flag was on
@@ -595,7 +593,6 @@ function buildEntryProps(args: {
 function buildAudience(
   targetTeam: string,
   featuredByCanonical: Map<string, any>,
-  holdoutEnabled: boolean,
   opponentCanonical?: string,
 ) {
   const featured = featuredByCanonical.get(targetTeam);
@@ -624,12 +621,6 @@ function buildAudience(
         });
       }
     }
-  }
-
-  if (holdoutEnabled) {
-    clauses.push({
-      custom_attribute: { custom_attribute_name: HOLDOUT_ATTRIBUTE, comparison: 'does_not_equal', value: true },
-    });
   }
 
   return clauses.length === 1 ? teamMatch : { AND: clauses };

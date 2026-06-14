@@ -90,3 +90,6 @@ verify_jwt = false
 [functions.braze-worldcup-congrats]
 verify_jwt = false
 
+[functions.sync-wc-canvas-analytics]
+verify_jwt = false
+
