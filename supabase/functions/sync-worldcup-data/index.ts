@@ -21,6 +21,10 @@ const corsHeaders = {
 const FOOTBALL_API_BASE = 'https://api.football-data.org/v4';
 const WC_COMPETITION_CODE = 'WC';
 const SYNC_DAYS_AHEAD = 45;
+// Look back N days so finished-match results (status + score) still get pulled
+// even if the previous cron run was skipped or the API published the result
+// late. Without this, any match older than "today" can never be updated.
+const SYNC_DAYS_BEHIND = 3;
 
 // World Cup tournament window (matches outside this range are ignored)
 const WC_WINDOW_START = '2026-06-11';
