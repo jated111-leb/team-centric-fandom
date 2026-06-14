@@ -429,8 +429,10 @@ Deno.serve(async (req) => {
       });
       const audience = buildAudience(row.target_team_canonical, featuredByCanonical, holdoutEnabled, opponentCanonical);
 
-      // dry run
-      if (row.dry_run || dryRun) {
+      // dry run — only honor the *current* feature flag.
+      // Ignore stale per-row `row.dry_run` so rows queued while the flag was on
+      // don't stay poisoned forever after the flag is turned off.
+      if (dryRun) {
         await supabase.from('wc_schedule_ledger').update({
           status: 'sent_to_braze',
           braze_send_id: `dry-run-${crypto.randomUUID()}`,
