@@ -18,7 +18,6 @@ const PRE_SEND_LOCK_KEY  = 41005;
 const VERIFY_WINDOW_MIN  = 30;
 const LOCK_TIMEOUT_MIN   = 10;
 const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3', 'WC Team 4'];
-const HOLDOUT_ATTRIBUTE  = 'wc_holdout_flag';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -90,9 +89,6 @@ Deno.serve(async (req) => {
       .from('wc_featured_teams').select('canonical_name, braze_attribute_value, display_name_en, display_name_ar');
     const featuredByCanonical = new Map(featuredTeams?.map(t => [t.canonical_name, t]) ?? []);
 
-    const { data: flagRows } = await supabase.from('wc_feature_flags').select('key, enabled');
-    const holdoutEnabled = flagRows?.find(f => f.key === 'holdout_enabled')?.enabled === true;
-
     // fetch active Braze schedules
     const endIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const brazeRes = await fetch(
@@ -148,9 +144,6 @@ Deno.serve(async (req) => {
             custom_attribute: { custom_attribute_name: attr, comparison: 'does_not_equal', value: opponentValue },
           });
         }
-      }
-      if (holdoutEnabled) {
-        clauses.push({ custom_attribute: { custom_attribute_name: HOLDOUT_ATTRIBUTE, comparison: 'does_not_equal', value: true } });
       }
       const audience = clauses.length === 1 ? teamMatch : { AND: clauses };
 

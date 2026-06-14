@@ -29,7 +29,6 @@ const MAX_MATCHES_PER_RUN  = 50;
 const MAX_MATCH_AGE_HOURS  = 36;
 
 const WC_TEAM_ATTRIBUTES = ['WC Team 1', 'WC Team 2', 'WC Team 3', 'WC Team 4'];
-const HOLDOUT_ATTRIBUTE  = 'wc_holdout_flag';
 
 const COMPETITION_EN = 'FIFA World Cup 2026';
 const COMPETITION_AR = 'كأس العالم 2026';
@@ -78,7 +77,6 @@ Deno.serve(async (req) => {
       );
     }
     const dryRun         = flag('dry_run_mode');
-    const holdoutEnabled = flag('holdout_enabled');
 
     // ---------- env / Braze ----------
     const brazeApiKey   = Deno.env.get('BRAZE_REST_API_KEY') ?? Deno.env.get('BRAZE_API_KEY');
@@ -253,14 +251,11 @@ Deno.serve(async (req) => {
         const winningBrazeValue = winningFeatured.braze_attribute_value ?? winningCanonical;
 
         // audience: any WC slot equals the winning team's braze value
-        const teamClause = {
+        const audience = {
           OR: WC_TEAM_ATTRIBUTES.map(attr => ({
             custom_attribute: { custom_attribute_name: attr, comparison: 'equals', value: winningBrazeValue },
           })),
         };
-        const audience = holdoutEnabled
-          ? { AND: [teamClause, { custom_attribute: { custom_attribute_name: HOLDOUT_ATTRIBUTE, comparison: 'does_not_equal', value: true } }] }
-          : teamClause;
 
         const brazePayload = {
           campaign_id: brazeCampaignId,
