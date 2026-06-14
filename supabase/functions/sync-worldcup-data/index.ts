@@ -21,6 +21,10 @@ const corsHeaders = {
 const FOOTBALL_API_BASE = 'https://api.football-data.org/v4';
 const WC_COMPETITION_CODE = 'WC';
 const SYNC_DAYS_AHEAD = 45;
+// Look back N days so finished-match results (status + score) still get pulled
+// even if the previous cron run was skipped or the API published the result
+// late. Without this, any match older than "today" can never be updated.
+const SYNC_DAYS_BEHIND = 3;
 
 // World Cup tournament window (matches outside this range are ignored)
 const WC_WINDOW_START = '2026-06-11';
@@ -146,9 +150,12 @@ Deno.serve(async (req) => {
       return { teamId, canonical: ft.canonical_name, iso: ft.iso_code, priority: ft.priority_flag };
     }
 
-    // Compute date window — sync next SYNC_DAYS_AHEAD days, clamped to WC window
+    // Compute date window — sync from N days ago through SYNC_DAYS_AHEAD days
+    // forward, clamped to the WC window. Looking back catches results we missed
+    // (e.g. cron skip, late API publication) on the very next run.
     const now = new Date();
-    const dateFrom = now.toISOString().split('T')[0];
+    const pastBound = new Date(now.getTime() - SYNC_DAYS_BEHIND * 24 * 60 * 60 * 1000);
+    const dateFrom = pastBound.toISOString().split('T')[0];
     const futureBound = new Date(now.getTime() + SYNC_DAYS_AHEAD * 24 * 60 * 60 * 1000);
     const dateToBound = futureBound.toISOString().split('T')[0];
     const dateTo = dateToBound > WC_WINDOW_END ? WC_WINDOW_END : dateToBound;
