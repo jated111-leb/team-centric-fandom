@@ -19,7 +19,10 @@ const corsHeaders = {
 };
 
 const LOCK_TIMEOUT_MINUTES = 10;
-const SCHEDULER_LOCK_KEY   = 41005;
+// Advisory lock key must be unique across ALL edge functions (one global
+// namespace) to avoid mutual exclusion between unrelated jobs. WC range:
+//   wc-scheduler=41007, wc-reconcile=41004, wc-pre-send=41005, wc-congrats=41006
+const SCHEDULER_LOCK_KEY   = 41006;
 const MAX_MATCHES_PER_RUN  = 50;
 // Only send congrats for matches finished within this window (hours since kickoff).
 // Widened to 36h to cover early kickoffs whose final scores land late in the DB.
