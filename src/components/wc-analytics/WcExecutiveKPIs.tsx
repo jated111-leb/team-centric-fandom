@@ -4,7 +4,7 @@ import { Send, Trophy, Users, MailOpen, MousePointerClick, AlertTriangle } from 
 
 export function WcExecutiveKPIs({ data }: { data: WcAnalyticsBundle }) {
   const { preGame, postGame, gapAlerts, perMatch } = data;
-  const matchesNotified = perMatch.filter((m) => m.preGameStatus !== 'none').length;
+  const matchesNotified = perMatch.filter((m) => m.preGameStatus === 'delivered' || m.preGameStatus === 'sent').length;
   const combinedSent = preGame.sent + postGame.sent;
   const combinedOpens = preGame.directOpens + postGame.directOpens;
   const combinedClicks = preGame.bodyClicks + postGame.bodyClicks;
