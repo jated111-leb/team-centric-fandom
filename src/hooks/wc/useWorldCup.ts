@@ -260,7 +260,9 @@ export function useWcAnalytics(days: number = 7, grain: WcAnalyticsGrain = 'day'
       const sinceDate = sinceIso.slice(0, 10);
 
       const [ledgerRes, statsRes, gapRes, matchesRes, congratsRes, logsRes] = await Promise.all([
-        db.from('wc_schedule_ledger').select('*').gte('created_at', sinceIso),
+        // Filter by scheduled send time (aligned with kickoff window), not by created_at —
+        // ledger rows can be created days before kickoff and would otherwise be dropped.
+        db.from('wc_schedule_ledger').select('*').gte('scheduled_send_at_utc', sinceIso),
         db.from('wc_canvas_daily_stats').select('*').gte('stat_date', sinceDate).order('stat_date', { ascending: true }),
         db.from('wc_scheduler_logs').select('*', { count: 'exact', head: true })
           .eq('function_name', 'gap-detection-worldcup').eq('log_level', 'warn').gte('created_at', sinceIso),
@@ -270,6 +272,7 @@ export function useWcAnalytics(days: number = 7, grain: WcAnalyticsGrain = 'day'
           .eq('log_level', 'error').gte('created_at', sinceIso)
           .order('created_at', { ascending: false }).limit(20),
       ]);
+
 
       if (ledgerRes.error) throw ledgerRes.error;
       if (statsRes.error) throw statsRes.error;
