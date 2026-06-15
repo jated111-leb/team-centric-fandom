@@ -345,8 +345,12 @@ export function useWcAnalytics(days: number = 7, grain: WcAnalyticsGrain = 'day'
       const cg = { sent: 0, uniqueRecipients: 0, directOpens: 0, totalOpens: 0, bodyClicks: 0, bounces: 0, conversions: 0 };
       const channelAgg: Record<string, { channel: string; sent: number; opens: number; clicks: number }> = {};
       for (const r of campaignRows) {
-        cg.sent += r.sent || 0;
-        cg.uniqueRecipients += r.unique_recipients || 0;
+        const rowSent = Number(r.sent || 0);
+        // Braze campaigns/data_series does NOT expose unique_recipients on channel stats
+        // (that field is Canvas-only). Fall back to `sent` so post-game reach is non-zero.
+        const rowUnique = Number(r.unique_recipients || 0) || rowSent;
+        cg.sent += rowSent;
+        cg.uniqueRecipients += rowUnique;
         cg.directOpens += r.direct_opens || 0;
         cg.totalOpens += r.total_opens || 0;
         cg.bodyClicks += r.body_clicks || 0;
@@ -354,8 +358,8 @@ export function useWcAnalytics(days: number = 7, grain: WcAnalyticsGrain = 'day'
         cg.conversions += r.conversions || 0;
         const k = bucketKey(r.stat_date, grain);
         if (!cgDaily[k]) cgDaily[k] = { bucket: k, sent: 0, uniqueRecipients: 0, opens: 0, clicks: 0, conversions: 0 };
-        cgDaily[k].sent += r.sent || 0;
-        cgDaily[k].uniqueRecipients += r.unique_recipients || 0;
+        cgDaily[k].sent += rowSent;
+        cgDaily[k].uniqueRecipients += rowUnique;
         cgDaily[k].opens += r.direct_opens || 0;
         cgDaily[k].clicks += r.body_clicks || 0;
         cgDaily[k].conversions += r.conversions || 0;
