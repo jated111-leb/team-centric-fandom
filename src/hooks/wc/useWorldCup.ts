@@ -403,7 +403,7 @@ export function useWcAnalytics(days: number = 7, grain: WcAnalyticsGrain = 'day'
       congrats.forEach((c) => congratsByMatch.set(c.match_id, c));
 
       const perMatch: WcMatchAnalytics[] = matches
-        .sort((a, b) => new Date(b.kickoff_utc).getTime() - new Date(a.kickoff_utc).getTime())
+        .sort((a, b) => new Date(a.kickoff_utc).getTime() - new Date(b.kickoff_utc).getTime())
         .map((m) => {
           const rows = ledgerByMatch.get(m.id) || [];
           const cgRow = congratsByMatch.get(m.id);
