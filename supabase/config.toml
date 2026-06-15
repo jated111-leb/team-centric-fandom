@@ -94,5 +94,3 @@ verify_jwt = false
 verify_jwt = false
 
 
-[functions.wc-congrats-campaign-details]
-verify_jwt = false
