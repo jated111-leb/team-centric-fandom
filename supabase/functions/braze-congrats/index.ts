@@ -31,6 +31,8 @@ Deno.serve(async (req) => {
 
   const lockId = crypto.randomUUID();
   let lockAcquired = false;
+  let advisoryLockHeld = false;
+
 
   try {
     // ==================== AUTH ====================
