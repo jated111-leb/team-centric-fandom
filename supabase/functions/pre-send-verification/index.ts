@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     );
 
     const brazeScheduleIds = new Set<string>();
-    
+
     if (brazeRes.ok) {
       const brazeData = await brazeRes.json();
       const ourBroadcasts = (brazeData.scheduled_broadcasts || []).filter((b: any) => 
@@ -135,7 +135,25 @@ Deno.serve(async (req) => {
         brazeScheduleIds.add(broadcast.schedule_id);
       }
       console.log(`Found ${brazeScheduleIds.size} active schedules in Braze`);
+    } else {
+      console.warn('Braze scheduled_broadcasts fetch failed:', brazeRes.status);
     }
+
+    // SAFETY: never recreate on an empty/failed Braze listing — that would
+    // duplicate every upcoming schedule (old Braze schedule still live).
+    if (brazeScheduleIds.size === 0) {
+      await supabase.from('scheduler_logs').insert({
+        function_name: 'pre-send-verification',
+        action: 'skipped_unverifiable',
+        reason: 'Braze scheduled_broadcasts listing empty or failed - skipping recreation to avoid duplicates',
+        details: { braze_status: brazeRes.status, checked: upcomingSchedules.length },
+      });
+      return new Response(
+        JSON.stringify({ success: true, checked: upcomingSchedules.length, verified: 0, recreated: 0, skipped: upcomingSchedules.length }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
 
     // Fetch team translations for recreation
     const { data: teamTranslations } = await supabase
