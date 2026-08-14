@@ -220,6 +220,7 @@ Deno.serve(async (req) => {
           { custom_attribute: { custom_attribute_name: 'Team 1', comparison: 'equals', value: team } },
           { custom_attribute: { custom_attribute_name: 'Team 2', comparison: 'equals', value: team } },
           { custom_attribute: { custom_attribute_name: 'Team 3', comparison: 'equals', value: team } },
+          { custom_attribute: { custom_attribute_name: 'Team 4', comparison: 'equals', value: team } },
         ])
       };
 

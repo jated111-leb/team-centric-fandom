@@ -406,12 +406,16 @@ Deno.serve(async (req) => {
           { custom_attribute: { custom_attribute_name: 'Team 1', comparison: 'equals', value: team } },
           { custom_attribute: { custom_attribute_name: 'Team 2', comparison: 'equals', value: team } },
           { custom_attribute: { custom_attribute_name: 'Team 3', comparison: 'equals', value: team } },
+          { custom_attribute: { custom_attribute_name: 'Team 4', comparison: 'equals', value: team } },
         ])
       };
 
       // Create signature for deduplication - includes Arabic translations for content freshness
-      // If Arabic names change, signature changes, triggering an update to Braze
-      const signature = `${sendAtDate.toISOString()}|${targetTeams.sort().join('+')}|${home_ar}|${away_ar}`;
+      // If Arabic names change, signature changes, triggering an update to Braze.
+      // The trailing audience version forces existing schedules to be re-pushed when
+      // the targeting slots change (v2 = Team 1..4).
+      const signature = `${sendAtDate.toISOString()}|${targetTeams.sort().join('+')}|${home_ar}|${away_ar}|aud-v2`;
+
 
       // PRE-FLIGHT CHECK 1: Check if notification was already delivered (webhook confirmation exists)
       // This prevents re-scheduling for matches that already received notifications
