@@ -6,12 +6,19 @@ const corsHeaders = {
 };
 
 const LOCK_TIMEOUT_MINUTES = 10;
+// Advisory lock key must be unique across ALL edge functions (global namespace).
+// leagues: scheduler=41001, congrats=41008
+const SCHEDULER_LOCK_KEY = 41008;
 const MAX_MATCHES_PER_RUN = 50;
 // Only send congrats for matches that finished within this window (hours since kickoff)
 const MAX_MATCH_AGE_HOURS = 36;
+// Matches that kicked off at least this long ago are candidates for a live score refresh
+const MIN_MINUTES_SINCE_KICKOFF = 100;
+const FOOTBALL_API_BASE = 'https://api.football-data.org/v4';
 
 // Competitions excluded from congrats notifications (same as pre-match)
 const EXCLUDED_COMPETITIONS = ['FL1', 'DED', 'EL', 'ECL'];
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -24,6 +31,8 @@ Deno.serve(async (req) => {
 
   const lockId = crypto.randomUUID();
   let lockAcquired = false;
+  let advisoryLockHeld = false;
+
 
   try {
     // ==================== AUTH ====================
@@ -68,8 +77,20 @@ Deno.serve(async (req) => {
     }
 
     // ==================== LOCK ====================
+    // Advisory lock first (atomic, mirrors the World Cup pipeline), then the
+    // visible scheduler_locks row for observability.
+    const { data: granted, error: advLockErr } = await supabase.rpc('pg_try_advisory_lock', { key: SCHEDULER_LOCK_KEY });
+    if (advLockErr) throw new Error(`advisory lock failed: ${advLockErr.message}`);
+    if (!granted) {
+      console.log('Another braze-congrats process holds the advisory lock - skipping');
+      return new Response(JSON.stringify({ message: 'Already running', processed: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    advisoryLockHeld = true;
+
     const lockExpiry = new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
     const lockCheckTime = new Date();
+
 
     const { data: currentLock } = await supabase
       .from('scheduler_locks')
@@ -102,9 +123,74 @@ Deno.serve(async (req) => {
       throw new Error('Missing Braze congrats configuration (BRAZE_API_KEY, BRAZE_REST_ENDPOINT, or BRAZE_CONGRATS_CAMPAIGN_ID)');
     }
 
-    // ==================== FETCH PENDING MATCHES ====================
+    // ==================== SCORE SELF-REFRESH ====================
+    // The daily football-data sync is too slow to drive a post-match push, so
+    // (like the World Cup pipeline) this run refreshes recently played matches
+    // itself and queues any that just finished.
     const ageCutoff = new Date(Date.now() - MAX_MATCH_AGE_HOURS * 60 * 60 * 1000).toISOString();
+    const kickoffCutoff = new Date(Date.now() - MIN_MINUTES_SINCE_KICKOFF * 60 * 1000).toISOString();
+    let refreshed = 0;
+    let queued = 0;
+
+    try {
+      const footballApiKey = Deno.env.get('FOOTBALL_API_KEY');
+      const { data: recentMatches } = await supabase
+        .from('matches')
+        .select('id, status, competition, congrats_status')
+        .gte('utc_date', ageCutoff)
+        .lte('utc_date', kickoffCutoff)
+        .neq('status', 'FINISHED')
+        .not('competition', 'in', `(${EXCLUDED_COMPETITIONS.join(',')})`)
+        .limit(50);
+
+      if (footballApiKey && recentMatches && recentMatches.length > 0) {
+        const ids = recentMatches.map(m => m.id).join(',');
+        console.log(`🔄 Refreshing scores for ${recentMatches.length} recently played matches`);
+        const resp = await fetch(`${FOOTBALL_API_BASE}/matches?ids=${ids}`, {
+          headers: { 'X-Auth-Token': footballApiKey },
+        });
+        if (resp.ok) {
+          const payload = await resp.json();
+          for (const apiMatch of payload.matches || []) {
+            const home = apiMatch.score?.fullTime?.home;
+            const away = apiMatch.score?.fullTime?.away;
+            const update: Record<string, unknown> = { status: apiMatch.status };
+            if (home != null && away != null) {
+              update.score_home = home;
+              update.score_away = away;
+            }
+            if (apiMatch.status === 'FINISHED' && home != null && away != null) {
+              update.congrats_status = 'pending';
+              queued++;
+            }
+            await supabase.from('matches').update(update).eq('id', apiMatch.id);
+            refreshed++;
+          }
+          console.log(`✅ Refreshed ${refreshed} matches, queued ${queued} for congrats`);
+        } else {
+          console.error(`Football API refresh failed: ${resp.status}`);
+        }
+      }
+    } catch (refreshErr) {
+      console.error('Score refresh step failed (continuing):', refreshErr);
+    }
+
+    // ==================== EXPIRE STALE QUEUE ====================
+    // Anything still pending beyond the age window can never be sent; mark it
+    // expired so the queue reflects reality.
+    const { data: expiredRows } = await supabase
+      .from('matches')
+      .update({ congrats_status: 'expired' })
+      .eq('congrats_status', 'pending')
+      .lt('utc_date', ageCutoff)
+      .select('id');
+    if (expiredRows && expiredRows.length > 0) {
+      console.log(`🧹 Expired ${expiredRows.length} stale pending congrats matches`);
+    }
+
+    // ==================== FETCH PENDING MATCHES ====================
     const { data: pendingMatches, error: matchError } = await supabase
+
       .from('matches')
       .select('*')
       .eq('status', 'FINISHED')
@@ -151,8 +237,13 @@ Deno.serve(async (req) => {
           return mapping.canonical_name;
         }
       }
-      return null;
+      // Fallback: a featured team whose exact name matches (no pattern needed)
+      const direct = featuredTeamNames.find(
+        n => n.toLowerCase() === teamName.toLowerCase()
+      );
+      return direct ?? null;
     };
+
 
     // Helper to generate Arabic translation (reused from braze-scheduler)
     async function ensureTeamTranslation(teamName: string): Promise<string | null> {
@@ -413,5 +504,9 @@ Deno.serve(async (req) => {
       }).eq('lock_name', 'braze-congrats').eq('locked_by', lockId);
       console.log(`🔓 Lock released: ${lockId}`);
     }
+    if (advisoryLockHeld) {
+      await supabase.rpc('pg_advisory_unlock', { key: SCHEDULER_LOCK_KEY });
+    }
   }
 });
+
