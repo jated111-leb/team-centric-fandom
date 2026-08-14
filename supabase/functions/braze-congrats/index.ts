@@ -121,9 +121,74 @@ Deno.serve(async (req) => {
       throw new Error('Missing Braze congrats configuration (BRAZE_API_KEY, BRAZE_REST_ENDPOINT, or BRAZE_CONGRATS_CAMPAIGN_ID)');
     }
 
-    // ==================== FETCH PENDING MATCHES ====================
+    // ==================== SCORE SELF-REFRESH ====================
+    // The daily football-data sync is too slow to drive a post-match push, so
+    // (like the World Cup pipeline) this run refreshes recently played matches
+    // itself and queues any that just finished.
     const ageCutoff = new Date(Date.now() - MAX_MATCH_AGE_HOURS * 60 * 60 * 1000).toISOString();
+    const kickoffCutoff = new Date(Date.now() - MIN_MINUTES_SINCE_KICKOFF * 60 * 1000).toISOString();
+    let refreshed = 0;
+    let queued = 0;
+
+    try {
+      const footballApiKey = Deno.env.get('FOOTBALL_API_KEY');
+      const { data: recentMatches } = await supabase
+        .from('matches')
+        .select('id, status, competition, congrats_status')
+        .gte('utc_date', ageCutoff)
+        .lte('utc_date', kickoffCutoff)
+        .neq('status', 'FINISHED')
+        .not('competition', 'in', `(${EXCLUDED_COMPETITIONS.join(',')})`)
+        .limit(50);
+
+      if (footballApiKey && recentMatches && recentMatches.length > 0) {
+        const ids = recentMatches.map(m => m.id).join(',');
+        console.log(`🔄 Refreshing scores for ${recentMatches.length} recently played matches`);
+        const resp = await fetch(`${FOOTBALL_API_BASE}/matches?ids=${ids}`, {
+          headers: { 'X-Auth-Token': footballApiKey },
+        });
+        if (resp.ok) {
+          const payload = await resp.json();
+          for (const apiMatch of payload.matches || []) {
+            const home = apiMatch.score?.fullTime?.home;
+            const away = apiMatch.score?.fullTime?.away;
+            const update: Record<string, unknown> = { status: apiMatch.status };
+            if (home != null && away != null) {
+              update.score_home = home;
+              update.score_away = away;
+            }
+            if (apiMatch.status === 'FINISHED' && home != null && away != null) {
+              update.congrats_status = 'pending';
+              queued++;
+            }
+            await supabase.from('matches').update(update).eq('id', apiMatch.id);
+            refreshed++;
+          }
+          console.log(`✅ Refreshed ${refreshed} matches, queued ${queued} for congrats`);
+        } else {
+          console.error(`Football API refresh failed: ${resp.status}`);
+        }
+      }
+    } catch (refreshErr) {
+      console.error('Score refresh step failed (continuing):', refreshErr);
+    }
+
+    // ==================== EXPIRE STALE QUEUE ====================
+    // Anything still pending beyond the age window can never be sent; mark it
+    // expired so the queue reflects reality.
+    const { data: expiredRows } = await supabase
+      .from('matches')
+      .update({ congrats_status: 'expired' })
+      .eq('congrats_status', 'pending')
+      .lt('utc_date', ageCutoff)
+      .select('id');
+    if (expiredRows && expiredRows.length > 0) {
+      console.log(`🧹 Expired ${expiredRows.length} stale pending congrats matches`);
+    }
+
+    // ==================== FETCH PENDING MATCHES ====================
     const { data: pendingMatches, error: matchError } = await supabase
+
       .from('matches')
       .select('*')
       .eq('status', 'FINISHED')
