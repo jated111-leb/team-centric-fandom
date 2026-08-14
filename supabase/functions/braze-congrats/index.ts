@@ -75,8 +75,20 @@ Deno.serve(async (req) => {
     }
 
     // ==================== LOCK ====================
+    // Advisory lock first (atomic, mirrors the World Cup pipeline), then the
+    // visible scheduler_locks row for observability.
+    const { data: granted, error: advLockErr } = await supabase.rpc('pg_try_advisory_lock', { key: SCHEDULER_LOCK_KEY });
+    if (advLockErr) throw new Error(`advisory lock failed: ${advLockErr.message}`);
+    if (!granted) {
+      console.log('Another braze-congrats process holds the advisory lock - skipping');
+      return new Response(JSON.stringify({ message: 'Already running', processed: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    advisoryLockHeld = true;
+
     const lockExpiry = new Date(Date.now() + LOCK_TIMEOUT_MINUTES * 60 * 1000).toISOString();
     const lockCheckTime = new Date();
+
 
     const { data: currentLock } = await supabase
       .from('scheduler_locks')
