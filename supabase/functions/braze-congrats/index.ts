@@ -6,12 +6,19 @@ const corsHeaders = {
 };
 
 const LOCK_TIMEOUT_MINUTES = 10;
+// Advisory lock key must be unique across ALL edge functions (global namespace).
+// leagues: scheduler=41001, congrats=41008
+const SCHEDULER_LOCK_KEY = 41008;
 const MAX_MATCHES_PER_RUN = 50;
 // Only send congrats for matches that finished within this window (hours since kickoff)
 const MAX_MATCH_AGE_HOURS = 36;
+// Matches that kicked off at least this long ago are candidates for a live score refresh
+const MIN_MINUTES_SINCE_KICKOFF = 100;
+const FOOTBALL_API_BASE = 'https://api.football-data.org/v4';
 
 // Competitions excluded from congrats notifications (same as pre-match)
 const EXCLUDED_COMPETITIONS = ['FL1', 'DED', 'EL', 'ECL'];
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
