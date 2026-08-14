@@ -235,8 +235,13 @@ Deno.serve(async (req) => {
           return mapping.canonical_name;
         }
       }
-      return null;
+      // Fallback: a featured team whose exact name matches (no pattern needed)
+      const direct = featuredTeamNames.find(
+        n => n.toLowerCase() === teamName.toLowerCase()
+      );
+      return direct ?? null;
     };
+
 
     // Helper to generate Arabic translation (reused from braze-scheduler)
     async function ensureTeamTranslation(teamName: string): Promise<string | null> {
