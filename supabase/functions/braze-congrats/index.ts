@@ -413,15 +413,21 @@ Deno.serve(async (req) => {
             winning_team_ar: winning_ar,
             losing_team_en: losingCanonical,
             losing_team_ar: losing_ar,
-            score_home: scoreHome,
-            score_away: scoreAway,
+            // Braze template renders: {winning_team_ar} {score_home}-{score_away} {losing_team_ar}
+            // so these must be winner-first, not literal home/away.
+            score_home: winnerIsHome ? scoreHome : scoreAway,
+            score_away: winnerIsHome ? scoreAway : scoreHome,
+            winner_score: winnerIsHome ? scoreHome : scoreAway,
+            loser_score: winnerIsHome ? scoreAway : scoreHome,
+            actual_score_home: scoreHome,
+            actual_score_away: scoreAway,
             home_en: match.home_team,
             away_en: match.away_team,
             home_ar,
             away_ar,
             competition_en,
             competition_ar,
-            result_summary: `${scoreHome}-${scoreAway}`,
+            result_summary: `${winnerIsHome ? scoreHome : scoreAway}-${winnerIsHome ? scoreAway : scoreHome}`,
           },
         };
 
