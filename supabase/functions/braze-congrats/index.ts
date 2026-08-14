@@ -504,5 +504,9 @@ Deno.serve(async (req) => {
       }).eq('lock_name', 'braze-congrats').eq('locked_by', lockId);
       console.log(`🔓 Lock released: ${lockId}`);
     }
+    if (advisoryLockHeld) {
+      await supabase.rpc('pg_advisory_unlock', { key: SCHEDULER_LOCK_KEY });
+    }
   }
 });
+
