@@ -437,7 +437,8 @@ const Analytics = () => {
             {analyticsData && <ContentPerformanceSection data={analyticsData} />}
           </TabsContent>
 
-          <TabsContent value="delivery">
+          <TabsContent value="delivery" className="space-y-6">
+            <PreMatchBrazeSection />
             {analyticsData && <DeliveryHealthSection data={analyticsData} />}
           </TabsContent>
 
