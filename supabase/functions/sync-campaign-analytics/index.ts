@@ -69,7 +69,9 @@ Deno.serve(async (req) => {
     }
 
     // Call Braze campaigns/data_series
-    const endingAt = new Date().toISOString();
+    const endingAt = endingAtParam
+      ? new Date(endingAtParam).toISOString()
+      : new Date().toISOString();
     const brazeUrl = `${brazeEndpoint}/campaigns/data_series?campaign_id=${campaignId}&length=${length}&ending_at=${endingAt}`;
 
     console.log(`Fetching Braze campaign data: length=${length}`);
