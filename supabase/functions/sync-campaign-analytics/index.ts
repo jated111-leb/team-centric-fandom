@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
     // Parse params
     const url = new URL(req.url);
     const length = Math.min(parseInt(url.searchParams.get("length") || "30"), 100);
+    const endingAtParam = url.searchParams.get("ending_at");
 
     const brazeEndpoint = Deno.env.get("BRAZE_REST_ENDPOINT");
     const brazeApiKey = Deno.env.get("BRAZE_API_KEY");
@@ -68,7 +69,9 @@ Deno.serve(async (req) => {
     }
 
     // Call Braze campaigns/data_series
-    const endingAt = new Date().toISOString();
+    const endingAt = endingAtParam
+      ? new Date(endingAtParam).toISOString()
+      : new Date().toISOString();
     const brazeUrl = `${brazeEndpoint}/campaigns/data_series?campaign_id=${campaignId}&length=${length}&ending_at=${endingAt}`;
 
     console.log(`Fetching Braze campaign data: length=${length}`);
@@ -172,20 +175,30 @@ Deno.serve(async (req) => {
 
     if (canvasId) {
       try {
-        const canvasParams = new URLSearchParams({
-          canvas_id: canvasId,
-          length: String(Math.min(length, 14)),
-          ending_at: endingAt,
-          include_step_breakdown: "true",
-        });
+        // Braze caps the canvas data series at 14 days when step breakdown is
+        // included, so walk backwards in 14-day chunks to cover `length` days.
+        let remaining = length;
+        let chunkEnd = new Date(endingAt);
 
-        const canvasRes = await fetch(`${brazeEndpoint}/canvas/data_series?${canvasParams}`, {
-          headers: { Authorization: `Bearer ${brazeApiKey}` },
-        });
+        while (remaining > 0) {
+          const chunkLength = Math.min(remaining, 14);
 
-        if (!canvasRes.ok) {
-          canvasError = `Braze canvas API ${canvasRes.status}: ${await canvasRes.text()}`;
-        } else {
+          const canvasParams = new URLSearchParams({
+            canvas_id: canvasId,
+            length: String(chunkLength),
+            ending_at: chunkEnd.toISOString(),
+            include_step_breakdown: "true",
+          });
+
+          const canvasRes = await fetch(`${brazeEndpoint}/canvas/data_series?${canvasParams}`, {
+            headers: { Authorization: `Bearer ${brazeApiKey}` },
+          });
+
+          if (!canvasRes.ok) {
+            canvasError = `Braze canvas API ${canvasRes.status}: ${await canvasRes.text()}`;
+            break;
+          }
+
           const canvasJson = await canvasRes.json();
           const series = canvasJson?.data?.stats || [];
 
@@ -235,6 +248,9 @@ Deno.serve(async (req) => {
               canvasUpserted++;
             }
           }
+
+          remaining -= chunkLength;
+          chunkEnd = new Date(chunkEnd.getTime() - chunkLength * 86400000);
         }
       } catch (e) {
         canvasError = e instanceof Error ? e.message : String(e);
@@ -246,6 +262,7 @@ Deno.serve(async (req) => {
     const summary = {
       success: true,
       campaign_id: campaignId,
+      ending_at: endingAt,
       days_fetched: brazeData.data.length,
       rows_upserted: upserted,
       canvas_rows_upserted: canvasUpserted,
