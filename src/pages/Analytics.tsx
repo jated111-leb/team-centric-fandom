@@ -12,6 +12,7 @@ import { DeliveryHealthSection } from "@/components/analytics/DeliveryHealthSect
 import { ExecutiveKPIs } from "@/components/analytics/ExecutiveKPIs";
 import { SchedulerHealthSection } from "@/components/analytics/SchedulerHealthSection";
 import { CongratsAnalyticsSection } from "@/components/analytics/CongratsAnalyticsSection";
+import { PreMatchBrazeSection } from "@/components/analytics/PreMatchBrazeSection";
 import { subDays, startOfDay, endOfDay, startOfYesterday, endOfYesterday } from "date-fns";
 
 export interface NotificationAnalytics {
@@ -437,7 +438,8 @@ const Analytics = () => {
             {analyticsData && <ContentPerformanceSection data={analyticsData} />}
           </TabsContent>
 
-          <TabsContent value="delivery">
+          <TabsContent value="delivery" className="space-y-6">
+            <PreMatchBrazeSection />
             {analyticsData && <DeliveryHealthSection data={analyticsData} />}
           </TabsContent>
 

@@ -162,11 +162,94 @@ Deno.serve(async (req) => {
       }
     }
 
+
+    // ---- Pre-match Canvas (match reminders) ----
+    // Webhooks are gone, so pre-match delivery numbers come from the Braze
+    // Canvas data series and land in campaign_analytics as 'pre_match'.
+    const canvasId = Deno.env.get("BRAZE_CANVAS_ID");
+    let canvasUpserted = 0;
+    let canvasError: string | null = null;
+
+    if (canvasId) {
+      try {
+        const canvasParams = new URLSearchParams({
+          canvas_id: canvasId,
+          length: String(Math.min(length, 14)),
+          ending_at: endingAt,
+          include_step_breakdown: "true",
+        });
+
+        const canvasRes = await fetch(`${brazeEndpoint}/canvas/data_series?${canvasParams}`, {
+          headers: { Authorization: `Bearer ${brazeApiKey}` },
+        });
+
+        if (!canvasRes.ok) {
+          canvasError = `Braze canvas API ${canvasRes.status}: ${await canvasRes.text()}`;
+        } else {
+          const canvasJson = await canvasRes.json();
+          const series = canvasJson?.data?.stats || [];
+
+          for (const day of series) {
+            let sent = 0, direct_opens = 0, total_opens = 0, bounces = 0, body_clicks = 0;
+
+            const stepStats = day.step_stats || {};
+            for (const step of Object.values<any>(stepStats)) {
+              const messages = step?.messages || {};
+              for (const channelStats of Object.values<any>(messages)) {
+                const list = Array.isArray(channelStats) ? channelStats : [channelStats];
+                for (const s of list) {
+                  if (!s || typeof s !== "object") continue;
+                  sent += s.sent || 0;
+                  direct_opens += s.direct_opens || 0;
+                  total_opens += s.total_opens || 0;
+                  bounces += s.bounces || 0;
+                  body_clicks += s.body_clicks || 0;
+                }
+              }
+            }
+
+            const { error: canvasUpsertError } = await supabase
+              .from("campaign_analytics")
+              .upsert(
+                {
+                  campaign_id: canvasId,
+                  notification_type: "pre_match",
+                  date: String(day.time).split("T")[0],
+                  unique_recipients: day.total_stats?.entries || 0,
+                  sent,
+                  direct_opens,
+                  total_opens,
+                  bounces,
+                  body_clicks,
+                  conversions: day.total_stats?.conversions || 0,
+                  raw_data: day,
+                  synced_at: new Date().toISOString(),
+                },
+                { onConflict: "campaign_id,date" }
+              );
+
+            if (canvasUpsertError) {
+              console.error(`Canvas upsert error ${day.time}:`, canvasUpsertError);
+              errors++;
+            } else {
+              canvasUpserted++;
+            }
+          }
+        }
+      } catch (e) {
+        canvasError = e instanceof Error ? e.message : String(e);
+      }
+
+      if (canvasError) console.error("Canvas sync failed:", canvasError);
+    }
+
     const summary = {
       success: true,
       campaign_id: campaignId,
       days_fetched: brazeData.data.length,
       rows_upserted: upserted,
+      canvas_rows_upserted: canvasUpserted,
+      canvas_error: canvasError,
       errors,
       date_range: {
         from: rows.length > 0 ? rows[rows.length - 1].date : null,
