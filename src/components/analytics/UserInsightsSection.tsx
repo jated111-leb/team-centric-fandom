@@ -1,15 +1,16 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, CheckCircle, Users, UserCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle, Send, Users } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import type { AnalyticsData } from "@/pages/Analytics";
+import type { AnalyticsData, PreMatchBrazeStats } from "@/pages/Analytics";
 
 interface UserInsightsSectionProps {
   data: AnalyticsData;
+  brazeStats: PreMatchBrazeStats | null;
 }
 
-export function UserInsightsSection({ data }: UserInsightsSectionProps) {
+export function UserInsightsSection({ data, brazeStats }: UserInsightsSectionProps) {
   const { userStats, frequencyDistribution } = data;
 
   // Use server-computed frequency distribution
@@ -39,12 +40,22 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
         </Alert>
       )}
 
-      {userStats.duplicateNotifications === 0 && (
+      {userStats.duplicateNotifications === 0 && !brazeStats && (
         <Alert className="border-secondary/50 bg-secondary/5">
           <CheckCircle className="h-4 w-4 text-secondary" />
           <AlertTitle>No Duplicates</AlertTitle>
           <AlertDescription>
             No duplicate notifications detected. Each user receives exactly 1 notification per match.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {brazeStats && (
+        <Alert className="border-secondary/50 bg-secondary/5">
+          <CheckCircle className="h-4 w-4 text-secondary" />
+          <AlertTitle>Live Braze Analytics</AlertTitle>
+          <AlertDescription>
+            Delivery totals come directly from the pre-game Canvas. User-level frequency and duplicate analysis are unavailable in Braze aggregate reporting.
           </AlertDescription>
         </Alert>
       )}
@@ -55,71 +66,61 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Total Unique Users
+              Canvas Entries
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{userStats.totalUsers.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Total reach</p>
+            <p className="text-xs text-muted-foreground">Braze entries in selected period</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Multi-Match Users
+              <Send className="h-4 w-4" />
+              Push Sends
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(userStats.multiMatchUsers ?? 0).toLocaleString()}</div>
+            <div className="text-2xl font-bold">{(brazeStats?.sent ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              Received 2+ different matches
+              Devices reached by Braze
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Users with Duplicates</CardTitle>
+            <CardTitle className="text-sm font-medium">Direct Opens</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{(userStats.usersWithDuplicates ?? 0).toLocaleString()}</span>
-              {(userStats.usersWithDuplicates ?? 0) === 0 ? (
-                <Badge variant="default" className="bg-secondary">Clean</Badge>
-              ) : (
-                <Badge variant="destructive">Bug</Badge>
-              )}
+              <span className="text-2xl font-bold">{(brazeStats?.opens ?? 0).toLocaleString()}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Same match 2+ times
+              Direct push opens
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Extra Notifications</CardTitle>
+            <CardTitle className="text-sm font-medium">Body Clicks</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{userStats.duplicateNotifications.toLocaleString()}</span>
-              {userStats.duplicateNotifications === 0 ? (
-                <Badge variant="default" className="bg-secondary">Clean</Badge>
-              ) : (
-                <Badge variant="destructive">Alert</Badge>
-              )}
+              <span className="text-2xl font-bold">{(brazeStats?.clicks ?? 0).toLocaleString()}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Duplicate sends total
+              Push notification clicks
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Notification Frequency Chart */}
-      <Card>
+      {!brazeStats && <Card>
         <CardHeader>
           <CardTitle>Notification Frequency Distribution</CardTitle>
           <CardDescription>How many notifications each user receives</CardDescription>
@@ -147,7 +148,7 @@ export function UserInsightsSection({ data }: UserInsightsSectionProps) {
             </ResponsiveContainer>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

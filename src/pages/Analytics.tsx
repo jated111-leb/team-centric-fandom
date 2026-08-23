@@ -66,6 +66,16 @@ export interface AnalyticsData {
   };
 }
 
+export interface PreMatchBrazeStats {
+  entries: number;
+  sent: number;
+  opens: number;
+  clicks: number;
+  previousSent: number;
+}
+
+const LEAGUE_PRE_MATCH_CANVAS_ID = "3e3e9556-8a93-4b71-bf55-83d6779e1d74";
+
 interface ServerAnalyticsSummary {
   userStats: {
     totalUsers: number;
@@ -129,6 +139,7 @@ const Analytics = () => {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [dateRange, setDateRange] = useState('7');
   const [serverStats, setServerStats] = useState<ServerAnalyticsSummary | null>(null);
+  const [preMatchBrazeStats, setPreMatchBrazeStats] = useState<PreMatchBrazeStats | null>(null);
 
   useEffect(() => {
     checkAdminAndFetchData();
@@ -194,6 +205,46 @@ const Analytics = () => {
         startDate = subDays(endDate, parseInt(dateRange));
       }
 
+      const startDateKey = startDate?.toISOString().split('T')[0];
+      const endDateKey = endDate.toISOString().split('T')[0];
+      let brazeQuery = supabase
+        .from('campaign_analytics')
+        .select('sent, unique_recipients, direct_opens, body_clicks')
+        .eq('campaign_id', LEAGUE_PRE_MATCH_CANVAS_ID)
+        .eq('notification_type', 'pre_match')
+        .lte('date', endDateKey);
+      if (startDateKey) brazeQuery = brazeQuery.gte('date', startDateKey);
+      const { data: brazeRows, error: brazeError } = await brazeQuery;
+      if (brazeError) throw brazeError;
+
+      let previousSent = 0;
+      if (startDate) {
+        const periodMs = endDate.getTime() - startDate.getTime();
+        const previousStart = new Date(startDate.getTime() - periodMs);
+        const previousEnd = new Date(startDate.getTime() - 86400000);
+        const { data: previousRows, error: previousError } = await supabase
+          .from('campaign_analytics')
+          .select('sent')
+          .eq('campaign_id', LEAGUE_PRE_MATCH_CANVAS_ID)
+          .eq('notification_type', 'pre_match')
+          .gte('date', previousStart.toISOString().split('T')[0])
+          .lte('date', previousEnd.toISOString().split('T')[0]);
+        if (previousError) throw previousError;
+        previousSent = (previousRows || []).reduce((sum, row) => sum + (row.sent || 0), 0);
+      }
+
+      const brazeStats = (brazeRows || []).reduce(
+        (totals, row) => ({
+          entries: totals.entries + (row.unique_recipients || 0),
+          sent: totals.sent + (row.sent || 0),
+          opens: totals.opens + (row.direct_opens || 0),
+          clicks: totals.clicks + (row.body_clicks || 0),
+          previousSent,
+        }),
+        { entries: 0, sent: 0, opens: 0, clicks: 0, previousSent }
+      );
+      setPreMatchBrazeStats(brazeStats);
+
       // Call server-side aggregation function (handles all heavy computation in DB)
       const { data: summaryData, error: summaryError } = await supabase
         .rpc('compute_analytics_summary', {
@@ -233,16 +284,16 @@ const Analytics = () => {
       setAnalyticsData({
         notifications: [], // We don't need raw notifications anymore for summary views
         userStats: {
-          totalUsers: summary.userStats.totalUsers || 0,
+          totalUsers: brazeStats.entries,
           multiMatchUsers: summary.userStats.multiMatchUsers || 0, // Users with 2+ different matches
           usersWithDuplicates: summary.duplicates.affectedUsers || 0, // Users who got duplicates
           duplicateNotifications: summary.duplicates.count || 0, // Total extra notifications
           todayUsers: summary.userStats.todayUsers || 0
         },
         periodComparison: {
-          currentPeriodNotifications: summary.periodComparison?.currentPeriodNotifications || 0,
-          previousPeriodNotifications: summary.periodComparison?.previousPeriodNotifications || 0,
-          currentPeriodUsers: summary.periodComparison?.currentPeriodUsers || 0,
+          currentPeriodNotifications: brazeStats.sent,
+          previousPeriodNotifications: brazeStats.previousSent,
+          currentPeriodUsers: brazeStats.entries,
           previousPeriodUsers: summary.periodComparison?.previousPeriodUsers || 0
         },
         frequencyDistribution: summary.frequencyDistribution || [],
@@ -360,7 +411,7 @@ const Analytics = () => {
               User insights, content performance, and delivery health
               {serverStats && (
                 <span className="ml-2 text-sm">
-                  • {serverStats.userStats.totalNotifications?.toLocaleString() || 0} notifications
+                   • {(preMatchBrazeStats?.sent || 0).toLocaleString()} notifications
                 </span>
               )}
             </p>
@@ -431,7 +482,7 @@ const Analytics = () => {
           </div>
 
           <TabsContent value="users">
-            {analyticsData && <UserInsightsSection data={analyticsData} />}
+             {analyticsData && <UserInsightsSection data={analyticsData} brazeStats={preMatchBrazeStats} />}
           </TabsContent>
 
           <TabsContent value="content">
@@ -439,7 +490,7 @@ const Analytics = () => {
           </TabsContent>
 
           <TabsContent value="delivery" className="space-y-6">
-            <PreMatchBrazeSection />
+             <PreMatchBrazeSection dateRange={dateRange} />
             {analyticsData && <DeliveryHealthSection data={analyticsData} />}
           </TabsContent>
 
