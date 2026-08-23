@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
     // Parse params
     const url = new URL(req.url);
     const length = Math.min(parseInt(url.searchParams.get("length") || "30"), 100);
+    const endingAtParam = url.searchParams.get("ending_at");
 
     const brazeEndpoint = Deno.env.get("BRAZE_REST_ENDPOINT");
     const brazeApiKey = Deno.env.get("BRAZE_API_KEY");
