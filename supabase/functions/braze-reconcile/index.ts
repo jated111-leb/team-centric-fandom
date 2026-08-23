@@ -283,16 +283,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    // CRITICAL FIX: Don't blindly mark past schedules as 'sent'
-    // Only mark as 'sent' if we have webhook confirmation in notification_sends
-    // Otherwise mark as 'failed' to flag for investigation
-    
-    // Fetch pending schedules that are past their send time beyond the webhook grace window
-    const webhookGraceCutoff = new Date(now.getTime() - WEBHOOK_GRACE_MINUTES * 60 * 1000);
+    // Braze-API pattern (mirrors braze-worldcup-reconcile):
+    // Webhooks are no longer used. A schedule is considered delivered once its
+    // send time has passed AND Braze no longer lists it as a pending broadcast
+    // (i.e. it fired). It is only cancelled if Braze still has it queued in the
+    // past, which means it never fired.
+    const stillScheduledIds = new Set<string>(
+      ourBroadcasts.map((b: any) => b.schedule_id).filter(Boolean)
+    );
+
+    const graceCutoff = new Date(now.getTime() - WEBHOOK_GRACE_MINUTES * 60 * 1000);
     const { data: pastPendingSchedules, error: fetchPastError } = await supabase
       .from('schedule_ledger')
       .select('id, match_id, braze_schedule_id, send_at_utc')
-      .lt('send_at_utc', webhookGraceCutoff.toISOString())
+      .lt('send_at_utc', graceCutoff.toISOString())
       .eq('status', 'pending');
 
     if (fetchPastError) {
@@ -303,54 +307,43 @@ Deno.serve(async (req) => {
     let markedAsFailed = 0;
 
     for (const schedule of pastPendingSchedules || []) {
-      // Check if we received a webhook for this match
-      const { data: webhookConfirmation, error: webhookError } = await supabase
-        .from('notification_sends')
-        .select('id')
-        .eq('match_id', schedule.match_id)
-        .limit(1)
-        .maybeSingle();
+      const stillQueuedInBraze =
+        !!schedule.braze_schedule_id && stillScheduledIds.has(schedule.braze_schedule_id);
 
-      if (webhookError) {
-        console.error(`Error checking webhook for match ${schedule.match_id}:`, webhookError);
-        continue;
-      }
-
-      if (webhookConfirmation) {
-        // We have webhook confirmation - mark as sent
+      if (!stillQueuedInBraze) {
+        // Braze dropped it from the scheduled list after the send time -> it fired
         await supabase
           .from('schedule_ledger')
           .update({ status: 'sent' })
           .eq('id', schedule.id);
-        
+
         markedAsSent++;
-        console.log(`Match ${schedule.match_id}: confirmed sent via webhook`);
+        console.log(`Match ${schedule.match_id}: send time passed and no longer queued in Braze — marked sent`);
       } else {
-        // No webhook confirmation - mark as cancelled (failed delivery)
+        // Still queued in Braze past its send time -> genuinely not delivered
         await supabase
           .from('schedule_ledger')
           .update({ status: 'cancelled' })
           .eq('id', schedule.id);
-        
+
         markedAsFailed++;
-        console.warn(`⚠️ Match ${schedule.match_id}: no webhook confirmation after ${WEBHOOK_GRACE_MINUTES} minute grace window - marking as cancelled`);
-        
-        // Log critical alert for failed delivery
+        console.warn(`⚠️ Match ${schedule.match_id}: still queued in Braze past send time — marking as cancelled`);
+
         await supabase.from('scheduler_logs').insert({
           function_name: 'braze-reconcile',
           match_id: schedule.match_id,
           action: 'delivery_failed',
-          reason: 'Past grace window with no webhook confirmation',
-          details: { 
-            braze_schedule_id: schedule.braze_schedule_id, 
+          reason: 'Still listed as a pending Braze broadcast past its send time',
+          details: {
+            braze_schedule_id: schedule.braze_schedule_id,
             send_at_utc: schedule.send_at_utc,
-            webhook_grace_minutes: WEBHOOK_GRACE_MINUTES,
+            grace_minutes: WEBHOOK_GRACE_MINUTES,
           },
         });
       }
     }
 
-    console.log(`Processed past schedules: ${markedAsSent} confirmed sent, ${markedAsFailed} failed`);
+    console.log(`Processed past schedules: ${markedAsSent} marked sent, ${markedAsFailed} failed`);
 
     // Only delete entries older than 30 days for cleanup
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
