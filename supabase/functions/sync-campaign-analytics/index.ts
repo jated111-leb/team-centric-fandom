@@ -101,17 +101,25 @@ Deno.serve(async (req) => {
     const rows = brazeData.data.map((day: any) => {
       const messages = day.messages || {};
       
-      // Aggregate across all push channels (ios_push, android_push, etc.)
+      // Aggregate across every channel/variation. Braze returns either an object
+      // or an array of per-variation objects per channel key.
       let sent = 0, direct_opens = 0, total_opens = 0, bounces = 0, body_clicks = 0;
-      
-      for (const [channel, stats] of Object.entries(messages)) {
-        if (channel.includes("push") && typeof stats === "object" && stats !== null) {
-          const s = stats as Record<string, number>;
-          sent += s.sent || 0;
-          direct_opens += s.direct_opens || 0;
-          total_opens += s.total_opens || 0;
-          bounces += s.bounces || 0;
-          body_clicks += s.body_clicks || 0;
+
+      const addStats = (s: Record<string, number>) => {
+        sent += s.sent || 0;
+        direct_opens += s.direct_opens || 0;
+        total_opens += s.total_opens || 0;
+        bounces += s.bounces || 0;
+        body_clicks += s.body_clicks || 0;
+      };
+
+      for (const stats of Object.values(messages)) {
+        if (Array.isArray(stats)) {
+          for (const variation of stats) {
+            if (variation && typeof variation === "object") addStats(variation as Record<string, number>);
+          }
+        } else if (stats && typeof stats === "object") {
+          addStats(stats as Record<string, number>);
         }
       }
 
