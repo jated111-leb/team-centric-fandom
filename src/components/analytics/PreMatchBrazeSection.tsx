@@ -19,7 +19,13 @@ interface Row {
   synced_at: string;
 }
 
-export const PreMatchBrazeSection = () => {
+interface PreMatchBrazeSectionProps {
+  dateRange: string;
+}
+
+const LEAGUE_PRE_MATCH_CANVAS_ID = "3e3e9556-8a93-4b71-bf55-83d6779e1d74";
+
+export const PreMatchBrazeSection = ({ dateRange }: PreMatchBrazeSectionProps) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,17 +36,29 @@ export const PreMatchBrazeSection = () => {
     const { data, error } = await supabase
       .from("campaign_analytics")
       .select("date, sent, unique_recipients, direct_opens, total_opens, body_clicks, bounces, synced_at")
+      .eq("campaign_id", LEAGUE_PRE_MATCH_CANVAS_ID)
       .eq("notification_type", "pre_match")
       .order("date", { ascending: true });
 
     if (error) console.error("Error loading pre-match analytics:", error);
-    setRows((data || []) as unknown as Row[]);
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+    const yesterday = new Date(now.getTime() - 86400000).toISOString().split("T")[0];
+    const start = dateRange === "all" || dateRange === "today" || dateRange === "yesterday"
+      ? null
+      : new Date(now.getTime() - Number(dateRange) * 86400000).toISOString().split("T")[0];
+    const filtered = (data || []).filter((row) => {
+      if (dateRange === "today") return row.date === today;
+      if (dateRange === "yesterday") return row.date === yesterday;
+      return !start || row.date >= start;
+    });
+    setRows(filtered as unknown as Row[]);
     setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [dateRange]);
 
   const handleSync = async () => {
     setSyncing(true);
